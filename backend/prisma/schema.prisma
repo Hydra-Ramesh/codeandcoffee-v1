@@ -1,0 +1,114 @@
+// Prisma schema for Code & Coffee Blog Platform
+// Database: Neon PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  passwordHash  String?
+  avatar        String?
+  bio           String?   @default("Passionate developer and coffee lover.")
+  role          Role      @default(USER)
+  isBanned      Boolean   @default(false)
+  oauthProvider String?   @default("local") // "local" | "google" | "github"
+  oauthId       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  dislikes      Dislike[]
+
+  @@index([email])
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String
+  content     String    // Rich Markdown
+  bannerImage String?
+  readingTime Int       @default(3) // minutes
+  views       Int       @default(0)
+  isPublished Boolean   @default(true)
+  category    String    @default("Engineering")
+  tags        String[]  @default(["Code", "Tech"])
+  mongoDocId  String?   // Reference to MongoDB Atlas rich archive/revisions
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  comments    Comment[]
+  likes       Like[]
+  dislikes    Dislike[]
+
+  @@index([slug])
+  @@index([isPublished])
+  @@index([category])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  authorId  String
+  postId    String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([postId])
+}
+
+model Dislike {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([postId])
+}
+
+model OtpVerification {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  purpose   String   @default("FORGOT_PASSWORD")
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, otp])
+}
