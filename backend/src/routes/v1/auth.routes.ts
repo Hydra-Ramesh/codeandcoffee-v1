@@ -13,4 +13,12 @@ router.post('/verify-otp', authLimiter, AuthController.verifyOtp);
 router.post('/reset-password', authLimiter, AuthController.resetPassword);
 router.post('/oauth-callback', AuthController.oauthCallback);
 
+// Google OAuth2 Routes
+router.get('/google', AuthController.initiateGoogleOAuth);
+router.get('/google/callback', AuthController.handleGoogleCallback);
+
+// GitHub OAuth Routes
+router.get('/github', AuthController.initiateGithubOAuth);
+router.get('/github/callback', AuthController.handleGithubCallback);
+
 export default router;

@@ -22,6 +22,7 @@ interface AuthContextType {
   loginWithOAuth: (provider: 'google' | 'github', email: string, name: string, avatar?: string) => Promise<boolean>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  setSessionFromToken: (token: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -117,6 +118,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setSessionFromToken = async (newToken: string) => {
+    localStorage.setItem('token', newToken);
+    setToken(newToken);
+    const res = await fetchApi('/auth/me', {
+      headers: { Authorization: `Bearer ${newToken}` },
+    });
+    if (res.success && res.data?.user) {
+      setUser(res.data.user);
+      return true;
+    }
+    return false;
+  };
+
   const isAdmin = user?.role === 'ADMIN';
 
   return (
@@ -131,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginWithOAuth,
         logout,
         refreshUser,
+        setSessionFromToken,
       }}
     >
       {children}

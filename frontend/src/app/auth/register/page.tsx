@@ -35,17 +35,10 @@ export default function RegisterPage() {
     setLoading(false);
   };
 
-  const handleOAuth = async (provider: 'google' | 'github') => {
+  const handleOAuth = (provider: 'google' | 'github') => {
     setLoading(true);
-    const dummyEmail = provider === 'google' ? `dev_${Date.now()}@gmail.com` : `octo_${Date.now()}@github.com`;
-    const dummyName = provider === 'google' ? 'Google Developer' : 'GitHub Engineer';
-    const success = await loginWithOAuth(provider, dummyEmail, dummyName);
-    if (success) {
-      router.push('/');
-    } else {
-      setError(`Failed to sign up with ${provider}.`);
-    }
-    setLoading(false);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+    window.location.href = `${apiUrl}/auth/${provider}`;
   };
 
   return (

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { AuthService } from '../services/auth.service.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+import { config } from '../config/env.js';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters long'),
@@ -99,7 +100,183 @@ export class AuthController {
     }
   }
 
-  // OAuth Mock/Direct exchange endpoint (for seamless client integration)
+  // --- Real Google OAuth2 Redirection & Callback ---
+  static initiateGoogleOAuth(req: Request, res: Response) {
+    const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+    const params = new URLSearchParams({
+      client_id: config.oauth.google.clientId,
+      redirect_uri: config.oauth.google.callbackUrl,
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'offline',
+      prompt: 'consent',
+    });
+    res.redirect(`${rootUrl}?${params.toString()}`);
+  }
+
+  static async handleGoogleCallback(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { code, error } = req.query;
+
+      if (error || !code) {
+        console.warn('Google OAuth returned error or was cancelled:', error);
+        res.redirect(`${config.clientUrl}/auth/login?error=${encodeURIComponent('Google login was cancelled or failed.')}`);
+        return;
+      }
+
+      // Exchange authorization code for tokens
+      const tokenUrl = 'https://oauth2.googleapis.com/token';
+      const tokenResponse = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code: String(code),
+          client_id: config.oauth.google.clientId,
+          client_secret: config.oauth.google.clientSecret,
+          redirect_uri: config.oauth.google.callbackUrl,
+          grant_type: 'authorization_code',
+        }),
+      });
+
+      const tokenData = (await tokenResponse.json()) as any;
+
+      if (!tokenData.access_token) {
+        console.error('Failed to exchange code with Google:', tokenData);
+        res.redirect(
+          `${config.clientUrl}/auth/login?error=${encodeURIComponent(
+            tokenData.error_description || 'Failed to exchange authorization token with Google'
+          )}`
+        );
+        return;
+      }
+
+      // Fetch user profile from Google UserInfo endpoint
+      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const googleProfile = (await userInfoResponse.json()) as any;
+
+      if (!googleProfile.email) {
+        res.redirect(`${config.clientUrl}/auth/login?error=${encodeURIComponent('Could not retrieve email from Google profile.')}`);
+        return;
+      }
+
+      const result = await AuthService.handleOAuthUser('google', {
+        id: googleProfile.id || `google_${Date.now()}`,
+        email: googleProfile.email,
+        name: googleProfile.name || googleProfile.given_name || 'Google Developer',
+        avatar: googleProfile.picture,
+      });
+
+      // Redirect to frontend callback page with tokens
+      res.redirect(
+        `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}&refreshToken=${encodeURIComponent(
+          result.refreshToken
+        )}`
+      );
+    } catch (err) {
+      console.error('Google OAuth callback error:', err);
+      res.redirect(`${config.clientUrl}/auth/login?error=${encodeURIComponent('An error occurred during Google sign-in.')}`);
+    }
+  }
+
+  // --- Real GitHub OAuth Redirection & Callback ---
+  static initiateGithubOAuth(req: Request, res: Response) {
+    const rootUrl = 'https://github.com/login/oauth/authorize';
+    const params = new URLSearchParams({
+      client_id: config.oauth.github.clientId,
+      redirect_uri: config.oauth.github.callbackUrl,
+      scope: 'read:user user:email',
+    });
+    res.redirect(`${rootUrl}?${params.toString()}`);
+  }
+
+  static async handleGithubCallback(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { code, error } = req.query;
+
+      if (error || !code) {
+        console.warn('GitHub OAuth returned error or was cancelled:', error);
+        res.redirect(`${config.clientUrl}/auth/login?error=${encodeURIComponent('GitHub login was cancelled or failed.')}`);
+        return;
+      }
+
+      // Exchange authorization code for token
+      const tokenUrl = 'https://github.com/login/oauth/access_token';
+      const tokenResponse = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: config.oauth.github.clientId,
+          client_secret: config.oauth.github.clientSecret,
+          code: String(code),
+          redirect_uri: config.oauth.github.callbackUrl,
+        }),
+      });
+
+      const tokenData = (await tokenResponse.json()) as any;
+
+      if (!tokenData.access_token) {
+        console.error('Failed to exchange code with GitHub:', tokenData);
+        res.redirect(
+          `${config.clientUrl}/auth/login?error=${encodeURIComponent(
+            tokenData.error_description || 'Failed to exchange authorization token with GitHub'
+          )}`
+        );
+        return;
+      }
+
+      // Fetch user profile from GitHub
+      const userResponse = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          'User-Agent': 'CodeAndCoffee-OAuth-App',
+        },
+      });
+      const githubProfile = (await userResponse.json()) as any;
+
+      let email = githubProfile.email;
+      if (!email) {
+        // Fetch emails list if primary email is private
+        const emailsResponse = await fetch('https://api.github.com/user/emails', {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+            'User-Agent': 'CodeAndCoffee-OAuth-App',
+          },
+        });
+        const emails = (await emailsResponse.json()) as any;
+        if (Array.isArray(emails)) {
+          const primary = emails.find((e: any) => e.primary && e.verified) || emails[0];
+          email = primary?.email;
+        }
+      }
+
+      if (!email) {
+        email = `${githubProfile.login}@users.noreply.github.com`;
+      }
+
+      const result = await AuthService.handleOAuthUser('github', {
+        id: String(githubProfile.id),
+        email,
+        name: githubProfile.name || githubProfile.login,
+        avatar: githubProfile.avatar_url,
+      });
+
+      res.redirect(
+        `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}&refreshToken=${encodeURIComponent(
+          result.refreshToken
+        )}`
+      );
+    } catch (err) {
+      console.error('GitHub OAuth callback error:', err);
+      res.redirect(`${config.clientUrl}/auth/login?error=${encodeURIComponent('An error occurred during GitHub sign-in.')}`);
+    }
+  }
+
+  // OAuth Mock/Direct exchange endpoint (for headless testing/backwards compatibility)
   static async oauthCallback(req: Request, res: Response, next: NextFunction) {
     try {
       const { provider, email, name, avatar, id } = req.body;

@@ -1,19 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../context/AuthContext';
 import { Coffee, Mail, Lock, LogIn, ArrowRight, ShieldCheck, User } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
-  const { login, loginWithOAuth } = useAuth();
+  const searchParams = useSearchParams();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,22 +37,10 @@ export default function LoginPage() {
     setLoading(false);
   };
 
-  const handleOAuth = async (provider: 'google' | 'github') => {
+  const handleOAuth = (provider: 'google' | 'github') => {
     setLoading(true);
-    // Client-side simulation of Google / GitHub OAuth callback
-    const dummyEmail = provider === 'google' ? 'developer.google@gmail.com' : 'coder.github@octocat.dev';
-    const dummyName = provider === 'google' ? 'Google Developer' : 'GitHub Engineer';
-    const dummyAvatar = provider === 'google'
-      ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'
-      : 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=400&q=80';
-
-    const success = await loginWithOAuth(provider, dummyEmail, dummyName, dummyAvatar);
-    if (success) {
-      router.push('/');
-    } else {
-      setError(`Failed to authenticate with ${provider}.`);
-    }
-    setLoading(false);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+    window.location.href = `${apiUrl}/auth/${provider}`;
   };
 
   // Quick fill helper for review/testing
@@ -206,3 +202,18 @@ export default function LoginPage() {
     </div>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-md mx-auto my-12 text-center text-gray-400 text-xs">
+          Loading login form...
+        </div>
+      }
+    >
+      <LoginFormContent />
+    </Suspense>
+  );
+}
+
