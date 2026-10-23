@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { redisClient } from '../config/redis.js';
 import { queueNewBlogBroadcast } from '../config/queues.js';
 import { CacheService } from '../services/cache.service.js';
+import { ViewBufferService } from '../services/viewBuffer.service.js';
 import { broadcastBlogPublished, broadcastReactionUpdate } from '../config/socket.js';
 
 function generateSlug(title: string): string {
@@ -85,7 +86,19 @@ export class BlogController {
           skip,
           take: limit,
           orderBy: { createdAt: 'desc' },
-          include: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            excerpt: true,
+            bannerImage: true,
+            readingTime: true,
+            views: true,
+            isPublished: true,
+            category: true,
+            tags: true,
+            createdAt: true,
+            updatedAt: true,
             author: { select: { id: true, name: true, avatar: true, role: true } },
             _count: { select: { likes: true, dislikes: true, comments: true } },
           },
@@ -93,13 +106,18 @@ export class BlogController {
         prisma.post.count({ where }),
       ]);
 
-      // Enrich with live active reader count from Redis
+      // Enrich with live active reader count and buffered view count
       const enrichedBlogs = await Promise.all(
         blogs.map(async (blog) => {
-          const activeKeys = await redisClient.keys(`blog:reader:${blog.id}:*`);
+          const [activeReaders, bufferedViews] = await Promise.all([
+            redisClient.scard(`blog:readers:${blog.id}`).catch(() => 0),
+            ViewBufferService.getBufferedViews(blog.id),
+          ]);
+
           return {
             ...blog,
-            activeReaders: activeKeys.length,
+            views: (blog.views || 0) + bufferedViews,
+            activeReaders: Math.max(activeReaders, 0),
             likesCount: blog._count.likes,
             dislikesCount: blog._count.dislikes,
             commentsCount: blog._count.comments,
@@ -173,22 +191,25 @@ export class BlogController {
         userDisliked = !!dislike;
       }
 
-      // Increment views count asynchronously
-      prisma.post
-        .update({
-          where: { id: blog.id },
-          data: { views: { increment: 1 } },
-        })
-        .catch((e) => console.warn('Views increment error:', e.message));
+      // Buffer view count in Redis (eliminates direct PostgreSQL write locks)
+      ViewBufferService.recordView(blog.id).catch((e) =>
+        console.warn('[ViewBuffer] Buffer error:', e.message)
+      );
 
-      // Active readers for this blog
-      const activeKeys = await redisClient.keys(`blog:reader:${blog.id}:*`);
+      // Fetch live buffered count and active readers count
+      const [bufferedViews, activeReadersCount] = await Promise.all([
+        ViewBufferService.getBufferedViews(blog.id),
+        redisClient.scard(`blog:readers:${blog.id}`).catch(() => 0),
+      ]);
+
+      const totalViews = (blog.views || 0) + bufferedViews;
 
       res.status(200).json({
         success: true,
         data: {
           ...blog,
-          activeReaders: activeKeys.length,
+          views: totalViews,
+          activeReaders: Math.max(activeReadersCount, 1),
           likesCount: blog._count?.likes ?? blog.likesCount ?? 0,
           dislikesCount: blog._count?.dislikes ?? blog.dislikesCount ?? 0,
           commentsCount: blog._count?.comments ?? blog.commentsCount ?? 0,

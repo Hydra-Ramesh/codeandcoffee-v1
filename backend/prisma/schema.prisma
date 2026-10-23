@@ -58,6 +58,7 @@ model ContributorApplication {
 
   @@index([userId])
   @@index([status])
+  @@index([status, createdAt(sort: Desc)])
 }
 
 model Post {
@@ -85,6 +86,8 @@ model Post {
   @@index([slug])
   @@index([isPublished])
   @@index([category])
+  @@index([isPublished, createdAt(sort: Desc)])
+  @@index([category, isPublished])
 }
 
 model Comment {
@@ -98,6 +101,7 @@ model Comment {
   updatedAt DateTime @updatedAt
 
   @@index([postId])
+  @@index([postId, createdAt(sort: Desc)])
 }
 
 model Like {

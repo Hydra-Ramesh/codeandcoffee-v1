@@ -6,15 +6,17 @@ import { setupQueues } from './config/queues.js';
 import { isCloudinaryConfigured } from './config/cloudinary.js';
 import { AuthService } from './services/auth.service.js';
 import { initSocketServer } from './config/socket.js';
+import { ViewBufferService } from './services/viewBuffer.service.js';
 
 async function bootstrap() {
   console.log('----------------------------------------------------');
   console.log('☕ Starting Code & Coffee Fullstack Blog Platform...');
   console.log('----------------------------------------------------');
 
-  // Initialize Queues & Mongo
+  // Initialize Queues, Mongo & View Batch Buffer
   setupQueues();
   await connectMongo();
+  ViewBufferService.startFlushInterval(60000);
 
   // Cloudinary v2 Status
   if (isCloudinaryConfigured()) {

@@ -13,12 +13,16 @@ export interface IRedisClient {
   srem(key: string, ...members: string[]): Promise<number>;
   scard(key: string): Promise<number>;
   smembers(key: string): Promise<string[]>;
+  hincrby(key: string, field: string, increment: number): Promise<number>;
+  hgetall(key: string): Promise<Record<string, string>>;
+  hdel(key: string, ...fields: string[]): Promise<number>;
 }
 
 // In-Memory Fallback for seamless local testing if remote Upstash Redis credentials are unset
 class MemoryRedis implements IRedisClient {
   private store = new Map<string, { value: any; expiry?: number }>();
   private sets = new Map<string, Set<string>>();
+  private hashes = new Map<string, Map<string, number>>();
 
   private isExpired(key: string): boolean {
     const item = this.store.get(key);
@@ -111,6 +115,38 @@ class MemoryRedis implements IRedisClient {
     const set = this.sets.get(key);
     return set ? Array.from(set) : [];
   }
+
+  async hincrby(key: string, field: string, increment: number): Promise<number> {
+    let hash = this.hashes.get(key);
+    if (!hash) {
+      hash = new Map<string, number>();
+      this.hashes.set(key, hash);
+    }
+    const current = hash.get(field) || 0;
+    const next = current + increment;
+    hash.set(field, next);
+    return next;
+  }
+
+  async hgetall(key: string): Promise<Record<string, string>> {
+    const hash = this.hashes.get(key);
+    if (!hash) return {};
+    const result: Record<string, string> = {};
+    for (const [f, v] of hash.entries()) {
+      result[f] = String(v);
+    }
+    return result;
+  }
+
+  async hdel(key: string, ...fields: string[]): Promise<number> {
+    const hash = this.hashes.get(key);
+    if (!hash) return 0;
+    let count = 0;
+    for (const f of fields) {
+      if (hash.delete(f)) count++;
+    }
+    return count;
+  }
 }
 
 let redisClient: IRedisClient;
@@ -138,6 +174,9 @@ if (config.upstashRedisRestUrl && config.upstashRedisRestToken) {
       srem: async (k, ...m) => (upstash.srem as any)(k, ...m),
       scard: async (k) => upstash.scard(k),
       smembers: async (k) => upstash.smembers(k),
+      hincrby: async (k, f, inc) => (upstash.hincrby as any)(k, f, inc),
+      hgetall: async (k) => ((await upstash.hgetall(k)) as Record<string, string>) || {},
+      hdel: async (k, ...f) => (upstash.hdel as any)(k, ...f),
     };
     console.log('✅ Connected to Upstash Redis REST API.');
   } catch (err) {
