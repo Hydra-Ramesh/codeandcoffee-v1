@@ -14,6 +14,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
+import { optimizeImageUrl } from '../../../lib/image';
 
 export default function AdminUserGovernancePage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -172,7 +173,10 @@ export default function AdminUserGovernancePage() {
                   <tr key={u.id} className="hover:bg-white/5 transition-colors">
                     <td className="p-4 flex items-center gap-2.5">
                       <img
-                        src={u.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.name)}`}
+                        src={
+                          optimizeImageUrl(u.avatar, { width: 80, height: 80, crop: 'fill' }) ||
+                          `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.name)}`
+                        }
                         alt={u.name}
                         className="w-8 h-8 rounded-full border border-white/15"
                       />

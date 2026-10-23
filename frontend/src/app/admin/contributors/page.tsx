@@ -15,6 +15,8 @@ import {
   Mail,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
+import { getSocket } from '../../../lib/socket';
+import { optimizeImageUrl } from '../../../lib/image';
 
 interface ContributorApplication {
   id: string;
@@ -44,6 +46,23 @@ export default function AdminContributorApplicationsPage() {
 
   useEffect(() => {
     loadApplications();
+
+    const socket = getSocket();
+    const handleRealtimeRefresh = () => {
+      loadApplications();
+    };
+
+    if (socket && socket.on) {
+      socket.on('admin:new_application', handleRealtimeRefresh);
+      socket.on('admin:contributor_count', handleRealtimeRefresh);
+    }
+
+    return () => {
+      if (socket && socket.off) {
+        socket.off('admin:new_application', handleRealtimeRefresh);
+        socket.off('admin:contributor_count', handleRealtimeRefresh);
+      }
+    };
   }, [filter]);
 
   const loadApplications = async () => {
@@ -211,7 +230,7 @@ export default function AdminContributorApplicationsPage() {
                   <div className="flex items-center gap-3">
                     <img
                       src={
-                        app.user.avatar ||
+                        optimizeImageUrl(app.user.avatar, { width: 100, height: 100, crop: 'fill' }) ||
                         `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(app.user.name)}`
                       }
                       alt={app.user.name}

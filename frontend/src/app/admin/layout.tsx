@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { fetchApi } from '../../lib/api';
+import { getSocket } from '../../lib/socket';
 import {
   ShieldAlert,
   LayoutDashboard,
@@ -26,8 +27,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (isAdmin) {
       loadPendingCount();
+
+      const socket = getSocket();
+      const handleCountUpdate = (data: { pendingCount: number }) => {
+        if (typeof data?.pendingCount === 'number') {
+          setPendingContributors(data.pendingCount);
+        }
+      };
+
+      if (socket && socket.on) {
+        socket.on('admin:contributor_count', handleCountUpdate);
+      }
+
+      return () => {
+        if (socket && socket.off) {
+          socket.off('admin:contributor_count', handleCountUpdate);
+        }
+      };
     }
-  }, [isAdmin, pathname]);
+  }, [isAdmin]);
 
   const loadPendingCount = async () => {
     try {

@@ -4,6 +4,10 @@ import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { queueContributorApprovedEmail } from '../config/queues.js';
 import { CacheService } from '../services/cache.service.js';
+import {
+  broadcastPendingContributorCount,
+  broadcastNewContributorApplication,
+} from '../config/socket.js';
 
 const applySchema = z.object({
   reason: z.string().min(10, 'Please provide at least 10 characters explaining your interest and experience.'),
@@ -66,6 +70,19 @@ export class ContributorController {
           resumeUrl,
           status: 'PENDING',
         },
+      });
+
+      // Real-time notification broadcast to Admin Console
+      setImmediate(async () => {
+        try {
+          const pendingCount = await prisma.contributorApplication.count({
+            where: { status: 'PENDING' },
+          });
+          broadcastPendingContributorCount(pendingCount);
+          broadcastNewContributorApplication(application);
+        } catch (e) {
+          console.warn('Real-time contributor broadcast note:', e);
+        }
       });
 
       res.status(201).json({
@@ -200,6 +217,18 @@ export class ContributorController {
         // Queue congratulatory email asynchronously via BullMQ
         queueContributorApprovedEmail(application.email, application.user.name);
       }
+
+      // Real-time notification update to Admin Console
+      setImmediate(async () => {
+        try {
+          const pendingCount = await prisma.contributorApplication.count({
+            where: { status: 'PENDING' },
+          });
+          broadcastPendingContributorCount(pendingCount);
+        } catch (e) {
+          console.warn('Real-time contributor count update note:', e);
+        }
+      });
 
       res.status(200).json({
         success: true,

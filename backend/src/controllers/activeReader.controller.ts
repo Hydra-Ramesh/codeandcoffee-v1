@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { redisClient } from '../config/redis.js';
+import { getActiveBlogReadersCount, getGlobalActiveStats } from '../config/socket.js';
 
 export class ActiveReaderController {
-  // Heartbeat endpoint: sent every 10-15s while user is on a blog page
+  // Heartbeat endpoint: lightweight fallback for legacy or non-socket sessions
   static async heartbeat(req: Request, res: Response, next: NextFunction) {
     try {
       const { blogId, readerId } = req.body;
@@ -12,21 +13,22 @@ export class ActiveReaderController {
         return;
       }
 
-      // Set key with 25s TTL in Redis (auto-expires if user closes tab)
-      const key = `blog:reader:${blogId}:${readerId}`;
-      await redisClient.setex(key, 25, 'active');
+      // Fast O(1) key marking with 30s auto-expiry in background
+      setImmediate(async () => {
+        try {
+          await redisClient.setex(`blog:reader:${blogId}:${readerId}`, 30, 'active');
+          await redisClient.setex(`site:active:${readerId}`, 30, 'active');
+        } catch {}
+      });
 
-      // Also mark in global site active set
-      await redisClient.setex(`site:active:${readerId}`, 25, 'active');
-
-      // Get current count for this blog
-      const blogKeys = await redisClient.keys(`blog:reader:${blogId}:*`);
+      // Get current instantaneous count from live WebSocket room state
+      const count = getActiveBlogReadersCount(blogId);
 
       res.status(200).json({
         success: true,
         data: {
           blogId,
-          activeReaders: Math.max(1, blogKeys.length),
+          activeReaders: Math.max(1, count),
         },
       });
     } catch (err) {
@@ -34,17 +36,17 @@ export class ActiveReaderController {
     }
   }
 
-  // Get current active readers for a specific blog
+  // Get current active readers for a specific blog (O(1) lookup)
   static async getActiveCount(req: Request, res: Response, next: NextFunction) {
     try {
-      const { blogId } = req.params;
-      const keys = await redisClient.keys(`blog:reader:${blogId}:*`);
+      const blogId = String(req.params.blogId);
+      const count = getActiveBlogReadersCount(blogId);
 
       res.status(200).json({
         success: true,
         data: {
           blogId,
-          activeReaders: keys.length,
+          activeReaders: count,
         },
       });
     } catch (err) {
@@ -52,23 +54,14 @@ export class ActiveReaderController {
     }
   }
 
-  // Global platform reader metrics (for Hero banner & Admin dashboard)
+  // Global platform reader metrics (for Hero banner & Admin dashboard, O(1) aggregation)
   static async getGlobalStats(req: Request, res: Response, next: NextFunction) {
     try {
-      const [blogReaderKeys, siteReaderKeys] = await Promise.all([
-        redisClient.keys('blog:reader:*'),
-        redisClient.keys('site:active:*'),
-      ]);
-
-      const totalActiveBlogReaders = blogReaderKeys.length;
-      const totalActiveSiteVisitors = Math.max(totalActiveBlogReaders, siteReaderKeys.length);
+      const stats = getGlobalActiveStats();
 
       res.status(200).json({
         success: true,
-        data: {
-          totalActiveBlogReaders,
-          totalActiveSiteVisitors: Math.max(1, totalActiveSiteVisitors),
-        },
+        data: stats,
       });
     } catch (err) {
       next(err);
