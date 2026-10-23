@@ -1,9 +1,9 @@
 import { Queue, Worker, Job } from 'bullmq';
 import { config } from './env.js';
-import { sendOtpEmail, sendWelcomeEmail, sendNewBlogNotificationEmail, BlogBroadcastData } from './email.js';
+import { sendOtpEmail, sendWelcomeEmail, sendNewBlogNotificationEmail, sendContributorApprovedEmail, BlogBroadcastData } from './email.js';
 import { prisma } from './database.js';
 
-type EmailJobType = 'otp' | 'welcome' | 'new-blog';
+type EmailJobType = 'otp' | 'welcome' | 'new-blog' | 'contributor-approved';
 
 interface EmailJobData {
   type: EmailJobType;
@@ -40,6 +40,8 @@ export function setupQueues() {
             await sendWelcomeEmail(toEmail, name || 'Developer');
           } else if (type === 'new-blog' && blogData) {
             await sendNewBlogNotificationEmail(toEmail, name || 'Reader', blogData);
+          } else if (type === 'contributor-approved') {
+            await sendContributorApprovedEmail(toEmail, name || 'Contributor');
           }
         },
         { connection }
@@ -112,6 +114,33 @@ export async function queueWelcomeEmail(toEmail: string, name: string): Promise<
       await sendWelcomeEmail(toEmail, name);
     } catch (e) {
       console.error('Error sending direct welcome email:', e);
+    }
+  });
+}
+
+/**
+ * Queue a Contributor Application Approval congratulatory email
+ */
+export async function queueContributorApprovedEmail(toEmail: string, name: string): Promise<void> {
+  if (emailQueue) {
+    try {
+      await emailQueue.add(
+        'send-contributor-approved',
+        { type: 'contributor-approved', toEmail, name },
+        { attempts: 3, backoff: { type: 'exponential', delay: 1000 } }
+      );
+      return;
+    } catch (err) {
+      console.warn('⚠️ BullMQ enqueue failed, executing directly:', (err as Error).message);
+    }
+  }
+
+  // Fallback: direct asynchronous dispatch
+  setImmediate(async () => {
+    try {
+      await sendContributorApprovedEmail(toEmail, name);
+    } catch (e) {
+      console.error('Error sending direct contributor approval email:', e);
     }
   });
 }

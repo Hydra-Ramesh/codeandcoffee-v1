@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Send, Trash2, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { fetchApi } from '../lib/api';
+import { optimizeImageUrl } from '../lib/image';
 import { useAuth } from '../context/AuthContext';
 import { getSocket } from '../lib/socket';
 import Link from 'next/link';
@@ -109,7 +110,10 @@ export default function CommentSection({ postId }: CommentSectionProps) {
         <form onSubmit={handlePostComment} className="mb-10 glass-card p-5 rounded-2xl border border-white/10">
           <div className="flex items-center gap-3 mb-3">
             <img
-              src={user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.name)}`}
+              src={
+                optimizeImageUrl(user.avatar, { width: 80, height: 80, crop: 'fill' }) ||
+                `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.name)}`
+              }
               alt={user.name}
               className="w-8 h-8 rounded-full border border-white/20"
             />
@@ -173,7 +177,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
                   <div className="flex items-center gap-3">
                     <img
                       src={
-                        comment.author.avatar ||
+                        optimizeImageUrl(comment.author.avatar, { width: 80, height: 80, crop: 'fill' }) ||
                         `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(comment.author.name)}`
                       }
                       alt={comment.author.name}

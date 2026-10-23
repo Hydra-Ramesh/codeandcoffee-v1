@@ -21,6 +21,7 @@ import MarkdownViewer from '../../../components/MarkdownViewer';
 import ActiveReaderPulse from '../../../components/ActiveReaderPulse';
 import LikeDislikeBar from '../../../components/LikeDislikeBar';
 import CommentSection from '../../../components/CommentSection';
+import { optimizeImageUrl } from '../../../lib/image';
 
 export default function BlogDetailPage() {
   const params = useParams();
@@ -161,7 +162,10 @@ export default function BlogDetailPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/10">
           <div className="flex items-center gap-3">
             <img
-              src={blog.author?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(blog.author?.name)}`}
+              src={
+                optimizeImageUrl(blog.author?.avatar, { width: 100, height: 100, crop: 'fill' }) ||
+                `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(blog.author?.name)}`
+              }
               alt={blog.author?.name}
               className="w-11 h-11 rounded-full border-2 border-amber-500/40 bg-slate-900"
             />
@@ -201,7 +205,7 @@ export default function BlogDetailPage() {
       {blog.bannerImage && (
         <div className="relative h-72 sm:h-96 w-full rounded-3xl overflow-hidden border border-white/10 bg-slate-950 shadow-2xl">
           <img
-            src={blog.bannerImage}
+            src={optimizeImageUrl(blog.bannerImage, { width: 1200 })}
             alt={blog.title}
             className="w-full h-full object-cover"
           />
@@ -240,7 +244,10 @@ export default function BlogDetailPage() {
       {/* Author Bio Card */}
       <div className="glass-card p-6 sm:p-8 rounded-2xl border border-white/10 flex flex-col sm:flex-row items-center sm:items-start gap-5">
         <img
-          src={blog.author?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(blog.author?.name)}`}
+          src={
+            optimizeImageUrl(blog.author?.avatar, { width: 150, height: 150, crop: 'fill' }) ||
+            `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(blog.author?.name)}`
+          }
           alt={blog.author?.name}
           className="w-16 h-16 rounded-full border-2 border-amber-500/50 bg-slate-900"
         />

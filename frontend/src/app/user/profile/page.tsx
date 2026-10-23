@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { fetchApi } from '../../../lib/api';
+import { optimizeImageUrl } from '../../../lib/image';
 import Link from 'next/link';
 import {
   User,
@@ -148,8 +149,7 @@ export default function UserProfilePage() {
           <div className="relative group/avatar">
             <img
               src={
-                avatar ||
-                user.avatar ||
+                optimizeImageUrl(avatar || user.avatar, { width: 200, height: 200, crop: 'fill' }) ||
                 `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.name)}`
               }
               alt={user.name}

@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Clock, ThumbsUp, ThumbsDown, MessageSquare, Flame, Sparkles, ArrowRight, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { optimizeImageUrl } from '../lib/image';
 
 export interface BlogPost {
   id: string;
@@ -59,7 +60,7 @@ export default function BlogCard({ blog, featured = false }: BlogCardProps) {
       >
         <img
           src={
-            blog.bannerImage ||
+            optimizeImageUrl(blog.bannerImage, { width: featured ? 1000 : 600 }) ||
             'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80'
           }
           alt={blog.title}
@@ -145,7 +146,7 @@ export default function BlogCard({ blog, featured = false }: BlogCardProps) {
           <div className="flex items-center gap-2.5">
             <img
               src={
-                blog.author?.avatar ||
+                optimizeImageUrl(blog.author?.avatar, { width: 100, height: 100, crop: 'fill' }) ||
                 `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(blog.author?.name || 'Dev')}`
               }
               alt={blog.author?.name}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { Coffee, Code2, ShieldAlert, User, LogOut, Menu, X, Sparkles, BookOpen, PenTool } from 'lucide-react';
+import { optimizeImageUrl } from '../lib/image';
 
 export default function Navbar() {
   const { user, isAdmin, isContributor, logout } = useAuth();
@@ -86,7 +87,10 @@ export default function Navbar() {
                 className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg glass-card hover:border-amber-500/40 transition-all"
               >
                 <img
-                  src={user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.name)}`}
+                  src={
+                    optimizeImageUrl(user.avatar, { width: 80, height: 80, crop: 'fill' }) ||
+                    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.name)}`
+                  }
                   alt={user.name}
                   className="w-7 h-7 rounded-full bg-slate-800 border border-white/20"
                 />
@@ -151,7 +155,10 @@ export default function Navbar() {
             <div className="pt-4 border-t border-white/10 space-y-2">
               <div className="flex items-center gap-3 px-3 py-2">
                 <img
-                  src={user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.name)}`}
+                  src={
+                    optimizeImageUrl(user.avatar, { width: 80, height: 80, crop: 'fill' }) ||
+                    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.name)}`
+                  }
                   alt={user.name}
                   className="w-8 h-8 rounded-full border border-white/20"
                 />

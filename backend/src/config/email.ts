@@ -317,3 +317,78 @@ export async function sendNewBlogNotificationEmail(
   console.log(`📨 [DEV EMAIL - NEW POST] To: ${toEmail} | Title: ${blog.title} | Link: ${blogUrl}`);
   return true;
 }
+
+/**
+ * Send Contributor Application Approved notification email
+ */
+export async function sendContributorApprovedEmail(
+  toEmail: string,
+  name: string
+): Promise<boolean> {
+  const mailTransporter = getEmailTransporter();
+  const studioUrl = `${config.clientUrl}/admin/blogs/new`;
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; margin: 0; padding: 24px; }
+          .container { max-width: 560px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.6); }
+          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #92400e 100%); padding: 28px 24px; text-align: center; }
+          .header h1 { margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; }
+          .content { padding: 32px 28px; }
+          .badge { display: inline-block; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 8px; margin-bottom: 12px; }
+          .title { color: #ffffff; font-size: 20px; font-weight: 800; margin: 0 0 14px 0; }
+          .box { background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px; font-size: 13px; color: #fde68a; line-height: 1.6; }
+          .btn-container { text-align: center; margin: 24px 0; }
+          .btn { display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #090d16 !important; font-weight: 800; font-size: 14px; text-decoration: none; padding: 12px 30px; border-radius: 10px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35); }
+          .footer { background: #0b0f19; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #1f2937; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>☕ Code & Coffee • Author Guild</h1>
+          </div>
+          <div class="content">
+            <span class="badge">Application Approved</span>
+            <h2 class="title">Welcome to the Author Guild, ${name}!</h2>
+            <p style="font-size: 14px; color: #d1d5db; line-height: 1.6;">
+              Great news! Your application to become a publisher/contributor on Code &amp; Coffee has been approved by the editorial staff.
+            </p>
+            <div class="box">
+              You now have contributor permissions to write, draft, edit, and publish your own technical deep-dives in the Author Studio!
+            </div>
+            <div class="btn-container">
+              <a href="${studioUrl}" class="btn" target="_blank">Open Author Studio &rarr;</a>
+            </div>
+          </div>
+          <div class="footer">
+            Code &amp; Coffee • Khejuri, East Medinipur, West Bengal, India, 721430
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  if (mailTransporter) {
+    try {
+      await mailTransporter.sendMail({
+        from: config.smtp.from || `"Code & Coffee" <${config.smtp.user}>`,
+        to: toEmail,
+        subject: '🎉 Congratulations! You are now a Contributor on Code & Coffee',
+        html: htmlContent,
+      });
+      console.log(`✅ Contributor approval email sent to ${toEmail}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed sending contributor approval email to ${toEmail}:`, (error as Error).message);
+    }
+  }
+
+  console.log(`📨 [DEV EMAIL - CONTRIBUTOR APPROVED] To: ${toEmail} | Name: ${name}`);
+  return true;
+}
+

@@ -237,23 +237,6 @@ export class BlogController {
       const slug = generateSlug(data.title);
       const readingTime = calculateReadingTime(data.content);
 
-      // Save revision to MongoDB Atlas
-      let mongoDocId: string | undefined = undefined;
-      try {
-        const revision = new BlogRevision({
-          blogSlug: slug,
-          authorEmail: req.user.email,
-          title: data.title,
-          contentMarkdown: data.content,
-          metaTags: data.tags,
-          revisionNumber: 1,
-        });
-        const savedRev = await revision.save();
-        mongoDocId = savedRev._id.toString();
-      } catch (mongoErr) {
-        console.warn('MongoDB Atlas revision save notice:', (mongoErr as Error).message);
-      }
-
       const post = await prisma.post.create({
         data: {
           title: data.title,
@@ -266,12 +249,36 @@ export class BlogController {
           tags: data.tags,
           isPublished: data.isPublished,
           authorId: req.user.id,
-          mongoDocId,
         },
         include: {
           author: { select: { id: true, name: true, avatar: true } },
           _count: { select: { likes: true, dislikes: true, comments: true } },
         },
+      });
+
+      const authorEmail = req.user?.email || '';
+
+      // Asynchronously archive revision to MongoDB Atlas (non-blocking)
+      setImmediate(async () => {
+        try {
+          const revision = new BlogRevision({
+            blogSlug: slug,
+            authorEmail,
+            title: data.title,
+            contentMarkdown: data.content,
+            metaTags: data.tags,
+            revisionNumber: 1,
+          });
+          const savedRev = await revision.save();
+          if (savedRev?._id) {
+            await prisma.post.update({
+              where: { id: post.id },
+              data: { mongoDocId: savedRev._id.toString() },
+            }).catch(() => {});
+          }
+        } catch (mongoErr) {
+          console.warn('MongoDB Atlas revision save notice:', (mongoErr as Error).message);
+        }
       });
 
       // Broadcast new blog notification email and WebSocket event if published
@@ -341,22 +348,6 @@ export class BlogController {
 
       const readingTime = data.content ? calculateReadingTime(data.content) : existing.readingTime;
 
-      // Save revision to MongoDB Atlas
-      try {
-        const count = await BlogRevision.countDocuments({ blogSlug: existing.slug });
-        const revision = new BlogRevision({
-          blogSlug: existing.slug,
-          authorEmail: req.user.email,
-          title: data.title || existing.title,
-          contentMarkdown: data.content || existing.content,
-          metaTags: data.tags || existing.tags,
-          revisionNumber: count + 1,
-        });
-        await revision.save();
-      } catch (mongoErr) {
-        console.warn('MongoDB Atlas revision update notice:', (mongoErr as Error).message);
-      }
-
       const updated = await prisma.post.update({
         where: { id },
         data: {
@@ -367,6 +358,26 @@ export class BlogController {
           author: { select: { id: true, name: true, avatar: true } },
           _count: { select: { likes: true, dislikes: true, comments: true } },
         },
+      });
+
+      const authorEmail = req.user?.email || '';
+
+      // Asynchronously archive revision to MongoDB Atlas (non-blocking)
+      setImmediate(async () => {
+        try {
+          const count = await BlogRevision.countDocuments({ blogSlug: existing.slug });
+          const revision = new BlogRevision({
+            blogSlug: existing.slug,
+            authorEmail,
+            title: data.title || existing.title,
+            contentMarkdown: data.content || existing.content,
+            metaTags: data.tags || existing.tags,
+            revisionNumber: count + 1,
+          });
+          await revision.save();
+        } catch (mongoErr) {
+          console.warn('MongoDB Atlas revision update notice:', (mongoErr as Error).message);
+        }
       });
 
       // If post was unpublished and now is published, notify users

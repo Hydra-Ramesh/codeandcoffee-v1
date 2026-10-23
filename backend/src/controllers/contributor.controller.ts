@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
-import { sendEmail } from '../config/email.js';
+import { queueContributorApprovedEmail } from '../config/queues.js';
+import { CacheService } from '../services/cache.service.js';
 
 const applySchema = z.object({
   reason: z.string().min(10, 'Please provide at least 10 characters explaining your interest and experience.'),
@@ -192,41 +193,12 @@ export class ContributorController {
           data: { role: 'CONTRIBUTOR' },
         });
 
-        // Send congratulatory email
-        try {
-          await sendEmail({
-            to: application.email,
-            subject: '🎉 Congratulations! You are now a Contributor on Code & Coffee',
-            text: `Hi ${application.user.name},\n\nGreat news! Your application to become a publisher/contributor on Code & Coffee has been approved by the editorial staff.\n\nYou can now log in and access the Author Studio to write, draft, and publish your own technical articles.\n\nVisit: http://localhost:3000/admin/blogs/new\n\nHappy Writing,\nThe Code & Coffee Engineering Staff`,
-            html: `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #0b0f19; color: #f3f4f6; border-radius: 16px; padding: 32px; border: 1px solid rgba(255, 255, 255, 0.1);">
-                <div style="text-align: center; margin-bottom: 24px;">
-                  <span style="font-size: 28px; font-weight: 800; color: #f59e0b;">☕ Code &amp; Coffee</span>
-                  <div style="font-size: 12px; letter-spacing: 2px; color: #9ca3af; margin-top: 4px;">AUTHOR GUILD</div>
-                </div>
-                <h2 style="color: #ffffff; font-size: 20px; font-weight: 700; margin-bottom: 12px;">🎉 Welcome to the Author Guild, ${application.user.name}!</h2>
-                <p style="font-size: 14px; color: #d1d5db; line-height: 1.6; margin-bottom: 20px;">
-                  Your contributor application has been reviewed and <strong style="color: #10b981;">approved</strong> by the administrator.
-                </p>
-                <div style="background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                  <p style="margin: 0; font-size: 13px; color: #fde68a;">
-                    You can now draft, format, and publish your original deep-dives in the Code &amp; Coffee Author Studio!
-                  </p>
-                </div>
-                <div style="text-align: center; margin-bottom: 24px;">
-                  <a href="http://localhost:3000/admin/blogs/new" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #030712; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 10px; text-decoration: none;">
-                    Open Author Studio &rarr;
-                  </a>
-                </div>
-                <p style="font-size: 12px; color: #6b7280; text-align: center; margin: 0;">
-                  Code &amp; Coffee • Khejuri, East Medinipur, West Bengal, India, 721430
-                </p>
-              </div>
-            `,
-          });
-        } catch (mailErr) {
-          console.warn('Contributor approval email notice:', (mailErr as Error).message);
-        }
+        // Invalidate cached user profile so new CONTRIBUTOR role is immediately visible
+        await CacheService.invalidateUserProfile(application.userId);
+        await CacheService.invalidateAdminAnalytics();
+
+        // Queue congratulatory email asynchronously via BullMQ
+        queueContributorApprovedEmail(application.email, application.user.name);
       }
 
       res.status(200).json({
