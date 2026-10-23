@@ -36,7 +36,7 @@ function OAuthCallbackContent() {
         if (success) {
           setStatus('success');
           setTimeout(() => {
-            router.push('/');
+            router.push('/blogs');
           }, 800);
         } else {
           setStatus('error');

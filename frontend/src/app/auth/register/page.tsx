@@ -28,7 +28,7 @@ export default function RegisterPage() {
     setLoading(true);
     const res = await register(name, email, password);
     if (res.success) {
-      router.push('/');
+      router.push('/blogs');
     } else {
       setError(res.message || 'Registration failed.');
     }

@@ -30,7 +30,7 @@ function LoginFormContent() {
 
     const res = await login(email, password);
     if (res.success) {
-      router.push('/');
+      router.push('/blogs');
     } else {
       setError(res.message || 'Invalid email or password.');
     }

@@ -2,11 +2,22 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Coffee, Mail, MapPin, Shield, CheckCircle, Heart } from 'lucide-react';
 
 export default function Footer() {
+  const pathname = usePathname();
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+
+  // Hide footer on authentication flows, admin dashboard, and the Explore Blogs catalog (/blogs)
+  if (
+    pathname?.startsWith('/auth') ||
+    pathname?.startsWith('/admin') ||
+    pathname === '/blogs'
+  ) {
+    return null;
+  }
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
