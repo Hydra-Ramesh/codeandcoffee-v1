@@ -8,9 +8,6 @@ import {
   Flame,
   Coffee,
   ArrowRight,
-  Database,
-  Cpu,
-  ShieldCheck,
   TrendingUp,
 } from 'lucide-react';
 import BlogCard, { BlogPost } from '../components/BlogCard';
@@ -75,112 +72,46 @@ export default function HomePage() {
     <div className="space-y-16">
       {/* Hero Section */}
       <section className="relative pt-6 pb-12 text-center md:text-left">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          <div className="lg:col-span-8 space-y-6">
-            {/* Live Indicator Pill */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold backdrop-blur-md shadow-lg shadow-amber-500/10">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-beacon" />
-              <Flame className="w-4 h-4 text-amber-400" />
-              <span>
-                <strong className="text-white font-mono">{globalStats.totalActiveSiteVisitors}</strong> developers reading live on the platform
-              </span>
-            </div>
-
-            {/* Gradient Title */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.15]">
-              Where Deep Code <br />
-              <span className="gradient-text-hero">Meets High Caffeine.</span>
-            </h1>
-
-            {/* Tagline */}
-            <p className="text-gray-300 text-base sm:text-lg max-w-2xl leading-relaxed">
-              Curated architectural deep-dives, distributed system blueprints, serverless database
-              internals, and modern engineering practices crafted for technical leaders and builders.
-            </p>
-
-            {/* Search Bar */}
-            <div className="relative max-w-xl">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search articles on Redis, Neon Postgres, Next.js, Scale..."
-                className="w-full pl-12 pr-4 py-3.5 rounded-2xl glass-input text-sm text-white placeholder-gray-400 shadow-xl"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-white"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+        <div className="max-w-4xl space-y-6">
+          {/* Live Indicator Pill */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold backdrop-blur-md shadow-lg shadow-amber-500/10">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-beacon" />
+            <Flame className="w-4 h-4 text-amber-400" />
+            <span>
+              <strong className="text-white font-mono">{globalStats.totalActiveSiteVisitors}</strong> developers reading live on the platform
+            </span>
           </div>
 
-          {/* Right Hero Badge / Platform Telemetry Card */}
-          <div className="lg:col-span-4 hidden lg:block">
-            <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-5 shadow-2xl">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <span className="text-xs uppercase tracking-wider font-mono text-gray-400">
-                  Telemetry Snapshot
-                </span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300">
-                  ONLINE
-                </span>
-              </div>
+          {/* Gradient Title */}
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.15]">
+            Where Deep Code <br />
+            <span className="gradient-text-hero">Meets High Caffeine.</span>
+          </h1>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-                      <Flame className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs text-gray-300">Active Blog Readers</span>
-                  </div>
-                  <span className="text-sm font-mono font-bold text-white">
-                    {globalStats.totalActiveBlogReaders}
-                  </span>
-                </div>
+          {/* Tagline */}
+          <p className="text-gray-300 text-base sm:text-lg max-w-2xl leading-relaxed">
+            Curated architectural deep-dives, distributed system blueprints, database
+            internals, and modern engineering practices crafted for technical leaders and builders.
+          </p>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
-                      <Database className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs text-gray-300">Database Engine</span>
-                  </div>
-                  <span className="text-xs font-mono text-amber-400">
-                    Neon Postgres
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
-                      <Cpu className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs text-gray-300">Caching Layer</span>
-                  </div>
-                  <span className="text-xs font-mono text-cyan-300">
-                    Upstash Redis
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs text-gray-300">Security Model</span>
-                  </div>
-                  <span className="text-xs font-mono text-emerald-400">
-                    Zero-Trust RBAC
-                  </span>
-                </div>
-              </div>
-            </div>
+          {/* Search Bar */}
+          <div className="relative max-w-xl">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search articles on system design, architecture, performance, clean code..."
+              className="w-full pl-12 pr-4 py-3.5 rounded-2xl glass-input text-sm text-white placeholder-gray-400 shadow-xl"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-white"
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
       </section>

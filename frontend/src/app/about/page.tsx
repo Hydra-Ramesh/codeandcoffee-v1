@@ -5,12 +5,12 @@ import { Coffee, Shield, Zap, Database, Terminal, Heart, Sparkles, Award } from 
 
 export default function AboutPage() {
   const stack = [
-    { name: 'Neon Serverless PostgreSQL', role: 'Primary durable relational storage with instant branching & connection pooling' },
-    { name: 'Upstash Distributed Redis', role: 'Sub-millisecond sliding window rate limiting & real-time reader heartbeats' },
-    { name: 'Node.js & Express v1 REST API', role: 'Hardened zero-trust gateway with Helmet, CORS, and Zod schema validations' },
-    { name: 'Next.js 15 App Router', role: 'Modern React server components, fluid responsive container queries, and glassmorphism UI' },
-    { name: 'BullMQ & Nodemailer', role: 'Asynchronous background queues for transactional Google SMTP email delivery' },
-    { name: 'MongoDB Atlas', role: 'Flexible document store for blog revision histories and rich draft archival' },
+    { name: 'Distributed Relational Store', role: 'High-availability relational data persistence, transactional isolation, and schema safety' },
+    { name: 'In-Memory Caching & Telemetry', role: 'Sub-millisecond sliding window rate limiting and real-time active reader pulse beacons' },
+    { name: 'Hardened Zero-Trust API Gateway', role: 'Strict REST v1 architecture, role-based access control, cryptographic tokens, and schema validation' },
+    { name: 'Modern Responsive Client', role: 'Fluid container queries, Markdown rendering with syntax highlighting, and glassmorphic design' },
+    { name: 'Asynchronous Event Workers', role: 'Resilient background message queues for audit logging and transactional notifications' },
+    { name: 'Cloud Object Storage & CDN', role: 'Global edge asset distribution, automatic compression, and responsive image streaming' },
   ];
 
   const team = [

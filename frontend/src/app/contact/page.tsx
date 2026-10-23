@@ -94,7 +94,7 @@ export default function ContactPage() {
                   type="text"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  placeholder="e.g. Distributed Consensus in Upstash / Neon Postgres"
+                  placeholder="e.g. Distributed consensus algorithms or editorial feedback"
                   required
                   className="w-full px-4 py-2.5 text-xs rounded-xl glass-input text-white"
                 />

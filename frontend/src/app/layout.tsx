@@ -7,17 +7,18 @@ import Footer from '../components/Footer';
 export const metadata: Metadata = {
   title: 'Code & Coffee — Engineering Journal for Scalable Software',
   description:
-    'A high-performance publication for distributed systems, serverless database engineering, Redis caching, and modern web application craftsmanship.',
+    'A high-performance publication for distributed systems, database engineering, cloud architecture, and modern web application craftsmanship.',
   keywords: [
     'System Design',
     'PostgreSQL',
-    'Neon Postgres',
-    'Redis',
-    'Upstash',
-    'Next.js 15',
-    'Node.js Express',
+    'Database Engineering',
+    'Distributed Systems',
+    'Caching Strategies',
+    'Next.js',
+    'Node.js',
     'Software Architecture',
     'Developer Blog',
+    'Cloud Security',
   ],
   authors: [{ name: 'Code & Coffee Engineering Staff' }],
   openGraph: {
