@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from '../config/database.js';
 import { config } from '../config/env.js';
-import { queueOtpEmail } from '../config/queues.js';
+import { queueOtpEmail, queueWelcomeEmail } from '../config/queues.js';
 
 export class AuthService {
   static async hashPassword(password: string): Promise<string> {
@@ -54,6 +54,9 @@ export class AuthService {
         avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`,
       },
     });
+
+    // Send Welcome registration email asynchronously
+    queueWelcomeEmail(user.email, user.name);
 
     const tokens = this.generateTokens({
       id: user.id,
@@ -220,6 +223,9 @@ export class AuthService {
           role: isInitialAdmin ? 'ADMIN' : 'USER',
         },
       });
+
+      // Send Welcome registration email for new OAuth signup
+      queueWelcomeEmail(user.email, user.name);
     } else {
       if (user.isBanned) {
         throw new Error('Account suspended by an administrator.');

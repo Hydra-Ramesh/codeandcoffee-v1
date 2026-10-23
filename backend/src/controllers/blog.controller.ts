@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma, BlogRevision } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { redisClient } from '../config/redis.js';
+import { queueNewBlogBroadcast } from '../config/queues.js';
 
 function generateSlug(title: string): string {
   const base = title
@@ -219,6 +220,19 @@ export class BlogController {
         },
       });
 
+      // Broadcast new blog notification email to all registered users if published
+      if (post.isPublished) {
+        queueNewBlogBroadcast({
+          title: post.title,
+          excerpt: post.excerpt,
+          slug: post.slug,
+          category: post.category,
+          bannerImage: post.bannerImage,
+          authorName: post.author.name,
+          readingTime: post.readingTime,
+        });
+      }
+
       res.status(201).json({
         success: true,
         message: 'Blog post created successfully by administrator.',
@@ -281,6 +295,19 @@ export class BlogController {
           _count: { select: { likes: true, dislikes: true, comments: true } },
         },
       });
+
+      // If post was unpublished and now is published, notify users
+      if (!existing.isPublished && updated.isPublished) {
+        queueNewBlogBroadcast({
+          title: updated.title,
+          excerpt: updated.excerpt,
+          slug: updated.slug,
+          category: updated.category,
+          bannerImage: updated.bannerImage,
+          authorName: updated.author.name,
+          readingTime: updated.readingTime,
+        });
+      }
 
       res.status(200).json({
         success: true,
