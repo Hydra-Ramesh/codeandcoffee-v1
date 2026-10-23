@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, Send, Trash2, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { fetchApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { getSocket } from '../lib/socket';
 import Link from 'next/link';
 
 interface Comment {
@@ -31,6 +32,31 @@ export default function CommentSection({ postId }: CommentSectionProps) {
 
   useEffect(() => {
     loadComments();
+
+    if (!postId) return;
+    const socket = getSocket();
+    const handleCommentUpdate = (data: { blogId: string; action: 'create' | 'delete'; comment: any }) => {
+      if (data.blogId === postId) {
+        if (data.action === 'create') {
+          setComments((prev) => {
+            if (prev.some((c) => c.id === data.comment.id)) return prev;
+            return [data.comment, ...prev];
+          });
+        } else if (data.action === 'delete') {
+          setComments((prev) => prev.filter((c) => c.id !== data.comment.id));
+        }
+      }
+    };
+
+    if (socket && socket.on) {
+      socket.on('comment:update', handleCommentUpdate);
+    }
+
+    return () => {
+      if (socket && socket.off) {
+        socket.off('comment:update', handleCommentUpdate);
+      }
+    };
   }, [postId]);
 
   const loadComments = async () => {

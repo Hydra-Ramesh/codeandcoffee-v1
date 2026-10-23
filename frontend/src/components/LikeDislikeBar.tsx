@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ThumbsUp, ThumbsDown, Share2, Bookmark, Check, LogIn } from 'lucide-react';
 import { fetchApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { getSocket } from '../lib/socket';
 import Link from 'next/link';
 
 interface LikeDislikeBarProps {
@@ -28,6 +29,28 @@ export default function LikeDislikeBar({
   const [userDisliked, setUserDisliked] = useState(initialUserDisliked);
   const [copied, setCopied] = useState(false);
   const [showAuthNotice, setShowAuthNotice] = useState(false);
+
+  useEffect(() => {
+    if (!blogId) return;
+
+    const socket = getSocket();
+    const handleReactionUpdate = (data: { blogId: string; likesCount: number; dislikesCount: number }) => {
+      if (data.blogId === blogId) {
+        setLikes(data.likesCount);
+        setDislikes(data.dislikesCount);
+      }
+    };
+
+    if (socket && socket.on) {
+      socket.on('reaction:update', handleReactionUpdate);
+    }
+
+    return () => {
+      if (socket && socket.off) {
+        socket.off('reaction:update', handleReactionUpdate);
+      }
+    };
+  }, [blogId]);
 
   const handleLike = async () => {
     if (!user) {

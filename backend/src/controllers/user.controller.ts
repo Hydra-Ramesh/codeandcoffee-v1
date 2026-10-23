@@ -4,9 +4,9 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { z } from 'zod';
 
 const updateProfileSchema = z.object({
-  name: z.string().min(2).optional(),
-  bio: z.string().max(300).optional(),
-  avatar: z.string().url().optional().or(z.string().length(0)),
+  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
+  bio: z.string().max(500, 'Bio is too long').optional(),
+  avatar: z.string().optional().or(z.string().length(0)),
 });
 
 export class UserController {

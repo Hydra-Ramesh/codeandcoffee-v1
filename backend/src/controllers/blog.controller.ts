@@ -4,6 +4,8 @@ import { prisma, BlogRevision } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { redisClient } from '../config/redis.js';
 import { queueNewBlogBroadcast } from '../config/queues.js';
+import { CacheService } from '../services/cache.service.js';
+import { broadcastBlogPublished, broadcastReactionUpdate } from '../config/socket.js';
 
 function generateSlug(title: string): string {
   const base = title
@@ -40,6 +42,19 @@ export class BlogController {
       const category = (req.query.category as string) || '';
       const tag = (req.query.tag as string) || '';
       const includeDrafts = req.query.includeDrafts === 'true';
+
+      const cacheKey = `blogs:list:${page}:${limit}:${category || 'all'}:${tag || 'all'}:${search || 'none'}:${includeDrafts}`;
+
+      // Check Redis cache for fast retrieval
+      const cached = await CacheService.get<any>(cacheKey);
+      if (cached) {
+        res.status(200).json({
+          success: true,
+          data: cached,
+          fromCache: true,
+        });
+        return;
+      }
 
       const skip = (page - 1) * limit;
 
@@ -92,17 +107,22 @@ export class BlogController {
         })
       );
 
+      const responsePayload = {
+        blogs: enrichedBlogs,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+
+      // Cache for 60 seconds
+      await CacheService.set(cacheKey, responsePayload, 60);
+
       res.status(200).json({
         success: true,
-        data: {
-          blogs: enrichedBlogs,
-          pagination: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-          },
-        },
+        data: responsePayload,
       });
     } catch (err) {
       next(err);
@@ -113,20 +133,30 @@ export class BlogController {
   static async getBlogBySlug(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const slug = String(req.params.slug);
-      const blog = await prisma.post.findUnique({
-        where: { slug },
-        include: {
-          author: { select: { id: true, name: true, avatar: true, bio: true, role: true } },
-          _count: { select: { likes: true, dislikes: true, comments: true } },
-        },
-      });
+      const cacheKey = `blog:slug:${slug}`;
+
+      // Check cached post structure
+      let blog = await CacheService.get<any>(cacheKey);
 
       if (!blog) {
-        res.status(404).json({ success: false, message: 'Blog post not found.' });
-        return;
+        blog = await prisma.post.findUnique({
+          where: { slug },
+          include: {
+            author: { select: { id: true, name: true, avatar: true, bio: true, role: true } },
+            _count: { select: { likes: true, dislikes: true, comments: true } },
+          },
+        });
+
+        if (!blog) {
+          res.status(404).json({ success: false, message: 'Blog post not found.' });
+          return;
+        }
+
+        // Cache base blog structure for 120 seconds
+        await CacheService.set(cacheKey, blog, 120);
       }
 
-      // Check if user has liked or disliked (if authenticated)
+      // Check user interaction state dynamically
       let userLiked = false;
       let userDisliked = false;
 
@@ -159,9 +189,9 @@ export class BlogController {
         data: {
           ...blog,
           activeReaders: activeKeys.length,
-          likesCount: blog._count.likes,
-          dislikesCount: blog._count.dislikes,
-          commentsCount: blog._count.comments,
+          likesCount: blog._count?.likes ?? blog.likesCount ?? 0,
+          dislikesCount: blog._count?.dislikes ?? blog.dislikesCount ?? 0,
+          commentsCount: blog._count?.comments ?? blog.commentsCount ?? 0,
           userLiked,
           userDisliked,
         },
@@ -220,7 +250,7 @@ export class BlogController {
         },
       });
 
-      // Broadcast new blog notification email to all registered users if published
+      // Broadcast new blog notification email and WebSocket event if published
       if (post.isPublished) {
         queueNewBlogBroadcast({
           title: post.title,
@@ -231,7 +261,20 @@ export class BlogController {
           authorName: post.author.name,
           readingTime: post.readingTime,
         });
+
+        // Real-time WebSocket announcement to all connected clients
+        broadcastBlogPublished({
+          id: post.id,
+          title: post.title,
+          slug: post.slug,
+          excerpt: post.excerpt,
+          category: post.category,
+          author: { name: post.author.name, avatar: post.author.avatar || undefined },
+        });
       }
+
+      // Invalidate query caches
+      await CacheService.invalidateBlogCaches(post.slug, post.id);
 
       res.status(201).json({
         success: true,
@@ -313,7 +356,19 @@ export class BlogController {
           authorName: updated.author.name,
           readingTime: updated.readingTime,
         });
+
+        broadcastBlogPublished({
+          id: updated.id,
+          title: updated.title,
+          slug: updated.slug,
+          excerpt: updated.excerpt,
+          category: updated.category,
+          author: { name: updated.author.name, avatar: updated.author.avatar || undefined },
+        });
       }
+
+      // Invalidate caches
+      await CacheService.invalidateBlogCaches(updated.slug, updated.id);
 
       res.status(200).json({
         success: true,
@@ -352,6 +407,9 @@ export class BlogController {
       }
 
       await prisma.post.delete({ where: { id } });
+
+      // Invalidate caches
+      await CacheService.invalidateBlogCaches(existing.slug, existing.id);
 
       res.status(200).json({
         success: true,
@@ -398,6 +456,10 @@ export class BlogController {
         prisma.like.count({ where: { postId: id } }),
         prisma.dislike.count({ where: { postId: id } }),
       ]);
+
+      // Real-time WebSocket reaction update
+      broadcastReactionUpdate(id, { likesCount, dislikesCount });
+      await CacheService.invalidateBlogCaches(undefined, id);
 
       res.status(200).json({
         success: true,
@@ -449,6 +511,10 @@ export class BlogController {
         prisma.like.count({ where: { postId: id } }),
         prisma.dislike.count({ where: { postId: id } }),
       ]);
+
+      // Real-time WebSocket reaction update
+      broadcastReactionUpdate(id, { likesCount, dislikesCount });
+      await CacheService.invalidateBlogCaches(undefined, id);
 
       res.status(200).json({
         success: true,

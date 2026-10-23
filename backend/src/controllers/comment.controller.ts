@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { z } from 'zod';
+import { CacheService } from '../services/cache.service.js';
+import { broadcastCommentUpdate } from '../config/socket.js';
 
 const commentSchema = z.object({
   content: z.string().min(2, 'Comment must be at least 2 characters long').max(1000, 'Comment is too long'),
@@ -9,10 +11,22 @@ const commentSchema = z.object({
 });
 
 export class CommentController {
-  // Public: List comments for a blog post
+  // Public: List comments for a blog post (with Redis caching)
   static async getComments(req: Request, res: Response, next: NextFunction) {
     try {
       const postId = String(req.params.postId);
+      const cacheKey = `comments:post:${postId}`;
+
+      const cached = await CacheService.get<any[]>(cacheKey);
+      if (cached) {
+        res.status(200).json({
+          success: true,
+          data: cached,
+          fromCache: true,
+        });
+        return;
+      }
+
       const comments = await prisma.comment.findMany({
         where: { postId },
         orderBy: { createdAt: 'desc' },
@@ -20,6 +34,9 @@ export class CommentController {
           author: { select: { id: true, name: true, avatar: true, role: true } },
         },
       });
+
+      // Cache comments for 60 seconds
+      await CacheService.set(cacheKey, comments, 60);
 
       res.status(200).json({
         success: true,
@@ -50,6 +67,13 @@ export class CommentController {
           author: { select: { id: true, name: true, avatar: true, role: true } },
         },
       });
+
+      // Real-time WebSocket broadcast to all readers in the blog room
+      broadcastCommentUpdate(data.postId, 'create', comment);
+
+      // Invalidate comments cache & blog count cache
+      await CacheService.del(`comments:post:${data.postId}`);
+      await CacheService.invalidateBlogCaches(undefined, data.postId);
 
       res.status(201).json({
         success: true,
@@ -84,6 +108,13 @@ export class CommentController {
       }
 
       await prisma.comment.delete({ where: { id } });
+
+      // Real-time WebSocket broadcast to remove comment
+      broadcastCommentUpdate(comment.postId, 'delete', { id: comment.id });
+
+      // Invalidate comments cache
+      await CacheService.del(`comments:post:${comment.postId}`);
+      await CacheService.invalidateBlogCaches(undefined, comment.postId);
 
       res.status(200).json({
         success: true,

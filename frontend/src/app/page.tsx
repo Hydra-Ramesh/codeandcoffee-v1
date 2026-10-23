@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import BlogCard, { BlogPost } from '../components/BlogCard';
 import { fetchApi } from '../lib/api';
+import { getSocket } from '../lib/socket';
 
 export default function HomePage() {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
@@ -22,6 +23,7 @@ export default function HomePage() {
     totalActiveBlogReaders: 14,
     totalActiveSiteVisitors: 42,
   });
+  const [newLivePost, setNewLivePost] = useState<any | null>(null);
 
   const categories = [
     'All',
@@ -35,9 +37,26 @@ export default function HomePage() {
     loadBlogs();
     loadGlobalStats();
 
-    // Poll global live reader stats every 15s
-    const statsInterval = setInterval(loadGlobalStats, 15000);
-    return () => clearInterval(statsInterval);
+    const socket = getSocket();
+    if (socket && socket.on) {
+      socket.on('global:stats', (stats: any) => {
+        setGlobalStats(stats);
+      });
+
+      socket.on('blog:published', (data: any) => {
+        if (data?.blog) {
+          setNewLivePost(data.blog);
+          loadBlogs();
+        }
+      });
+    }
+
+    return () => {
+      if (socket && socket.off) {
+        socket.off('global:stats');
+        socket.off('blog:published');
+      }
+    };
   }, [selectedCategory]);
 
   const loadBlogs = async () => {
@@ -198,6 +217,36 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      {/* Real-Time Live Article Broadcast Toast */}
+      {newLivePost && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm glass-card border border-amber-500/40 p-4 rounded-2xl shadow-2xl flex items-start gap-3 backdrop-blur-xl animate-fade-in">
+          <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300">
+            <Sparkles className="w-5 h-5 text-amber-400" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-beacon" />
+                Live Broadcast
+              </span>
+              <button
+                onClick={() => setNewLivePost(null)}
+                className="text-gray-400 hover:text-white text-xs px-1"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs font-semibold text-white line-clamp-1">{newLivePost.title}</p>
+            <Link
+              href={`/blogs/${newLivePost.slug}`}
+              className="text-[11px] text-amber-300 hover:underline inline-flex items-center gap-1 font-medium pt-0.5"
+            >
+              Read new publication &rarr;
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

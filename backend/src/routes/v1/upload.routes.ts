@@ -4,8 +4,8 @@ import { authenticate, requireAdmin, requireContributorOrAdmin } from '../../mid
 
 const router = Router();
 
-// Admins & Contributors can upload blog banners and images
-router.post('/image', authenticate, requireContributorOrAdmin, uploadMiddleware.single('image'), UploadController.uploadImage);
+// Authenticated users can upload profile avatars, blog banners and photos
+router.post('/image', authenticate, uploadMiddleware.single('image'), UploadController.uploadImage);
 router.delete('/image', authenticate, requireContributorOrAdmin, UploadController.deleteImage);
 router.delete('/image/:publicId', authenticate, requireContributorOrAdmin, UploadController.deleteImage);
 

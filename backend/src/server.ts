@@ -1,9 +1,11 @@
+import http from 'http';
 import { createApp } from './app.js';
 import { config } from './config/env.js';
 import { connectMongo, prisma } from './config/database.js';
 import { setupQueues } from './config/queues.js';
 import { isCloudinaryConfigured } from './config/cloudinary.js';
 import { AuthService } from './services/auth.service.js';
+import { initSocketServer } from './config/socket.js';
 
 async function bootstrap() {
   console.log('----------------------------------------------------');
@@ -47,9 +49,11 @@ async function bootstrap() {
   }
 
   const app = createApp();
+  const httpServer = http.createServer(app);
+  initSocketServer(httpServer);
 
-  const server = app.listen(config.port, () => {
-    console.log(`🚀 Code & Coffee API v1 running live on http://localhost:${config.port}`);
+  const server = httpServer.listen(config.port, () => {
+    console.log(`🚀 Code & Coffee API v1 & WebSocket Server live on http://localhost:${config.port}`);
     console.log(`📡 Health Check URL: http://localhost:${config.port}/api/v1/health`);
     console.log(`🌐 Allowed Client URL: ${config.clientUrl}`);
     console.log('----------------------------------------------------');

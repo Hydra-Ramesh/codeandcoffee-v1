@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from '../config/database.js';
+import { Role } from '@prisma/client';
 import { config } from '../config/env.js';
 import { queueOtpEmail, queueWelcomeEmail } from '../config/queues.js';
 
@@ -14,7 +15,7 @@ export class AuthService {
     return bcrypt.compare(password, hash);
   }
 
-  static generateTokens(payload: { id: string; email: string; name: string; role: 'USER' | 'ADMIN' }) {
+  static generateTokens(payload: { id: string; email: string; name: string; role: Role }) {
     const accessToken = jwt.sign(payload, config.jwtSecret, {
       expiresIn: config.jwtExpiresIn as jwt.SignOptions['expiresIn'],
     });
