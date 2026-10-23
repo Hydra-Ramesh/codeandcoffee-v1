@@ -78,7 +78,7 @@ export default function Footer() {
         </div>
 
         {/* Middle Section: Links & Contact Info */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 py-14 border-b border-white/10 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 py-14 border-b border-white/10 text-sm">
           {/* Engineering Tracks */}
           <div>
             <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-4">
@@ -161,34 +161,27 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Office Address 1 */}
-          <div className="col-span-2 md:col-span-1 space-y-2">
+          {/* Office Address & Contact */}
+          <div className="col-span-2 md:col-span-1 space-y-3">
             <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-4 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-amber-400" /> San Francisco HQ
+              <MapPin className="w-3.5 h-3.5 text-amber-400" /> Office Address
             </h4>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              450 Mission Street, Suite 1200<br />
-              Financial District, San Francisco<br />
-              CA 94105, United States
+            <p className="text-xs text-gray-300 leading-relaxed">
+              Khejuri, East Medinipur<br />
+              West Bengal, India, 721430
             </p>
-            <p className="text-xs text-amber-400 pt-1">
-              hq@codeandcoffee.dev
-            </p>
-          </div>
-
-          {/* Office Address 2 */}
-          <div className="col-span-2 md:col-span-1 space-y-2">
-            <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-4 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-purple-400" /> Bengaluru R&amp;D
-            </h4>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              Embassy TechVillage, Outer Ring Road<br />
-              Devarabisanahalli, Bellandur<br />
-              Bengaluru 560103, India
-            </p>
-            <p className="text-xs text-purple-400 pt-1">
-              apac@codeandcoffee.dev
-            </p>
+            <div className="pt-2">
+              <span className="block text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                Direct Contact
+              </span>
+              <a
+                href="mailto:codeandcoffee2024@gmail.com"
+                className="text-xs text-amber-400 hover:text-amber-300 hover:underline font-mono inline-flex items-center gap-1.5 break-all"
+              >
+                <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                codeandcoffee2024@gmail.com
+              </a>
+            </div>
           </div>
         </div>
 

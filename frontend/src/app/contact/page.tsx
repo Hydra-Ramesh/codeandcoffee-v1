@@ -127,41 +127,52 @@ export default function ContactPage() {
 
         {/* Global Addresses & Channels */}
         <div className="lg:col-span-5 space-y-6">
-          {/* San Francisco HQ */}
+          {/* Registered Office */}
           <div className="glass-card p-6 rounded-2xl border border-white/10 space-y-3">
             <div className="flex items-center gap-2 text-amber-400">
               <Building className="w-5 h-5" />
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                San Francisco Global HQ
+                Headquarters &amp; Registered Office
               </h3>
             </div>
             <p className="text-xs text-gray-300 leading-relaxed">
-              Code &amp; Coffee Media Inc.<br />
-              450 Mission Street, Suite 1200<br />
-              Financial District, San Francisco, CA 94105<br />
-              United States of America
+              Code &amp; Coffee<br />
+              Khejuri, East Medinipur<br />
+              West Bengal, India, 721430
             </p>
-            <div className="text-xs text-amber-400 font-mono pt-1">
-              hq@codeandcoffee.dev
+            <div className="pt-2 border-t border-white/5 space-y-1">
+              <span className="block text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                Official Email
+              </span>
+              <a
+                href="mailto:codeandcoffee2024@gmail.com"
+                className="text-xs text-amber-400 hover:text-amber-300 hover:underline font-mono inline-flex items-center gap-1.5"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                codeandcoffee2024@gmail.com
+              </a>
             </div>
           </div>
 
-          {/* Bengaluru APAC Hub */}
+          {/* Editorial & Community Contact */}
           <div className="glass-card p-6 rounded-2xl border border-white/10 space-y-3">
             <div className="flex items-center gap-2 text-purple-400">
               <MapPin className="w-5 h-5" />
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                Bengaluru Engineering Center
+                Editorial &amp; Author Inquiries
               </h3>
             </div>
             <p className="text-xs text-gray-300 leading-relaxed">
-              Embassy TechVillage, Tower 2B<br />
-              Outer Ring Road, Devarabisanahalli<br />
-              Bengaluru, Karnataka 560103<br />
-              India
+              Looking to contribute technical articles, submit guest engineering case studies, or report site feedback?
             </p>
             <div className="text-xs text-purple-400 font-mono pt-1">
-              apac@codeandcoffee.dev
+              <a
+                href="mailto:codeandcoffee2024@gmail.com"
+                className="hover:underline inline-flex items-center gap-1.5"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                codeandcoffee2024@gmail.com
+              </a>
             </div>
           </div>
 
@@ -172,8 +183,10 @@ export default function ContactPage() {
               Security Vulnerability Disclosure
             </div>
             <p className="text-gray-400 leading-relaxed">
-              For responsible security disclosures, PGP-encrypted reports can be sent directly to{' '}
-              <span className="text-white font-mono">security@codeandcoffee.dev</span>.
+              For responsible security disclosures, reports can be sent directly to{' '}
+              <a href="mailto:codeandcoffee2024@gmail.com" className="text-amber-400 hover:underline font-mono">
+                codeandcoffee2024@gmail.com
+              </a>.
             </p>
             <div className="flex items-center gap-1.5 text-gray-400 pt-1">
               <Clock className="w-3.5 h-3.5 text-amber-400" />
