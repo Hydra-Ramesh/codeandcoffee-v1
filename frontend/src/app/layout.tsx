@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     'Developer Blog',
     'Cloud Security',
   ],
-  authors: [{ name: 'Code & Coffee Engineering Staff' }],
+  authors: [{ name: 'Ramesh Das' }, { name: 'Code & Coffee Engineering Staff' }],
   openGraph: {
     title: 'Code & Coffee — Engineering Journal',
     description: 'High-throughput architecture, zero-trust security, and modern web engineering deep-dives.',
