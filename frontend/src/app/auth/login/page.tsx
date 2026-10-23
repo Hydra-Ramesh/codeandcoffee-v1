@@ -11,6 +11,8 @@ function LoginFormContent() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
 
+  const redirectParam = searchParams.get('redirect');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,11 @@ function LoginFormContent() {
 
     const res = await login(email, password);
     if (res.success) {
-      router.push('/blogs');
+      if (redirectParam) {
+        router.push(redirectParam);
+      } else {
+        router.push('/blogs');
+      }
     } else {
       setError(res.message || 'Invalid email or password.');
     }
@@ -39,6 +45,9 @@ function LoginFormContent() {
 
   const handleOAuth = (provider: 'google' | 'github') => {
     setLoading(true);
+    if (redirectParam && typeof window !== 'undefined') {
+      sessionStorage.setItem('auth_redirect', redirectParam);
+    }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     window.location.href = `${apiUrl}/auth/${provider}`;
   };
@@ -65,6 +74,13 @@ function LoginFormContent() {
           <h1 className="text-2xl font-bold text-white">Welcome Back</h1>
           <p className="text-xs text-gray-400">Sign in to your Code &amp; Coffee developer account</p>
         </div>
+
+        {redirectParam && (
+          <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+            <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Please sign in to read the full publication.</span>
+          </div>
+        )}
 
         {error && (
           <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs text-center font-medium">
@@ -194,7 +210,10 @@ function LoginFormContent() {
 
         <div className="text-center text-xs text-gray-400">
           Don&apos;t have an account?{' '}
-          <Link href="/auth/register" className="text-amber-400 font-semibold hover:underline">
+          <Link
+            href={redirectParam ? `/auth/register?redirect=${encodeURIComponent(redirectParam)}` : '/auth/register'}
+            className="text-amber-400 font-semibold hover:underline"
+          >
             Register now &rarr;
           </Link>
         </div>

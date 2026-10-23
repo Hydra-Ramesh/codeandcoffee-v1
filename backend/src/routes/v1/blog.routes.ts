@@ -6,7 +6,7 @@ const router = Router();
 
 // Public routes
 router.get('/', BlogController.getAllBlogs);
-router.get('/:slug', optionalAuth, BlogController.getBlogBySlug);
+router.get('/:slug', authenticate, BlogController.getBlogBySlug);
 
 // Authoring and managing blogs: Administrators and Contributors
 router.post('/', authenticate, requireContributorOrAdmin, BlogController.createBlog);

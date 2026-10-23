@@ -1,14 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../context/AuthContext';
 import { Coffee, User, Mail, Lock, Sparkles } from 'lucide-react';
 
-export default function RegisterPage() {
+function RegisterFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { register, loginWithOAuth } = useAuth();
+
+  const redirectParam = searchParams.get('redirect');
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,7 +31,11 @@ export default function RegisterPage() {
     setLoading(true);
     const res = await register(name, email, password);
     if (res.success) {
-      router.push('/blogs');
+      if (redirectParam) {
+        router.push(redirectParam);
+      } else {
+        router.push('/blogs');
+      }
     } else {
       setError(res.message || 'Registration failed.');
     }
@@ -37,6 +44,9 @@ export default function RegisterPage() {
 
   const handleOAuth = (provider: 'google' | 'github') => {
     setLoading(true);
+    if (redirectParam && typeof window !== 'undefined') {
+      sessionStorage.setItem('auth_redirect', redirectParam);
+    }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     window.location.href = `${apiUrl}/auth/${provider}`;
   };
@@ -49,8 +59,15 @@ export default function RegisterPage() {
             <Sparkles className="w-6 h-6" />
           </div>
           <h1 className="text-2xl font-bold text-white">Join the Community</h1>
-          <p className="text-xs text-gray-400">Create your account to react, comment, and engage</p>
+          <p className="text-xs text-gray-400">Create your account to read full deep-dives, react, and comment</p>
         </div>
+
+        {redirectParam && (
+          <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+            <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Create a free developer account to read the full publication.</span>
+          </div>
+        )}
 
         {error && (
           <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs text-center font-medium">
@@ -163,11 +180,28 @@ export default function RegisterPage() {
 
         <div className="text-center text-xs text-gray-400">
           Already have an account?{' '}
-          <Link href="/auth/login" className="text-amber-400 font-semibold hover:underline">
+          <Link
+            href={redirectParam ? `/auth/login?redirect=${encodeURIComponent(redirectParam)}` : '/auth/login'}
+            className="text-amber-400 font-semibold hover:underline"
+          >
             Sign In &rarr;
           </Link>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-md mx-auto my-12 text-center text-gray-400 text-xs">
+          Loading registration form...
+        </div>
+      }
+    >
+      <RegisterFormContent />
+    </Suspense>
   );
 }

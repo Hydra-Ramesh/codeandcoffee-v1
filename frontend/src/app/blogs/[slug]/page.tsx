@@ -12,8 +12,11 @@ import {
   Sparkles,
   Eye,
   ShieldCheck,
+  Lock,
+  LogIn,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
 import MarkdownViewer from '../../../components/MarkdownViewer';
 import ActiveReaderPulse from '../../../components/ActiveReaderPulse';
 import LikeDislikeBar from '../../../components/LikeDislikeBar';
@@ -23,16 +26,25 @@ export default function BlogDetailPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
+  const { user, isLoading: authLoading } = useAuth();
 
   const [blog, setBlog] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // If unauthenticated once auth verification completes, redirect to sign-in page with return URL
   useEffect(() => {
-    if (slug) {
+    if (!authLoading && !user && slug) {
+      router.replace(`/auth/login?redirect=${encodeURIComponent(`/blogs/${slug}`)}`);
+    }
+  }, [authLoading, user, slug, router]);
+
+  // Load blog only when user is authenticated
+  useEffect(() => {
+    if (user && slug) {
       loadBlog();
     }
-  }, [slug]);
+  }, [user, slug]);
 
   const loadBlog = async () => {
     setLoading(true);
@@ -45,7 +57,7 @@ export default function BlogDetailPage() {
     setLoading(false);
   };
 
-  if (loading) {
+  if (authLoading || (user && loading)) {
     return (
       <div className="max-w-4xl mx-auto py-12 space-y-6 animate-pulse">
         <div className="h-6 w-32 bg-slate-800 rounded-lg" />
@@ -60,17 +72,60 @@ export default function BlogDetailPage() {
     );
   }
 
+  if (!authLoading && !user) {
+    return (
+      <div className="max-w-md mx-auto my-16 text-center glass-card p-8 rounded-3xl border border-white/10 shadow-2xl space-y-6">
+        <div className="inline-flex p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-white">Sign In Required</h2>
+          <p className="text-xs text-gray-300 leading-relaxed">
+            Full engineering deep-dives and architectural publications are available to authenticated members. Please sign in or create a free developer account to continue reading.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <Link
+            href={`/auth/login?redirect=${encodeURIComponent(`/blogs/${slug}`)}`}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+          >
+            <LogIn className="w-4 h-4" /> Sign In
+          </Link>
+          <Link
+            href={`/auth/register?redirect=${encodeURIComponent(`/blogs/${slug}`)}`}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl glass-card text-white hover:bg-white/10 text-xs font-semibold border border-white/10 transition-colors"
+          >
+            Register Free
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (error || !blog) {
     return (
       <div className="max-w-2xl mx-auto py-20 text-center glass-card p-8 rounded-3xl">
-        <h2 className="text-2xl font-bold text-white mb-2">Article Not Found</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">
+          {error?.includes('Authentication') ? 'Authentication Required' : 'Article Not Found'}
+        </h2>
         <p className="text-gray-400 mb-6">{error || "The requested blog post doesn't exist or was removed."}</p>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-semibold text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" /> Return to Home
-        </Link>
+        <div className="flex items-center justify-center gap-3">
+          {error?.includes('Authentication') ? (
+            <Link
+              href={`/auth/login?redirect=${encodeURIComponent(`/blogs/${slug}`)}`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-semibold text-sm"
+            >
+              <LogIn className="w-4 h-4" /> Sign In to Read
+            </Link>
+          ) : (
+            <Link
+              href="/blogs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-semibold text-sm"
+            >
+              <ArrowLeft className="w-4 h-4" /> Explore All Blogs
+            </Link>
+          )}
+        </div>
       </div>
     );
   }

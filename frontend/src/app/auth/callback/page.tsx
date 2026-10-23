@@ -35,8 +35,14 @@ function OAuthCallbackContent() {
       .then((success) => {
         if (success) {
           setStatus('success');
+          const redirectParam =
+            searchParams.get('redirect') ||
+            (typeof window !== 'undefined' ? sessionStorage.getItem('auth_redirect') : null);
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('auth_redirect');
+          }
           setTimeout(() => {
-            router.push('/blogs');
+            router.push(redirectParam || '/blogs');
           }, 800);
         } else {
           setStatus('error');

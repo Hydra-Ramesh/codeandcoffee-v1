@@ -2,7 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Clock, ThumbsUp, ThumbsDown, MessageSquare, Flame, Sparkles } from 'lucide-react';
+import { Clock, ThumbsUp, ThumbsDown, MessageSquare, Flame, Sparkles, ArrowRight, Lock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export interface BlogPost {
   id: string;
@@ -33,10 +34,15 @@ interface BlogCardProps {
 }
 
 export default function BlogCard({ blog, featured = false }: BlogCardProps) {
+  const { user } = useAuth();
   const activeCount = blog.activeReaders || 0;
   const likes = blog.likesCount || 0;
   const dislikes = blog.dislikesCount || 0;
   const comments = blog.commentsCount || 0;
+
+  const targetUrl = user
+    ? `/blogs/${blog.slug}`
+    : `/auth/login?redirect=${encodeURIComponent(`/blogs/${blog.slug}`)}`;
 
   return (
     <article
@@ -45,8 +51,9 @@ export default function BlogCard({ blog, featured = false }: BlogCardProps) {
       }`}
     >
       {/* Top Banner Image */}
-      <div
-        className={`relative overflow-hidden rounded-xl bg-slate-900 border border-white/10 ${
+      <Link
+        href={targetUrl}
+        className={`relative block overflow-hidden rounded-xl bg-slate-900 border border-white/10 cursor-pointer ${
           featured ? 'md:col-span-7 h-64 md:h-80' : 'h-48 w-full mb-4'
         }`}
       >
@@ -79,7 +86,7 @@ export default function BlogCard({ blog, featured = false }: BlogCardProps) {
           <Flame className="w-3.5 h-3.5 text-amber-400" />
           <span>{activeCount > 0 ? `${activeCount} live` : 'Active'}</span>
         </div>
-      </div>
+      </Link>
 
       {/* Content Section */}
       <div className={`flex flex-col flex-1 justify-between ${featured ? 'md:col-span-5' : ''}`}>
@@ -101,7 +108,7 @@ export default function BlogCard({ blog, featured = false }: BlogCardProps) {
           </div>
 
           {/* Title */}
-          <Link href={`/blogs/${blog.slug}`}>
+          <Link href={targetUrl}>
             <h3
               className={`font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-2 ${
                 featured ? 'text-2xl md:text-3xl mb-3' : 'text-lg mb-2'
@@ -112,9 +119,25 @@ export default function BlogCard({ blog, featured = false }: BlogCardProps) {
           </Link>
 
           {/* Excerpt */}
-          <p className="text-gray-400 text-sm line-clamp-3 mb-4 leading-relaxed">
+          <p className="text-gray-400 text-sm line-clamp-3 mb-3 leading-relaxed">
             {blog.excerpt}
           </p>
+
+          {/* Read Full Article Action Link */}
+          <div className="mb-4">
+            <Link
+              href={targetUrl}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors group/read"
+            >
+              <span>Read Full Article</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover/read:translate-x-1 transition-transform" />
+              {!user && (
+                <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-medium flex items-center gap-1">
+                  <Lock className="w-2.5 h-2.5 text-amber-400" /> Sign In Required
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
 
         {/* Footer: Author & Interaction Telemetry */}
