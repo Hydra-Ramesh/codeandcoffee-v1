@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../context/AuthContext';
-import { Coffee, Mail, Lock, LogIn, ArrowRight, ShieldCheck, User } from 'lucide-react';
+import { Coffee, Mail, Lock, LogIn } from 'lucide-react';
 
 function LoginFormContent() {
   const router = useRouter();
@@ -50,17 +50,6 @@ function LoginFormContent() {
     }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     window.location.href = `${apiUrl}/auth/${provider}`;
-  };
-
-  // Quick fill helper for review/testing
-  const fillCredentials = (type: 'admin' | 'user') => {
-    if (type === 'admin') {
-      setEmail('admin@codeandcoffee.dev');
-      setPassword('AdminPassword123!');
-    } else {
-      setEmail('alex.dev@gmail.com');
-      setPassword('UserPassword123!');
-    }
   };
 
   return (
@@ -182,31 +171,6 @@ function LoginFormContent() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        {/* Quick Fill Demo Accounts */}
-        <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 space-y-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 flex items-center justify-between">
-            <span>Quick Login Demo:</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fillCredentials('admin')}
-              className="flex-1 py-1 px-2 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-[11px] font-medium border border-purple-500/30 flex items-center justify-center gap-1"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Fill Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => fillCredentials('user')}
-              className="flex-1 py-1 px-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 text-[11px] font-medium border border-blue-500/30 flex items-center justify-center gap-1"
-            >
-              <User className="w-3.5 h-3.5" />
-              Fill Reader
-            </button>
-          </div>
-        </div>
 
         <div className="text-center text-xs text-gray-400">
           Don&apos;t have an account?{' '}
