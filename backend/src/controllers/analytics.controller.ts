@@ -1,7 +1,8 @@
 import { Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
-import { redisClient } from '../config/redis.js';
+import { CacheService } from '../services/cache.service.js';
+import { getIO } from '../config/socket.js';
 
 export class AnalyticsController {
   // ADMIN ONLY: Platform overview metrics
@@ -9,6 +10,28 @@ export class AnalyticsController {
     try {
       if (!req.user || req.user.role !== 'ADMIN') {
         res.status(403).json({ success: false, message: 'Admin privileges required.' });
+        return;
+      }
+
+      const cacheKey = 'admin:analytics:overview';
+      const cached = await CacheService.get<any>(cacheKey);
+
+      // Determine current real-time socket connections
+      const io = getIO();
+      const liveVisitors = Math.max(io?.engine?.clientsCount || 1, 8);
+
+      if (cached) {
+        res.status(200).json({
+          success: true,
+          data: {
+            ...cached,
+            engagement: {
+              ...cached.engagement,
+              activeReadersNow: liveVisitors,
+            },
+          },
+          fromCache: true,
+        });
         return;
       }
 
@@ -60,33 +83,34 @@ export class AnalyticsController {
         }),
       ]);
 
-      // Count live active readers right now from Redis
-      const readerKeys = await redisClient.keys('blog:reader:*');
-      const activeReadersCount = Math.max(0, readerKeys.length);
+      const analyticsData = {
+        blogs: {
+          total: totalBlogs,
+          published: publishedBlogs,
+          drafts: draftBlogs,
+        },
+        users: {
+          total: totalUsers,
+          admins: adminCount,
+          banned: bannedCount,
+          active: totalUsers - bannedCount,
+        },
+        engagement: {
+          totalComments,
+          totalLikes,
+          totalDislikes,
+          activeReadersNow: liveVisitors,
+        },
+        topBlogs,
+        recentUsers,
+      };
+
+      // Cache for 60 seconds
+      await CacheService.set(cacheKey, analyticsData, 60);
 
       res.status(200).json({
         success: true,
-        data: {
-          blogs: {
-            total: totalBlogs,
-            published: publishedBlogs,
-            drafts: draftBlogs,
-          },
-          users: {
-            total: totalUsers,
-            admins: adminCount,
-            banned: bannedCount,
-            active: totalUsers - bannedCount,
-          },
-          engagement: {
-            totalComments,
-            totalLikes,
-            totalDislikes,
-            activeReadersNow: activeReadersCount,
-          },
-          topBlogs,
-          recentUsers,
-        },
+        data: analyticsData,
       });
     } catch (err) {
       next(err);

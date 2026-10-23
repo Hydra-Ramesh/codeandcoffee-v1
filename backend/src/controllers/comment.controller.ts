@@ -71,9 +71,10 @@ export class CommentController {
       // Real-time WebSocket broadcast to all readers in the blog room
       broadcastCommentUpdate(data.postId, 'create', comment);
 
-      // Invalidate comments cache & blog count cache
+      // Invalidate comments cache & blog count cache & user profile
       await CacheService.del(`comments:post:${data.postId}`);
       await CacheService.invalidateBlogCaches(undefined, data.postId);
+      await CacheService.invalidateUserProfile(req.user.id);
 
       res.status(201).json({
         success: true,
@@ -112,9 +113,10 @@ export class CommentController {
       // Real-time WebSocket broadcast to remove comment
       broadcastCommentUpdate(comment.postId, 'delete', { id: comment.id });
 
-      // Invalidate comments cache
+      // Invalidate comments cache & user profile
       await CacheService.del(`comments:post:${comment.postId}`);
       await CacheService.invalidateBlogCaches(undefined, comment.postId);
+      await CacheService.invalidateUserProfile(comment.authorId);
 
       res.status(200).json({
         success: true,

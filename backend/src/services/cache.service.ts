@@ -8,7 +8,14 @@ export class CacheService {
     try {
       const data = await redisClient.get(key);
       if (!data) return null;
-      return JSON.parse(data) as T;
+      if (typeof data === 'object') {
+        return data as T;
+      }
+      try {
+        return JSON.parse(data) as T;
+      } catch {
+        return data as unknown as T;
+      }
     } catch (err) {
       console.warn(`Cache get error for key "${key}":`, (err as Error).message);
       return null;
@@ -68,8 +75,24 @@ export class CacheService {
       if (blogId) {
         await this.del(`blog:id:${blogId}`);
       }
+      // Also invalidate admin dashboard analytics
+      await this.del('admin:analytics:overview');
     } catch (err) {
       console.warn('Error during blog cache invalidation:', (err as Error).message);
     }
+  }
+
+  /**
+   * Invalidate admin analytics dashboard cache
+   */
+  static async invalidateAdminAnalytics(): Promise<void> {
+    await this.del('admin:analytics:overview');
+  }
+
+  /**
+   * Invalidate specific user profile cache
+   */
+  static async invalidateUserProfile(userId: string): Promise<void> {
+    await this.del(`user:profile:${userId}`);
   }
 }

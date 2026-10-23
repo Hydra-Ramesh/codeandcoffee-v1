@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+import { CacheService } from '../services/cache.service.js';
 import { z } from 'zod';
 
 const updateProfileSchema = z.object({
@@ -192,6 +193,17 @@ export class UserController {
         return;
       }
 
+      const cacheKey = `user:profile:${req.user.id}`;
+      const cached = await CacheService.get<any>(cacheKey);
+      if (cached) {
+        res.status(200).json({
+          success: true,
+          data: cached,
+          fromCache: true,
+        });
+        return;
+      }
+
       const user = await prisma.user.findUnique({
         where: { id: req.user.id },
         select: {
@@ -222,6 +234,11 @@ export class UserController {
         },
       });
 
+      // Cache user profile for 120 seconds
+      if (user) {
+        await CacheService.set(cacheKey, user, 120);
+      }
+
       res.status(200).json({
         success: true,
         data: user,
@@ -248,11 +265,14 @@ export class UserController {
           id: true,
           name: true,
           email: true,
-          role: true,
           avatar: true,
           bio: true,
+          role: true,
         },
       });
+
+      // Invalidate cached profile
+      await CacheService.invalidateUserProfile(req.user.id);
 
       res.status(200).json({
         success: true,

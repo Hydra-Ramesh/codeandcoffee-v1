@@ -49,6 +49,7 @@ export class BlogController {
       // Check Redis cache for fast retrieval
       const cached = await CacheService.get<any>(cacheKey);
       if (cached) {
+        res.set('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
         res.status(200).json({
           success: true,
           data: cached,
@@ -138,6 +139,7 @@ export class BlogController {
       // Cache for 60 seconds
       await CacheService.set(cacheKey, responsePayload, 60);
 
+      res.set('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
       res.status(200).json({
         success: true,
         data: responsePayload,
@@ -204,6 +206,7 @@ export class BlogController {
 
       const totalViews = (blog.views || 0) + bufferedViews;
 
+      res.set('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=300');
       res.status(200).json({
         success: true,
         data: {
@@ -481,6 +484,7 @@ export class BlogController {
       // Real-time WebSocket reaction update
       broadcastReactionUpdate(id, { likesCount, dislikesCount });
       await CacheService.invalidateBlogCaches(undefined, id);
+      await CacheService.invalidateUserProfile(userId);
 
       res.status(200).json({
         success: true,
@@ -536,6 +540,7 @@ export class BlogController {
       // Real-time WebSocket reaction update
       broadcastReactionUpdate(id, { likesCount, dislikesCount });
       await CacheService.invalidateBlogCaches(undefined, id);
+      await CacheService.invalidateUserProfile(userId);
 
       res.status(200).json({
         success: true,
