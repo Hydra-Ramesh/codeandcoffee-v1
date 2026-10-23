@@ -136,6 +136,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/become-contributor" className="hover:text-amber-400 transition-colors">
+                  Become a Contributor
+                </Link>
+              </li>
+              <li>
                 <Link href="/blogs" className="hover:text-amber-400 transition-colors">
                   All Publications
                 </Link>

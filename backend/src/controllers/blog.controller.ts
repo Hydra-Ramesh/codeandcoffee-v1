@@ -171,11 +171,11 @@ export class BlogController {
     }
   }
 
-  // ADMIN ONLY: Create Blog
+  // ADMIN & CONTRIBUTOR: Create Blog
   static async createBlog(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user || req.user.role !== 'ADMIN') {
-        res.status(403).json({ success: false, message: 'Only administrators can create blog articles.' });
+      if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'CONTRIBUTOR')) {
+        res.status(403).json({ success: false, message: 'Only administrators and authorized contributors can create blog articles.' });
         return;
       }
 
@@ -235,7 +235,7 @@ export class BlogController {
 
       res.status(201).json({
         success: true,
-        message: 'Blog post created successfully by administrator.',
+        message: 'Blog post created successfully.',
         data: {
           ...post,
           activeReaders: 0,
@@ -249,11 +249,11 @@ export class BlogController {
     }
   }
 
-  // ADMIN ONLY: Update Blog
+  // ADMIN & CONTRIBUTOR: Update Blog
   static async updateBlog(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user || req.user.role !== 'ADMIN') {
-        res.status(403).json({ success: false, message: 'Only administrators can modify blog articles.' });
+      if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'CONTRIBUTOR')) {
+        res.status(403).json({ success: false, message: 'Only administrators and authorized contributors can modify blog articles.' });
         return;
       }
 
@@ -263,6 +263,12 @@ export class BlogController {
       const existing = await prisma.post.findUnique({ where: { id } });
       if (!existing) {
         res.status(404).json({ success: false, message: 'Blog post not found.' });
+        return;
+      }
+
+      // Contributors can only modify their own articles
+      if (req.user.role === 'CONTRIBUTOR' && existing.authorId !== req.user.id) {
+        res.status(403).json({ success: false, message: 'Access denied: Contributors can only modify their own articles.' });
         return;
       }
 
@@ -324,15 +330,27 @@ export class BlogController {
     }
   }
 
-  // ADMIN ONLY: Delete Blog
+  // ADMIN & CONTRIBUTOR: Delete Blog
   static async deleteBlog(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user || req.user.role !== 'ADMIN') {
-        res.status(403).json({ success: false, message: 'Only administrators can delete blogs.' });
+      if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'CONTRIBUTOR')) {
+        res.status(403).json({ success: false, message: 'Only administrators and authorized contributors can delete blogs.' });
         return;
       }
 
       const id = String(req.params.id);
+      const existing = await prisma.post.findUnique({ where: { id } });
+      if (!existing) {
+        res.status(404).json({ success: false, message: 'Blog post not found.' });
+        return;
+      }
+
+      // Contributors can only delete their own articles
+      if (req.user.role === 'CONTRIBUTOR' && existing.authorId !== req.user.id) {
+        res.status(403).json({ success: false, message: 'Access denied: Contributors can only delete their own articles.' });
+        return;
+      }
+
       await prisma.post.delete({ where: { id } });
 
       res.status(200).json({

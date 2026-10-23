@@ -26,6 +26,40 @@ export function getEmailTransporter(): nodemailer.Transporter | null {
 }
 
 /**
+ * Send custom transactional email
+ */
+export async function sendEmail({
+  to,
+  subject,
+  text,
+  html,
+}: {
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
+}): Promise<boolean> {
+  const mailTransporter = getEmailTransporter();
+  if (mailTransporter) {
+    try {
+      await mailTransporter.sendMail({
+        from: config.smtp.from || `"Code & Coffee" <${config.smtp.user}>`,
+        to,
+        subject,
+        text,
+        html,
+      });
+      console.log(`✅ Email dispatched to ${to}: ${subject}`);
+      return true;
+    } catch (err) {
+      console.error(`❌ Failed sending email to ${to}:`, (err as Error).message);
+    }
+  }
+  console.log(`📨 [DEV EMAIL] To: ${to} | Subject: ${subject}`);
+  return true;
+}
+
+/**
  * Send 6-digit OTP verification email
  */
 export async function sendOtpEmail(toEmail: string, otpCode: string, name?: string): Promise<boolean> {

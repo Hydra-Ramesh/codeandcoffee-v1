@@ -133,8 +133,8 @@ export class UserController {
       const id = String(req.params.id);
       const { role } = req.body;
 
-      if (role !== 'ADMIN' && role !== 'USER') {
-        res.status(400).json({ success: false, message: 'Invalid role. Must be either USER or ADMIN.' });
+      if (role !== 'ADMIN' && role !== 'CONTRIBUTOR' && role !== 'USER') {
+        res.status(400).json({ success: false, message: 'Invalid role. Must be USER, CONTRIBUTOR, or ADMIN.' });
         return;
       }
 

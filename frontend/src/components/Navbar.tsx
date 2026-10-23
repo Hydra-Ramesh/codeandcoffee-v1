@@ -4,15 +4,16 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { Coffee, Code2, ShieldAlert, User, LogOut, Menu, X, Sparkles, BookOpen } from 'lucide-react';
+import { Coffee, Code2, ShieldAlert, User, LogOut, Menu, X, Sparkles, BookOpen, PenTool } from 'lucide-react';
 
 export default function Navbar() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isContributor, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
   const navLinks = [
     { name: 'Explore Blogs', href: '/blogs' },
+    { name: 'Write for Us', href: '/become-contributor' },
     { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
   ];
@@ -67,6 +68,16 @@ export default function Navbar() {
                 >
                   <ShieldAlert className="w-4 h-4 text-amber-300" />
                   Admin Panel
+                </Link>
+              )}
+
+              {!isAdmin && user.role === 'CONTRIBUTOR' && (
+                <Link
+                  href="/admin/blogs/new"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 text-xs font-bold uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all"
+                >
+                  <PenTool className="w-3.5 h-3.5" />
+                  Author Studio
                 </Link>
               )}
 
@@ -154,10 +165,21 @@ export default function Navbar() {
                 <Link
                   href="/admin"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-amber-400 font-medium bg-amber-500/10"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-purple-300 font-medium bg-purple-500/10"
                 >
                   <ShieldAlert className="w-4 h-4" />
                   Admin Panel
+                </Link>
+              )}
+
+              {!isAdmin && user.role === 'CONTRIBUTOR' && (
+                <Link
+                  href="/admin/blogs/new"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-amber-400 font-medium bg-amber-500/10"
+                >
+                  <PenTool className="w-4 h-4" />
+                  Author Studio
                 </Link>
               )}
 

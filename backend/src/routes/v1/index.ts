@@ -6,6 +6,7 @@ import userRoutes from './user.routes.js';
 import commentRoutes from './comment.routes.js';
 import analyticsRoutes from './analytics.routes.js';
 import uploadRoutes from './upload.routes.js';
+import contributorRoutes from './contributor.routes.js';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/users', userRoutes);
 router.use('/comments', commentRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/contributors', contributorRoutes);
 
 export default router;

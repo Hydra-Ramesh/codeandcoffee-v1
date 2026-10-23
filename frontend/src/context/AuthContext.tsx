@@ -7,7 +7,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'CONTRIBUTOR' | 'ADMIN';
   avatar?: string;
   bio?: string;
 }
@@ -17,6 +17,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isAdmin: boolean;
+  isContributor: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   loginWithOAuth: (provider: 'google' | 'github', email: string, name: string, avatar?: string) => Promise<boolean>;
@@ -132,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isAdmin = user?.role === 'ADMIN';
+  const isContributor = user?.role === 'CONTRIBUTOR' || user?.role === 'ADMIN';
 
   return (
     <AuthContext.Provider
@@ -140,6 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token,
         isLoading,
         isAdmin,
+        isContributor,
         login,
         register,
         loginWithOAuth,

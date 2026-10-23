@@ -54,17 +54,18 @@ export default function AdminUserGovernancePage() {
     }
   };
 
-  const handleToggleRole = async (user: any) => {
-    const newRole = user.role === 'ADMIN' ? 'USER' : 'ADMIN';
-    if (!confirm(`Change role of ${user.name} to ${newRole}?`)) return;
+  const handleToggleRole = async (targetUser: any, specificRole?: string) => {
+    const newRole = specificRole || (targetUser.role === 'ADMIN' ? 'USER' : 'ADMIN');
+    if (newRole === targetUser.role) return;
+    if (!confirm(`Change role of ${targetUser.name} to ${newRole}?`)) return;
 
-    const res = await fetchApi(`/users/${user.id}/role`, {
+    const res = await fetchApi(`/users/${targetUser.id}/role`, {
       method: 'PATCH',
       body: JSON.stringify({ role: newRole }),
     });
 
     if (res.success && res.data) {
-      setUsers(users.map((u) => (u.id === user.id ? { ...u, role: newRole } : u)));
+      setUsers(users.map((u) => (u.id === targetUser.id ? { ...u, role: newRole } : u)));
       setMessage(res.message || `Role updated to ${newRole}`);
       setTimeout(() => setMessage(null), 3000);
     } else {
@@ -142,6 +143,7 @@ export default function AdminUserGovernancePage() {
         >
           <option value="">All Roles</option>
           <option value="ADMIN">Administrators</option>
+          <option value="CONTRIBUTOR">Contributors</option>
           <option value="USER">Standard Users</option>
         </select>
       </div>
@@ -178,15 +180,21 @@ export default function AdminUserGovernancePage() {
                     </td>
                     <td className="p-4 text-gray-300 font-mono text-[11px]">{u.email}</td>
                     <td className="p-4">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      <select
+                        value={u.role}
+                        onChange={(e) => handleToggleRole(u, e.target.value)}
+                        className={`px-2 py-1 rounded text-[10px] font-bold border cursor-pointer outline-none ${
                           u.role === 'ADMIN'
-                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                            : 'bg-slate-800 text-gray-300'
+                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                            : u.role === 'CONTRIBUTOR'
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                            : 'bg-slate-800 text-gray-300 border-white/10'
                         }`}
                       >
-                        {u.role}
-                      </span>
+                        <option value="USER" className="bg-slate-900 text-white">USER</option>
+                        <option value="CONTRIBUTOR" className="bg-slate-900 text-amber-300">CONTRIBUTOR</option>
+                        <option value="ADMIN" className="bg-slate-900 text-purple-300">ADMIN</option>
+                      </select>
                     </td>
                     <td className="p-4">
                       <span

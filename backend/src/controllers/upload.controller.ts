@@ -33,7 +33,87 @@ export const uploadMiddleware = multer({
   },
 });
 
+export const resumeUploadMiddleware = multer({
+  storage,
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
+  fileFilter: (_req, file, cb) => {
+    const allowed = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'image/png',
+      'image/jpeg',
+    ];
+    if (allowed.includes(file.mimetype) || file.originalname.match(/\.(pdf|doc|docx|txt)$/i)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only document files (PDF, DOC, DOCX) or images are allowed for resumes!'));
+    }
+  },
+});
+
 export class UploadController {
+  /**
+   * Upload resume document (PDF, DOCX)
+   */
+  static async uploadResume(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.file || !req.file.buffer) {
+        res.status(400).json({ success: false, message: 'No resume document uploaded.' });
+        return;
+      }
+
+      // Check if Cloudinary v2 is configured
+      if (isCloudinaryConfigured()) {
+        try {
+          const cloudinaryResult = await uploadBufferToCloudinary(req.file.buffer, {
+            folder: 'code_and_coffee/resumes',
+            filename: req.file.originalname,
+          });
+
+          res.status(200).json({
+            success: true,
+            message: 'Resume uploaded successfully to Cloudinary.',
+            data: {
+              url: cloudinaryResult.secure_url,
+              publicId: cloudinaryResult.public_id,
+              filename: req.file.originalname,
+              size: cloudinaryResult.bytes,
+              storage: 'cloudinary_v2',
+            },
+          });
+          return;
+        } catch (cloudinaryErr) {
+          console.error('⚠️ Cloudinary resume upload failed, falling back to disk storage:', cloudinaryErr);
+        }
+      }
+
+      // Fallback: Local disk storage
+      const ext = path.extname(req.file.originalname) || '.pdf';
+      const uniqueName = `resume_${Date.now()}_${Math.round(Math.random() * 1e9)}${ext}`;
+      const filePath = path.join(uploadsDir, uniqueName);
+
+      await fs.promises.writeFile(filePath, req.file.buffer);
+
+      const protocol = req.protocol;
+      const host = req.get('host');
+      const fileUrl = `${protocol}://${host}/uploads/${uniqueName}`;
+
+      res.status(200).json({
+        success: true,
+        message: 'Resume stored in local uploads directory.',
+        data: {
+          url: fileUrl,
+          filename: req.file.originalname,
+          size: req.file.size,
+          storage: 'local',
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
   /**
    * Upload an image to Cloudinary v2 object storage (with local fallback if unconfigured)
    */

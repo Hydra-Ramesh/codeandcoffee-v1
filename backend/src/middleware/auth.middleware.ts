@@ -7,7 +7,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'CONTRIBUTOR' | 'ADMIN';
   isBanned?: boolean;
 }
 
@@ -67,6 +67,27 @@ export function requireAdmin(
     res.status(403).json({
       success: false,
       message: 'Access denied: Administrator privileges required for this action.',
+    });
+    return;
+  }
+
+  next();
+}
+
+export function requireContributorOrAdmin(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Authentication required.' });
+    return;
+  }
+
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'CONTRIBUTOR') {
+    res.status(403).json({
+      success: false,
+      message: 'Access denied: Contributor or Administrator privileges required to author articles.',
     });
     return;
   }
