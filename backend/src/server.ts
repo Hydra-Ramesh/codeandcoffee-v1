@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { config } from './config/env.js';
 import { connectMongo, prisma } from './config/database.js';
 import { setupQueues } from './config/queues.js';
+import { isCloudinaryConfigured } from './config/cloudinary.js';
 import { AuthService } from './services/auth.service.js';
 
 async function bootstrap() {
@@ -12,6 +13,13 @@ async function bootstrap() {
   // Initialize Queues & Mongo
   setupQueues();
   await connectMongo();
+
+  // Cloudinary v2 Status
+  if (isCloudinaryConfigured()) {
+    console.log('☁️ Cloudinary v2 Object Storage: Active & Ready for photos.');
+  } else {
+    console.log('📁 Object Storage: Local /uploads active (Cloudinary v2 keys can be set in .env).');
+  }
 
   // Ensure default Admin user exists in Neon DB
   try {

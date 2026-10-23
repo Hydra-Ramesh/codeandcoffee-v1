@@ -40,6 +40,13 @@ export const config = {
     },
   },
 
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
+    apiKey: process.env.CLOUDINARY_API_KEY || '',
+    apiSecret: process.env.CLOUDINARY_API_SECRET || '',
+    url: process.env.CLOUDINARY_URL || '',
+  },
+
   initialAdmin: {
     email: process.env.INITIAL_ADMIN_EMAIL || 'admin@codeandcoffee.dev',
     password: process.env.INITIAL_ADMIN_PASSWORD || 'AdminPassword123!',
