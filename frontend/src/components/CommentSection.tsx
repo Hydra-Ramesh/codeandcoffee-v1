@@ -25,6 +25,15 @@ interface CommentSectionProps {
   postId: string;
 }
 
+function deduplicateComments(list: Comment[]): Comment[] {
+  const seen = new Set<string>();
+  return list.filter((c) => {
+    if (!c?.id || seen.has(c.id)) return false;
+    seen.add(c.id);
+    return true;
+  });
+}
+
 export default function CommentSection({ postId }: CommentSectionProps) {
   const { user, isAdmin } = useAuth();
   const { success, warning, error: toastError } = useToast();
@@ -37,7 +46,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     setLoading(true);
     const res = await fetchApi(`/comments/${postId}`);
     if (res.success && Array.isArray(res.data)) {
-      setComments(res.data);
+      setComments(deduplicateComments(res.data));
     }
     setLoading(false);
   };
@@ -52,7 +61,22 @@ export default function CommentSection({ postId }: CommentSectionProps) {
         if (data.action === 'create') {
           setComments((prev) => {
             if (prev.some((c) => c.id === data.comment.id)) return prev;
-            return [data.comment, ...prev];
+
+            // Check if there is an in-flight optimistic comment from this user matching content
+            const optimisticIndex = prev.findIndex(
+              (c) =>
+                c.id.startsWith('optimistic-') &&
+                c.author.id === data.comment.author.id &&
+                c.content.trim() === data.comment.content.trim()
+            );
+
+            if (optimisticIndex !== -1) {
+              const updated = [...prev];
+              updated[optimisticIndex] = data.comment;
+              return deduplicateComments(updated);
+            }
+
+            return deduplicateComments([data.comment, ...prev]);
           });
         } else if (data.action === 'delete') {
           setComments((prev) => prev.filter((c) => c.id !== data.comment.id));
@@ -90,7 +114,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
       },
     };
 
-    setComments((prev) => [optimisticComment, ...prev]);
+    setComments((prev) => deduplicateComments([optimisticComment, ...prev]));
     setNewComment('');
     setSubmitting(true);
 
@@ -101,8 +125,14 @@ export default function CommentSection({ postId }: CommentSectionProps) {
       });
 
       if (res.success && res.data) {
-        // Replace temporary optimistic comment with verified server record
-        setComments((prev) => prev.map((c) => (c.id === tempId ? res.data : c)));
+        // If socket event already inserted this comment, remove the optimistic placeholder
+        setComments((prev) => {
+          const alreadyExists = prev.some((c) => c.id === res.data.id);
+          if (alreadyExists) {
+            return prev.filter((c) => c.id !== tempId);
+          }
+          return deduplicateComments(prev.map((c) => (c.id === tempId ? res.data : c)));
+        });
         success('Comment posted to discussion!');
       } else {
         // Rollback
@@ -238,7 +268,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
             No comments yet. Be the first developer to share your insight!
           </div>
         ) : (
-          comments.map((comment) => {
+          deduplicateComments(comments).map((comment) => {
             const canDelete = user && (user.id === comment.author.id || isAdmin);
             return (
               <div
