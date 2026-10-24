@@ -19,6 +19,9 @@ const __dirname = path.dirname(__filename);
 export function createApp() {
   const app = express();
 
+  // Trust first reverse proxy hop (Render, Cloudflare, AWS, Nginx)
+  app.set('trust proxy', 1);
+
   // Distributed correlation ID assignment
   app.use(requestIdMiddleware);
 

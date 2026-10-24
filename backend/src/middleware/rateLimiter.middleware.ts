@@ -6,6 +6,7 @@ export const apiLimiter = rateLimit({
   max: 300, // Limit each IP to 300 requests per 15 mins
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     success: false,
     message: 'Too many requests from this IP address, please try again after 15 minutes.',
@@ -18,6 +19,7 @@ export const authLimiter = rateLimit({
   max: 20, // Max 20 attempts
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     success: false,
     message: 'Too many authentication attempts. Please wait 10 minutes before trying again.',
@@ -30,6 +32,7 @@ export const heartbeatLimiter = rateLimit({
   max: 60, // Up to 60 pings/min
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     success: false,
     message: 'Heartbeat rate limit reached.',
@@ -42,6 +45,7 @@ export const commentLimiter = rateLimit({
   max: 15, // Up to 15 comments per 5 minutes per IP
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     success: false,
     message: 'Too many comments submitted in a short period. Please wait a few minutes.',
@@ -54,6 +58,7 @@ export const contributorLimiter = rateLimit({
   max: 5, // Up to 5 submission attempts per hour per IP
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     success: false,
     message: 'Application submission limit exceeded. Please wait an hour before submitting again.',
