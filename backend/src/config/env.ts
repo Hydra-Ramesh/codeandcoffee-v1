@@ -8,11 +8,25 @@ const defaultApiBaseUrl =
     ? 'https://codeandcoffee-v1.onrender.com'
     : `http://localhost:${process.env.PORT || '5000'}`);
 
+const rawClientUrl =
+  process.env.CLIENT_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://codeandcoffee-v1.vercel.app'
+    : 'http://localhost:3000');
+
+// Primary single URL for OAuth redirect URLs and email links
+const primaryClientUrl = rawClientUrl.split(',')[0].trim();
+const allowedClientOrigins = rawClientUrl
+  .split(',')
+  .map((u) => u.trim())
+  .filter(Boolean);
+
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   apiVersion: process.env.API_VERSION || 'v1',
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
+  clientUrl: primaryClientUrl,
+  allowedClientOrigins,
 
   databaseUrl: process.env.DATABASE_URL || '',
   mongodbUri: process.env.MONGODB_URI || '',

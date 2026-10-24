@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://codeandcoffee-v1.vercel.app'),
   title: 'Code & Coffee — Engineering Journal for Scalable Software',
   description:
     'A high-performance publication for distributed systems, database engineering, cloud architecture, and modern web application craftsmanship.',
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Code & Coffee — Engineering Journal',
     description: 'High-throughput architecture, zero-trust security, and modern web engineering deep-dives.',
-    url: 'https://codeandcoffee.dev',
+    url: 'https://codeandcoffee-v1.vercel.app',
     siteName: 'Code & Coffee',
     images: [
       {

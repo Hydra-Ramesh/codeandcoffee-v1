@@ -37,9 +37,10 @@ export function createApp() {
   );
 
   // Dynamic and resilient CORS origin resolution
-  const rawClientOrigins = (config.clientUrl || '').split(',').map((u) => u.trim()).filter(Boolean);
+  const rawClientOrigins = config.allowedClientOrigins || [config.clientUrl];
   const staticOrigins = new Set([
     ...rawClientOrigins,
+    'https://codeandcoffee-v1.vercel.app',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001',
