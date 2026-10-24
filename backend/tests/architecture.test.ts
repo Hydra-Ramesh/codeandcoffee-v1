@@ -185,4 +185,20 @@ describe('System Architecture & Reliability Suite', () => {
       expect(subsequentRes.status).toBe(401);
     });
   });
+
+  describe('Topic 18: CORS Preflight & Header Whitelisting', () => {
+    it('OPTIONS preflight requests should allow Idempotency-Key and X-Request-Id headers', async () => {
+      const res = await request(app)
+        .options('/api/v1/blogs')
+        .set('Origin', 'http://localhost:3000')
+        .set('Access-Control-Request-Method', 'POST')
+        .set('Access-Control-Request-Headers', 'content-type, idempotency-key, x-request-id');
+
+      expect([200, 204]).toContain(res.status);
+      expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+      const allowedHeaders = res.headers['access-control-allow-headers']?.toLowerCase();
+      expect(allowedHeaders).toContain('idempotency-key');
+      expect(allowedHeaders).toContain('x-request-id');
+    });
+  });
 });
