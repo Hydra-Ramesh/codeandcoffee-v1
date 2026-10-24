@@ -19,6 +19,16 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
       },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '5000',
+      },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        port: '5000',
+      },
     ],
   },
   turbopack: {
@@ -33,17 +43,27 @@ const nextConfig: NextConfig = {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error'] } : false,
   },
   async headers() {
+    const apiOrigin = process.env.NEXT_PUBLIC_API_URL
+      ? (() => {
+          try {
+            return new URL(process.env.NEXT_PUBLIC_API_URL).origin;
+          } catch {
+            return '';
+          }
+        })()
+      : '';
+
     const cspHeader = `
       default-src 'self';
       script-src 'self' 'unsafe-eval' 'unsafe-inline';
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-      img-src 'self' blob: data: https://res.cloudinary.com https://images.unsplash.com https://api.dicebear.com https://avatars.githubusercontent.com https://lh3.googleusercontent.com;
+      img-src 'self' blob: data: http://localhost:5000 http://127.0.0.1:5000 http://localhost:* http://127.0.0.1:* ${apiOrigin} https://res.cloudinary.com https://images.unsplash.com https://api.dicebear.com https://avatars.githubusercontent.com https://lh3.googleusercontent.com;
       font-src 'self' data: https://fonts.gstatic.com;
       object-src 'none';
       base-uri 'self';
       form-action 'self';
       frame-ancestors 'none';
-      connect-src 'self' http://localhost:5000 ws://localhost:5000 wss://localhost:5000 http://127.0.0.1:5000 ws://127.0.0.1:5000 https://api.dicebear.com https://res.cloudinary.com;
+      connect-src 'self' http://localhost:5000 ws://localhost:5000 wss://localhost:5000 http://127.0.0.1:5000 ws://127.0.0.1:5000 ${apiOrigin} https://api.dicebear.com https://res.cloudinary.com;
     `.replace(/\s{2,}/g, ' ').trim();
 
     return [

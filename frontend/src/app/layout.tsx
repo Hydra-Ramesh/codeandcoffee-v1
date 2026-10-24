@@ -55,7 +55,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" data-scroll-behavior="smooth">
       <body className="bg-[#090d16] text-[#f3f4f6] min-h-screen flex flex-col justify-between selection:bg-amber-500 selection:text-slate-950">
         <AuthProvider>
           <ToastProvider>
