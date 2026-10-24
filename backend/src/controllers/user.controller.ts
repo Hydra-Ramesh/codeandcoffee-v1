@@ -122,6 +122,9 @@ export class UserController {
         select: { id: true, name: true, email: true, role: true, isBanned: true },
       });
 
+      // Invalidate session cache immediately so bans take effect instantly
+      await CacheService.invalidateUserSession(id);
+
       res.status(200).json({
         success: true,
         message: `User ${updated.email} has been ${updated.isBanned ? 'suspended' : 'reactivated'} successfully.`,
@@ -159,6 +162,9 @@ export class UserController {
         select: { id: true, name: true, email: true, role: true, isBanned: true },
       });
 
+      // Invalidate session cache immediately so role changes apply instantly
+      await CacheService.invalidateUserSession(id);
+
       res.status(200).json({
         success: true,
         message: `User role updated to ${role}.`,
@@ -184,6 +190,7 @@ export class UserController {
       }
 
       await prisma.user.delete({ where: { id } });
+      await CacheService.invalidateUserSession(id);
 
       res.status(200).json({
         success: true,

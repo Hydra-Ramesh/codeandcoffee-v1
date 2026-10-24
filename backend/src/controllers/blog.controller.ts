@@ -573,4 +573,39 @@ export class BlogController {
       next(err);
     }
   }
+
+  // Public: Get category breakdown with published blog counts (cached for 10 min)
+  static async getCategoriesSummary(req: Request, res: Response, next: NextFunction) {
+    try {
+      const cacheKey = 'blogs:categories:summary';
+      const cached = await CacheService.get<any>(cacheKey);
+      if (cached) {
+        res.set('X-Cache', 'HIT');
+        res.set('Cache-Control', 'public, max-age=120, s-maxage=300, stale-while-revalidate=600');
+        res.status(200).json({ success: true, data: cached, fromCache: true });
+        return;
+      }
+
+      const categories = await prisma.post.groupBy({
+        by: ['category'],
+        where: { isPublished: true },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+      });
+
+      const formatted = categories.map((c) => ({
+        category: c.category,
+        count: c._count.id,
+      }));
+
+      // Cache for 600 seconds (10 min)
+      await CacheService.set(cacheKey, formatted, 600);
+
+      res.set('X-Cache', 'MISS');
+      res.set('Cache-Control', 'public, max-age=120, s-maxage=300, stale-while-revalidate=600');
+      res.status(200).json({ success: true, data: formatted, fromCache: false });
+    } catch (err) {
+      next(err);
+    }
+  }
 }

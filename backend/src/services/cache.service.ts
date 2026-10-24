@@ -75,7 +75,8 @@ export class CacheService {
       if (blogId) {
         await this.del(`blog:id:${blogId}`);
       }
-      // Also invalidate admin dashboard analytics
+      // Invalidate category breakdown and admin dashboard analytics
+      await this.del('blogs:categories:summary');
       await this.del('admin:analytics:overview');
     } catch (err) {
       console.warn('Error during blog cache invalidation:', (err as Error).message);
@@ -90,9 +91,43 @@ export class CacheService {
   }
 
   /**
-   * Invalidate specific user profile cache
+   * Invalidate specific user profile and authenticated session cache
    */
   static async invalidateUserProfile(userId: string): Promise<void> {
-    await this.del(`user:profile:${userId}`);
+    await Promise.all([
+      this.del(`user:profile:${userId}`),
+      this.del(`user:session:${userId}`),
+    ]);
+  }
+
+  /**
+   * Invalidate authenticated session cache for a user (e.g., when banned, role changed, or password reset)
+   */
+  static async invalidateUserSession(userId: string): Promise<void> {
+    await this.del(`user:session:${userId}`);
+  }
+
+  /**
+   * Invalidate admin badges and pending counter caches
+   */
+  static async invalidateAdminBadges(): Promise<void> {
+    await Promise.all([
+      this.del('admin:badge:contributors'),
+      this.del('admin:badge:inquiries'),
+      this.del('admin:stats:waitlist'),
+      this.del('admin:analytics:overview'),
+    ]);
+  }
+
+  /**
+   * Invalidate waitlist statistics and specific user status cache
+   */
+  static async invalidateWaitlist(userId?: string): Promise<void> {
+    const promises = [this.del('admin:stats:waitlist')];
+    if (userId) {
+      promises.push(this.del(`waitlist:status:${userId}`));
+    }
+    await Promise.all(promises);
   }
 }
+

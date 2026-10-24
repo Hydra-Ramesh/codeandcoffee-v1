@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
 import { prisma } from '../config/database.js';
 
+import { CacheService } from '../services/cache.service.js';
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -13,6 +15,26 @@ export interface AuthUser {
 
 export interface AuthenticatedRequest extends Request {
   user?: AuthUser;
+}
+
+async function getCachedAuthUser(userId: string): Promise<AuthUser | null> {
+  const cacheKey = `user:session:${userId}`;
+  const cached = await CacheService.get<AuthUser>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, role: true, isBanned: true },
+  });
+
+  if (user) {
+    // Cache active user session in Redis for 300 seconds (5 minutes)
+    await CacheService.set(cacheKey, user, 300);
+  }
+
+  return user as AuthUser | null;
 }
 
 export async function authenticate(
@@ -32,11 +54,8 @@ export async function authenticate(
 
     const decoded = jwt.verify(token, config.jwtSecret) as AuthUser;
 
-    // Check user in database
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, email: true, name: true, role: true, isBanned: true },
-    });
+    // Check user in Redis session cache or database
+    const user = await getCachedAuthUser(decoded.id);
 
     if (!user) {
       res.status(401).json({ success: false, message: 'User not found or account deactivated.' });
@@ -112,10 +131,7 @@ export async function optionalAuth(
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as AuthUser;
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, email: true, name: true, role: true, isBanned: true },
-    });
+    const user = await getCachedAuthUser(decoded.id);
 
     if (user && !user.isBanned) {
       req.user = user as AuthUser;

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { broadcastNewWaitlistEntry, broadcastWaitlistCount } from '../config/socket.js';
+import { CacheService } from '../services/cache.service.js';
 
 const joinWaitlistSchema = z.object({
   track: z.string().min(2, 'Track is required').default('All Tracks (Full Job-Ready Bundle)'),
@@ -82,6 +83,9 @@ export class WaitlistController {
         },
       });
 
+      // Invalidate waitlist cache and specific user waitlist status
+      await CacheService.invalidateWaitlist(req.user.id);
+
       // Broadcast real-time event to Admin Console (No email to admin, displayed directly in panel)
       try {
         const totalWaitlistCount = await prisma.waitlistEntry.count();
@@ -114,6 +118,17 @@ export class WaitlistController {
         return;
       }
 
+      const cacheKey = `waitlist:status:${req.user.id}`;
+      const cached = await CacheService.get<any>(cacheKey);
+      if (cached) {
+        res.json({
+          success: true,
+          data: cached,
+          fromCache: true,
+        });
+        return;
+      }
+
       const userEmail = req.user.email.toLowerCase().trim();
 
       const entries = await prisma.waitlistEntry.findMany({
@@ -126,12 +141,17 @@ export class WaitlistController {
         orderBy: { createdAt: 'desc' },
       });
 
+      const responsePayload = {
+        hasJoined: entries.length > 0,
+        entries: entries,
+      };
+
+      // Cache user status for 300 seconds (5 min)
+      await CacheService.set(cacheKey, responsePayload, 300);
+
       res.json({
         success: true,
-        data: {
-          hasJoined: entries.length > 0,
-          entries: entries,
-        },
+        data: responsePayload,
       });
     } catch (err) {
       next(err);
@@ -230,6 +250,17 @@ export class WaitlistController {
    */
   static async getWaitlistStats(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      const cacheKey = 'admin:stats:waitlist';
+      const cached = await CacheService.get<any>(cacheKey);
+      if (cached) {
+        res.json({
+          success: true,
+          data: cached,
+          fromCache: true,
+        });
+        return;
+      }
+
       const [totalCount, waitlistedCount, invitedCount, onboardedCount, recentEntries] = await Promise.all([
         prisma.waitlistEntry.count(),
         prisma.waitlistEntry.count({ where: { status: 'WAITLISTED' } }),
@@ -251,15 +282,20 @@ export class WaitlistController {
         }),
       ]);
 
+      const responsePayload = {
+        totalCount,
+        waitlistedCount,
+        invitedCount,
+        onboardedCount,
+        recentEntries,
+      };
+
+      // Cache waitlist stats for 60 seconds
+      await CacheService.set(cacheKey, responsePayload, 60);
+
       res.json({
         success: true,
-        data: {
-          totalCount,
-          waitlistedCount,
-          invitedCount,
-          onboardedCount,
-          recentEntries,
-        },
+        data: responsePayload,
       });
     } catch (err) {
       next(err);
@@ -282,6 +318,9 @@ export class WaitlistController {
         },
       });
 
+      // Invalidate waitlist cache
+      await CacheService.invalidateWaitlist(entry.userId || undefined);
+
       res.json({
         success: true,
         message: `Status updated to ${status}.`,
@@ -299,9 +338,12 @@ export class WaitlistController {
     try {
       const id = String(req.params.id);
 
-      await prisma.waitlistEntry.delete({
+      const entry = await prisma.waitlistEntry.delete({
         where: { id },
       });
+
+      // Invalidate waitlist cache
+      await CacheService.invalidateWaitlist(entry.userId || undefined);
 
       res.json({
         success: true,

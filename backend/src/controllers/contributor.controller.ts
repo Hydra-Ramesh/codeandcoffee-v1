@@ -72,6 +72,9 @@ export class ContributorController {
         },
       });
 
+      // Invalidate admin contributor badge cache
+      await CacheService.del('admin:badge:contributors');
+
       // Real-time notification broadcast to Admin Console
       setImmediate(async () => {
         try {
@@ -161,13 +164,27 @@ export class ContributorController {
    */
   static async getPendingCount(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      const cacheKey = 'admin:badge:contributors';
+      const cached = await CacheService.get<{ pendingCount: number }>(cacheKey);
+      if (cached) {
+        res.status(200).json({
+          success: true,
+          data: cached,
+          fromCache: true,
+        });
+        return;
+      }
+
       const count = await prisma.contributorApplication.count({
         where: { status: 'PENDING' },
       });
 
+      const responsePayload = { pendingCount: count };
+      await CacheService.set(cacheKey, responsePayload, 60);
+
       res.status(200).json({
         success: true,
-        data: { pendingCount: count },
+        data: responsePayload,
       });
     } catch (err) {
       next(err);
@@ -217,6 +234,9 @@ export class ContributorController {
         // Queue congratulatory email asynchronously via BullMQ
         queueContributorApprovedEmail(application.email, application.user.name);
       }
+
+      // Invalidate admin contributor badge cache
+      await CacheService.del('admin:badge:contributors');
 
       // Real-time notification update to Admin Console
       setImmediate(async () => {

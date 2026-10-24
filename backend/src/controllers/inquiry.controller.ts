@@ -10,6 +10,7 @@ import {
   broadcastPendingInquiryCount,
   broadcastNewInquiry,
 } from '../config/socket.js';
+import { CacheService } from '../services/cache.service.js';
 
 const submitInquirySchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters long'),
@@ -62,6 +63,9 @@ export class InquiryController {
       }).catch((err) => {
         console.error('Failed sending admin inquiry email notification:', err.message);
       });
+
+      // Invalidate admin inquiries badge cache
+      await CacheService.del('admin:badge:inquiries');
 
       // Real-time broadcast to Admin Dashboard
       try {
@@ -163,13 +167,27 @@ export class InquiryController {
    */
   static async getPendingCount(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      const cacheKey = 'admin:badge:inquiries';
+      const cached = await CacheService.get<{ pendingCount: number }>(cacheKey);
+      if (cached) {
+        res.status(200).json({
+          success: true,
+          data: cached,
+          fromCache: true,
+        });
+        return;
+      }
+
       const pendingCount = await prisma.inquiry.count({
         where: { status: 'PENDING' },
       });
 
+      const responsePayload = { pendingCount };
+      await CacheService.set(cacheKey, responsePayload, 60);
+
       res.status(200).json({
         success: true,
-        data: { pendingCount },
+        data: responsePayload,
       });
     } catch (err) {
       next(err);
@@ -213,6 +231,9 @@ export class InquiryController {
         console.error(`Failed sending inquiry resolution email to ${inquiry.email}:`, err.message);
       });
 
+      // Invalidate admin inquiries badge cache
+      await CacheService.del('admin:badge:inquiries');
+
       // Broadcast updated pending count to Admin Dashboard
       try {
         const pendingCount = await prisma.inquiry.count({
@@ -242,6 +263,9 @@ export class InquiryController {
       await prisma.inquiry.delete({
         where: { id },
       });
+
+      // Invalidate admin inquiries badge cache
+      await CacheService.del('admin:badge:inquiries');
 
       // Update broadcast count
       const pendingCount = await prisma.inquiry.count({
