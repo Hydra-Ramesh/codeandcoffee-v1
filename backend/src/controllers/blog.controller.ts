@@ -49,6 +49,7 @@ export class BlogController {
       // Check Redis cache for fast retrieval
       const cached = await CacheService.get<any>(cacheKey);
       if (cached) {
+        res.set('X-Cache', 'HIT');
         res.set('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
         res.status(200).json({
           success: true,
@@ -139,10 +140,12 @@ export class BlogController {
       // Cache for 60 seconds
       await CacheService.set(cacheKey, responsePayload, 60);
 
+      res.set('X-Cache', 'MISS');
       res.set('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
       res.status(200).json({
         success: true,
         data: responsePayload,
+        fromCache: false,
       });
     } catch (err) {
       next(err);
@@ -156,9 +159,11 @@ export class BlogController {
       const cacheKey = `blog:slug:${slug}`;
 
       // Check cached post structure
+      let isFromCache = true;
       let blog = await CacheService.get<any>(cacheKey);
 
       if (!blog) {
+        isFromCache = false;
         blog = await prisma.post.findUnique({
           where: { slug },
           include: {
@@ -206,9 +211,11 @@ export class BlogController {
 
       const totalViews = (blog.views || 0) + bufferedViews;
 
+      res.set('X-Cache', isFromCache ? 'HIT' : 'MISS');
       res.set('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=300');
       res.status(200).json({
         success: true,
+        fromCache: isFromCache,
         data: {
           ...blog,
           views: totalViews,
