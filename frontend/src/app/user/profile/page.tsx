@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { fetchApi } from '../../../lib/api';
 import { optimizeImageUrl } from '../../../lib/image';
 import Link from 'next/link';
+import ProfileSkeleton from '../../../components/skeletons/ProfileSkeleton';
 import {
   User,
   Mail,
@@ -106,11 +107,7 @@ export default function UserProfilePage() {
   };
 
   if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto py-12 text-center text-gray-400 text-sm animate-pulse">
-        Loading user profile...
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (!user) {

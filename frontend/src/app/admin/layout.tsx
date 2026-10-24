@@ -17,6 +17,7 @@ import {
   UserCheck,
   PenTool,
 } from 'lucide-react';
+import AdminLayoutSkeleton from '../../components/skeletons/AdminLayoutSkeleton';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, isAdmin, isContributor, isLoading } = useAuth();
@@ -59,11 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   if (isLoading) {
-    return (
-      <div className="py-20 text-center text-gray-400 text-sm animate-pulse">
-        Verifying authorization credentials...
-      </div>
-    );
+    return <AdminLayoutSkeleton />;
   }
 
   // Security Guard: Only ADMIN or CONTRIBUTOR can access

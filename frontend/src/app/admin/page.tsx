@@ -17,6 +17,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { fetchApi } from '../../lib/api';
+import AdminDashboardSkeleton from '../../components/skeletons/AdminDashboardSkeleton';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -64,16 +65,7 @@ export default function AdminDashboardPage() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((n) => (
-            <div key={n} className="h-28 rounded-2xl glass-card" />
-          ))}
-        </div>
-        <div className="h-64 rounded-2xl glass-card" />
-      </div>
-    );
+    return <AdminDashboardSkeleton />;
   }
 
   const blogs = stats?.blogs || {};

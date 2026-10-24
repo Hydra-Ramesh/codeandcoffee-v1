@@ -15,6 +15,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
+import AdminTableSkeleton from '../../../components/skeletons/AdminTableSkeleton';
 
 export default function AdminBlogManagementPage() {
   const [blogs, setBlogs] = useState<any[]>([]);
@@ -96,7 +97,7 @@ export default function AdminBlogManagementPage() {
       {/* Table */}
       <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
         {loading ? (
-          <div className="py-12 text-center text-gray-400 text-xs">Loading articles...</div>
+          <AdminTableSkeleton columns={6} rows={6} />
         ) : filtered.length === 0 ? (
           <div className="py-12 text-center text-gray-400 text-xs">No articles found.</div>
         ) : (

@@ -22,6 +22,7 @@ import ActiveReaderPulse from '../../../components/ActiveReaderPulse';
 import LikeDislikeBar from '../../../components/LikeDislikeBar';
 import CommentSection from '../../../components/CommentSection';
 import { optimizeImageUrl } from '../../../lib/image';
+import ArticleDetailSkeleton from '../../../components/skeletons/ArticleDetailSkeleton';
 
 export default function BlogDetailPage() {
   const params = useParams();
@@ -59,18 +60,7 @@ export default function BlogDetailPage() {
   };
 
   if (authLoading || (user && loading)) {
-    return (
-      <div className="max-w-4xl mx-auto py-12 space-y-6 animate-pulse">
-        <div className="h-6 w-32 bg-slate-800 rounded-lg" />
-        <div className="h-12 w-3/4 bg-slate-800 rounded-xl" />
-        <div className="h-96 w-full bg-slate-800 rounded-2xl" />
-        <div className="space-y-3">
-          <div className="h-4 bg-slate-800 rounded w-full" />
-          <div className="h-4 bg-slate-800 rounded w-5/6" />
-          <div className="h-4 bg-slate-800 rounded w-4/6" />
-        </div>
-      </div>
-    );
+    return <ArticleDetailSkeleton />;
   }
 
   if (!authLoading && !user) {

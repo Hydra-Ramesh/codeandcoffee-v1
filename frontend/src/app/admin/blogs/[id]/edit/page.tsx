@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { fetchApi } from '../../../../../lib/api';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
+import EditorSkeleton from '../../../../../components/skeletons/EditorSkeleton';
 
 const MarkdownEditor = dynamic(() => import('../../../../../components/MarkdownEditor'), {
   ssr: false,
@@ -92,11 +93,7 @@ export default function EditBlogPage() {
   };
 
   if (loading) {
-    return (
-      <div className="py-16 text-center text-gray-400 text-xs animate-pulse">
-        Loading article data...
-      </div>
-    );
+    return <EditorSkeleton />;
   }
 
   return (

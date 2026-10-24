@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
 import { fetchApi } from '../../lib/api';
+import ContributorFormSkeleton from '../../components/skeletons/ContributorFormSkeleton';
 import {
   Sparkles,
   Coffee,
@@ -137,12 +138,7 @@ export default function BecomeContributorPage() {
   };
 
   if (isLoading || loadingApp) {
-    return (
-      <div className="max-w-2xl mx-auto py-24 text-center space-y-4">
-        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-gray-400 text-xs">Loading contributor program details...</p>
-      </div>
-    );
+    return <ContributorFormSkeleton />;
   }
 
   // State 1: Not logged in (Registration Prompt)

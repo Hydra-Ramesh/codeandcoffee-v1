@@ -16,6 +16,7 @@ import {
 import { fetchApi } from '../../../lib/api';
 import { optimizeImageUrl } from '../../../lib/image';
 import { useDebounce } from '../../../hooks/useDebounce';
+import AdminTableSkeleton from '../../../components/skeletons/AdminTableSkeleton';
 
 export default function AdminUserGovernancePage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -154,7 +155,7 @@ export default function AdminUserGovernancePage() {
       {/* Users Table */}
       <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
         {loading ? (
-          <div className="py-12 text-center text-gray-400 text-xs">Loading user database...</div>
+          <AdminTableSkeleton columns={6} rows={6} hasAvatar={true} />
         ) : filteredUsers.length === 0 ? (
           <div className="py-12 text-center text-gray-400 text-xs">No users matched your search filters.</div>
         ) : (

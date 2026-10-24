@@ -18,6 +18,7 @@ import { fetchApi } from '../../../lib/api';
 import { getSocket } from '../../../lib/socket';
 import { optimizeImageUrl } from '../../../lib/image';
 import { useDebounce } from '../../../hooks/useDebounce';
+import ContributorAppSkeleton from '../../../components/skeletons/ContributorAppSkeleton';
 
 interface ContributorApplication {
   id: string;
@@ -202,11 +203,7 @@ export default function AdminContributorApplicationsPage() {
 
       {/* Applications List */}
       {loading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="h-36 rounded-2xl glass-card animate-pulse" />
-          ))}
-        </div>
+        <ContributorAppSkeleton count={3} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 glass-card rounded-2xl p-8 space-y-2">
           <UserCheck className="w-10 h-10 text-gray-500 mx-auto mb-2" />
