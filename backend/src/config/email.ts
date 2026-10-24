@@ -27,31 +27,72 @@ export function getEmailTransporter(): nodemailer.Transporter | null {
 }
 
 /**
- * Send custom transactional email
+/**
+ * Send custom transactional email using Resend HTTPS REST API (Port 443) with SMTP fallback
  */
 export async function sendEmail({
   to,
   subject,
   text,
   html,
+  replyTo,
 }: {
   to: string;
   subject: string;
   text?: string;
   html?: string;
+  replyTo?: string;
 }): Promise<boolean> {
+  const from = config.smtp.from || 'Code & Coffee <noreply@rameshdas.online>';
+  const resendApiKey =
+    process.env.RESEND_API_KEY ||
+    (config.smtp.pass?.startsWith('re_') ? config.smtp.pass : null);
+
+  // 1. Direct Resend HTTPS REST API (Port 443 - zero firewall blocks on Render / Vercel / Cloud)
+  if (resendApiKey) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from,
+          to: [to],
+          subject,
+          html: html || text,
+          text,
+          ...(replyTo ? { reply_to: replyTo } : {}),
+        }),
+      });
+
+      const data = (await res.json()) as any;
+      if (res.ok && data?.id) {
+        console.log(`✅ [Resend REST API] Email successfully delivered to ${to}: "${subject}" (ID: ${data.id})`);
+        return true;
+      } else {
+        console.warn(`⚠️ [Resend REST API] Note for ${to}:`, data);
+      }
+    } catch (err: any) {
+      console.warn(`⚠️ [Resend REST API] Request error for ${to}:`, err.message);
+    }
+  }
+
+  // 2. Nodemailer SMTP Fallback
   const mailTransporter = getEmailTransporter();
   if (mailTransporter) {
     return smtpCircuitBreaker.execute(
       async () => {
         await mailTransporter.sendMail({
-          from: config.smtp.from || `"Code & Coffee" <${config.smtp.user}>`,
+          from,
           to,
           subject,
           text,
           html,
+          ...(replyTo ? { replyTo } : {}),
         });
-        console.log(`✅ Email dispatched to ${to}: ${subject}`);
+        console.log(`✅ [SMTP] Email dispatched to ${to}: ${subject}`);
         return true;
       },
       (err: Error) => {
@@ -61,6 +102,7 @@ export async function sendEmail({
       }
     );
   }
+
   console.log(`📨 [DEV EMAIL] To: ${to} | Subject: ${subject}`);
   return true;
 }
@@ -107,27 +149,11 @@ export async function sendOtpEmail(toEmail: string, otpCode: string, name?: stri
     </html>
   `;
 
-  if (mailTransporter) {
-    try {
-      await mailTransporter.sendMail({
-        from: config.smtp.from || `"Code & Coffee" <${config.smtp.user}>`,
-        to: toEmail,
-        subject: `☕ [Code & Coffee] Your Verification Code is ${otpCode}`,
-        html: htmlContent,
-      });
-      console.log(`✅ SMTP Verification Email sent successfully to ${toEmail}`);
-      return true;
-    } catch (error) {
-      console.error('❌ Failed sending via Google SMTP, falling back to console log:', (error as Error).message);
-    }
-  }
-
-  // Developer Mode logging fallback
-  console.log('====================================================');
-  console.log(`📨 [DEV EMAIL - OTP] To: ${toEmail}`);
-  console.log(`🔑 Verification OTP: ${otpCode}`);
-  console.log('====================================================');
-  return true;
+  return sendEmail({
+    to: toEmail,
+    subject: `☕ [Code & Coffee] Your Verification Code is ${otpCode}`,
+    html: htmlContent,
+  });
 }
 
 /**
@@ -196,26 +222,11 @@ export async function sendWelcomeEmail(toEmail: string, name: string): Promise<b
     </html>
   `;
 
-  if (mailTransporter) {
-    try {
-      await mailTransporter.sendMail({
-        from: config.smtp.from || `"Code & Coffee" <${config.smtp.user}>`,
-        to: toEmail,
-        subject: `☕ Welcome to Code & Coffee, ${name || 'Developer'}!`,
-        html: htmlContent,
-      });
-      console.log(`✅ Welcome email sent successfully to ${toEmail}`);
-      return true;
-    } catch (error) {
-      console.error('❌ Failed sending welcome email via Google SMTP:', (error as Error).message);
-    }
-  }
-
-  console.log('====================================================');
-  console.log(`📨 [DEV EMAIL - WELCOME] To: ${toEmail} (${name})`);
-  console.log(`🔗 Explore Link: ${exploreUrl}`);
-  console.log('====================================================');
-  return true;
+  return sendEmail({
+    to: toEmail,
+    subject: `☕ Welcome to Code & Coffee, ${name || 'Developer'}!`,
+    html: htmlContent,
+  });
 }
 
 export interface BlogBroadcastData {
@@ -379,23 +390,11 @@ export async function sendContributorApprovedEmail(
     </html>
   `;
 
-  if (mailTransporter) {
-    try {
-      await mailTransporter.sendMail({
-        from: config.smtp.from || `"Code & Coffee" <${config.smtp.user}>`,
-        to: toEmail,
-        subject: '🎉 Congratulations! You are now a Contributor on Code & Coffee',
-        html: htmlContent,
-      });
-      console.log(`✅ Contributor approval email sent to ${toEmail}`);
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed sending contributor approval email to ${toEmail}:`, (error as Error).message);
-    }
-  }
-
-  console.log(`📨 [DEV EMAIL - CONTRIBUTOR APPROVED] To: ${toEmail} | Name: ${name}`);
-  return true;
+  return sendEmail({
+    to: toEmail,
+    subject: '🎉 Congratulations! You are now a Contributor on Code & Coffee',
+    html: htmlContent,
+  });
 }
 
 /**
@@ -460,24 +459,12 @@ export async function sendAdminNewInquiryNotificationEmail(inquiry: {
     </html>
   `;
 
-  if (mailTransporter) {
-    try {
-      await mailTransporter.sendMail({
-        from: config.smtp.from || `"Code & Coffee System" <${config.smtp.user}>`,
-        to: adminEmail,
-        replyTo: inquiry.email,
-        subject: `📬 [New Inquiry] ${inquiry.subject} (from ${inquiry.name})`,
-        html: htmlContent,
-      });
-      console.log(`✅ Admin inquiry notification email dispatched to ${adminEmail}`);
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed sending admin inquiry notification to ${adminEmail}:`, (error as Error).message);
-    }
-  }
-
-  console.log(`📨 [DEV EMAIL - NEW INQUIRY NOTIFICATION] To: ${adminEmail} | From: ${inquiry.email} | Subject: ${inquiry.subject}`);
-  return true;
+  return sendEmail({
+    to: adminEmail,
+    replyTo: inquiry.email,
+    subject: `📬 [New Inquiry] ${inquiry.subject} (from ${inquiry.name})`,
+    html: htmlContent,
+  });
 }
 
 /**
@@ -496,7 +483,6 @@ export async function sendInquiryResolvedUserEmail({
   adminReply: string;
   originalMessage: string;
 }): Promise<boolean> {
-  const mailTransporter = getEmailTransporter();
   const exploreUrl = `${config.clientUrl}/blogs`;
 
   const htmlContent = `
@@ -552,23 +538,11 @@ export async function sendInquiryResolvedUserEmail({
     </html>
   `;
 
-  if (mailTransporter) {
-    try {
-      await mailTransporter.sendMail({
-        from: config.smtp.from || `"Code & Coffee Support" <${config.smtp.user}>`,
-        to: toEmail,
-        subject: `☕ Response to your inquiry: ${subject}`,
-        html: htmlContent,
-      });
-      console.log(`✅ Inquiry resolution response email dispatched to ${toEmail}`);
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed sending inquiry resolution response email to ${toEmail}:`, (error as Error).message);
-    }
-  }
-
-  console.log(`📨 [DEV EMAIL - INQUIRY RESOLVED] To: ${toEmail} | Subject: ${subject}`);
-  return true;
+  return sendEmail({
+    to: toEmail,
+    subject: `☕ Response to your inquiry: ${subject}`,
+    html: htmlContent,
+  });
 }
 
 
