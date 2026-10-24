@@ -2,6 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { CacheService } from '../services/cache.service.js';
+import { SessionService } from '../services/session.service.js';
+import { AuthService } from '../services/auth.service.js';
+import { config } from '../config/env.js';
+import {
+  sendPasswordResetDirectEmail,
+  sendAccountDeletionScheduledEmail,
+  sendAccountRecoveredEmail,
+} from '../config/email.js';
 import { z } from 'zod';
 import { sanitizeText } from '../utils/sanitize.js';
 
@@ -215,6 +223,8 @@ export class UserController {
           avatar: true,
           bio: true,
           oauthProvider: true,
+          deletionRequestedAt: true,
+          deletionScheduledAt: true,
           createdAt: true,
           likes: {
             take: 10,
@@ -235,14 +245,31 @@ export class UserController {
         },
       });
 
+      let isPendingDeletion = false;
+      let daysRemaining = null;
+      if (user?.deletionScheduledAt) {
+        if (new Date(user.deletionScheduledAt) > new Date()) {
+          isPendingDeletion = true;
+          daysRemaining = Math.max(0, Math.ceil((new Date(user.deletionScheduledAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+        }
+      }
+
+      const responseData = user
+        ? {
+            ...user,
+            isPendingDeletion,
+            daysRemaining,
+          }
+        : null;
+
       // Cache user profile for 120 seconds
-      if (user) {
-        await CacheService.set(cacheKey, user, 120);
+      if (responseData) {
+        await CacheService.set(cacheKey, responseData, 120);
       }
 
       res.status(200).json({
         success: true,
-        data: user,
+        data: responseData,
       });
     } catch (err) {
       next(err);
@@ -284,6 +311,222 @@ export class UserController {
         success: true,
         message: 'Profile updated successfully.',
         data: updated,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Authenticated User: List all active devices and sessions
+  static async getUserSessions(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Authentication required.' });
+        return;
+      }
+
+      const sessionId = req.cookies?.sessionId;
+      const sessions = await SessionService.getUserSessions(req.user.id, sessionId, req);
+
+      res.status(200).json({
+        success: true,
+        data: sessions,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Authenticated User: Revoke / log out specific device session
+  static async revokeSession(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Authentication required.' });
+        return;
+      }
+
+      const sessionId = String(req.params.id);
+      const result = await SessionService.revokeSession(req.user.id, sessionId);
+
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Authenticated User: Revoke all other device sessions
+  static async revokeOtherSessions(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Authentication required.' });
+        return;
+      }
+
+      const sessionId = req.cookies?.sessionId;
+      const result = await SessionService.revokeOtherSessions(req.user.id, sessionId, req);
+
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Authenticated User: Request password reset directly to profile email
+  static async requestDirectPasswordReset(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Authentication required.' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+      });
+
+      if (!user) {
+        res.status(404).json({ success: false, message: 'User not found.' });
+        return;
+      }
+
+      const otp = AuthService.generateOtp(6);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Invalidate existing unused codes
+      await prisma.otpVerification.updateMany({
+        where: { email: user.email, isUsed: false },
+        data: { isUsed: true },
+      });
+
+      await prisma.otpVerification.create({
+        data: {
+          email: user.email,
+          otp,
+          purpose: 'DIRECT_RESET_PASSWORD',
+          expiresAt,
+        },
+      });
+
+      const resetUrl = `${config.clientUrl}/auth/forgot-password?email=${encodeURIComponent(user.email)}&otp=${otp}`;
+
+      // Dispatch direct branded email
+      await sendPasswordResetDirectEmail({
+        toEmail: user.email,
+        name: user.name,
+        otpCode: otp,
+        resetUrl,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: `Password reset verification email has been dispatched to ${user.email}. Check your inbox.`,
+        email: user.email,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Authenticated User: Request account deletion with 15-day cool-off period
+  static async requestAccountDeletion(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Authentication required.' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+      });
+
+      if (!user) {
+        res.status(404).json({ success: false, message: 'User not found.' });
+        return;
+      }
+
+      // Safeguard against deleting primary platform administrator
+      if (user.email.toLowerCase() === config.initialAdmin.email.toLowerCase()) {
+        res.status(400).json({
+          success: false,
+          message: 'The primary system administrator account cannot be scheduled for deletion.',
+        });
+        return;
+      }
+
+      // Schedule permanent deletion 15 days from now
+      const scheduledDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          deletionRequestedAt: new Date(),
+          deletionScheduledAt: scheduledDate,
+        },
+      });
+
+      await CacheService.invalidateUserProfile(user.id);
+
+      // Asynchronously send confirmation email with recovery instructions
+      sendAccountDeletionScheduledEmail({
+        toEmail: user.email,
+        name: user.name,
+        scheduledDate,
+      }).catch((e) => console.warn('Could not dispatch deletion scheduled email:', e));
+
+      res.status(200).json({
+        success: true,
+        message: 'Account deletion scheduled. A 15-day cool-off period has begun during which you can recover your account anytime.',
+        deletionScheduledAt: scheduledDate,
+        daysRemaining: 15,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Authenticated User: Cancel account deletion & restore account
+  static async cancelAccountDeletion(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Authentication required.' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+      });
+
+      if (!user) {
+        res.status(404).json({ success: false, message: 'User not found.' });
+        return;
+      }
+
+      if (!user.deletionScheduledAt) {
+        res.status(400).json({
+          success: false,
+          message: 'This account does not have a pending deletion schedule.',
+        });
+        return;
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          deletionRequestedAt: null,
+          deletionScheduledAt: null,
+        },
+      });
+
+      await CacheService.invalidateUserProfile(user.id);
+
+      // Asynchronously send confirmation email
+      sendAccountRecoveredEmail({
+        toEmail: user.email,
+        name: user.name,
+      }).catch((e) => console.warn('Could not dispatch recovery confirmation email:', e));
+
+      res.status(200).json({
+        success: true,
+        message: 'Account deletion request cancelled successfully! Your account and content remain active.',
       });
     } catch (err) {
       next(err);

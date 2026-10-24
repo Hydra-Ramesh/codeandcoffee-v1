@@ -179,6 +179,19 @@ export class AuthService {
       throw new Error('Invalid email or password.');
     }
 
+    // Check account deletion status (15-day cooling period)
+    let isPendingDeletion = false;
+    let daysRemaining = null;
+    if (user.deletionScheduledAt) {
+      const now = new Date();
+      if (user.deletionScheduledAt <= now) {
+        throw new Error('This account has passed its 15-day recovery window and is scheduled for permanent purging.');
+      } else {
+        isPendingDeletion = true;
+        daysRemaining = Math.max(0, Math.ceil((new Date(user.deletionScheduledAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+      }
+    }
+
     const tokens = this.generateTokens({
       id: user.id,
       email: user.email,
@@ -196,6 +209,9 @@ export class AuthService {
         role: user.role,
         avatar: user.avatar,
         bio: user.bio,
+        deletionScheduledAt: user.deletionScheduledAt,
+        isPendingDeletion,
+        daysRemaining,
       },
       ...tokens,
     };
@@ -322,6 +338,19 @@ export class AuthService {
       });
     }
 
+    // Check account deletion status (15-day cooling period)
+    let isPendingDeletion = false;
+    let daysRemaining = null;
+    if (user.deletionScheduledAt) {
+      const now = new Date();
+      if (user.deletionScheduledAt <= now) {
+        throw new Error('This account has passed its 15-day recovery window and is scheduled for permanent purging.');
+      } else {
+        isPendingDeletion = true;
+        daysRemaining = Math.max(0, Math.ceil((new Date(user.deletionScheduledAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+      }
+    }
+
     const tokens = this.generateTokens({
       id: user.id,
       email: user.email,
@@ -337,6 +366,9 @@ export class AuthService {
         role: user.role,
         avatar: user.avatar,
         bio: user.bio,
+        deletionScheduledAt: user.deletionScheduledAt,
+        isPendingDeletion,
+        daysRemaining,
       },
       ...tokens,
     };

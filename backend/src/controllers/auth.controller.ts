@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction, CookieOptions } from 'express';
 import { z } from 'zod';
 import { AuthService } from '../services/auth.service.js';
+import { SessionService } from '../services/session.service.js';
+import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { config } from '../config/env.js';
 
@@ -52,10 +54,23 @@ export class AuthController {
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
       }
+
+      // Record device session and track logins
+      const sessionResult = await SessionService.recordLoginSession(result.user, req);
+      if (sessionResult?.session?.id) {
+        res.cookie('sessionId', sessionResult.session.id, {
+          ...AUTH_COOKIE_OPTIONS,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+      }
+
       res.status(201).json({
         success: true,
         message: 'Account registered successfully.',
-        data: result,
+        data: {
+          ...result,
+          sessionId: sessionResult?.session?.id,
+        },
       });
     } catch (err) {
       next(err);
@@ -75,10 +90,24 @@ export class AuthController {
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
       }
+
+      // Record device session and detect new device login
+      const sessionResult = await SessionService.recordLoginSession(result.user, req);
+      if (sessionResult?.session?.id) {
+        res.cookie('sessionId', sessionResult.session.id, {
+          ...AUTH_COOKIE_OPTIONS,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+      }
+
       res.status(200).json({
         success: true,
         message: 'Logged in successfully.',
-        data: result,
+        data: {
+          ...result,
+          sessionId: sessionResult?.session?.id,
+          isNewDevice: sessionResult?.isNewDevice || false,
+        },
       });
     } catch (err) {
       next(err);
@@ -127,6 +156,12 @@ export class AuthController {
       sameSite: 'lax',
       path: '/',
     });
+    res.clearCookie('sessionId', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
     res.status(200).json({
       success: true,
       message: 'Logged out successfully.',
@@ -135,9 +170,43 @@ export class AuthController {
 
   static async getMe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatar: true,
+          bio: true,
+          deletionRequestedAt: true,
+          deletionScheduledAt: true,
+        },
+      });
+
+      if (!user) {
+        res.status(404).json({ success: false, message: 'User not found.' });
+        return;
+      }
+
+      let isPendingDeletion = false;
+      let daysRemaining = null;
+      if (user.deletionScheduledAt) {
+        if (new Date(user.deletionScheduledAt) > new Date()) {
+          isPendingDeletion = true;
+          daysRemaining = Math.max(0, Math.ceil((new Date(user.deletionScheduledAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+        }
+      }
+
       res.status(200).json({
         success: true,
-        data: { user: req.user },
+        data: {
+          user: {
+            ...user,
+            isPendingDeletion,
+            daysRemaining,
+          },
+        },
       });
     } catch (err) {
       next(err);
@@ -246,6 +315,14 @@ export class AuthController {
         res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
       }
 
+      const sessionResult = await SessionService.recordLoginSession(result.user, req);
+      if (sessionResult?.session?.id) {
+        res.cookie('sessionId', sessionResult.session.id, {
+          ...AUTH_COOKIE_OPTIONS,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+      }
+
       // Redirect to frontend callback page with tokens
       res.redirect(
         `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}&refreshToken=${encodeURIComponent(
@@ -347,6 +424,14 @@ export class AuthController {
         res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
       }
 
+      const sessionResult = await SessionService.recordLoginSession(result.user, req);
+      if (sessionResult?.session?.id) {
+        res.cookie('sessionId', sessionResult.session.id, {
+          ...AUTH_COOKIE_OPTIONS,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+      }
+
       res.redirect(
         `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}&refreshToken=${encodeURIComponent(
           result.refreshToken
@@ -377,10 +462,22 @@ export class AuthController {
         res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
       }
 
+      const sessionResult = await SessionService.recordLoginSession(result.user, req);
+      if (sessionResult?.session?.id) {
+        res.cookie('sessionId', sessionResult.session.id, {
+          ...AUTH_COOKIE_OPTIONS,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+      }
+
       res.status(200).json({
         success: true,
         message: `Successfully authenticated via ${provider}`,
-        data: result,
+        data: {
+          ...result,
+          sessionId: sessionResult?.session?.id,
+          isNewDevice: sessionResult?.isNewDevice || false,
+        },
       });
     } catch (err) {
       next(err);

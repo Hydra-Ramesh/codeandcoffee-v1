@@ -10,6 +10,9 @@ export interface User {
   role: 'USER' | 'CONTRIBUTOR' | 'ADMIN';
   avatar?: string;
   bio?: string;
+  deletionScheduledAt?: string;
+  isPendingDeletion?: boolean;
+  daysRemaining?: number | null;
 }
 
 interface AuthContextType {

@@ -33,16 +33,38 @@ model User {
   isBanned      Boolean   @default(false)
   oauthProvider String?   @default("local") // "local" | "google" | "github"
   oauthId       String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  deletionRequestedAt DateTime?
+  deletionScheduledAt DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   posts         Post[]
   comments      Comment[]
   likes         Like[]
   dislikes      Dislike[]
   applications  ContributorApplication[]
+  sessions      UserSession[]
 
   @@index([email])
+}
+
+model UserSession {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceType  String   @default("Desktop") // "Desktop" | "Mobile" | "Tablet"
+  browser     String   @default("Unknown")
+  os          String   @default("Unknown")
+  ipAddress   String   @default("Unknown")
+  userAgent   String   @default("")
+  lastActive  DateTime @default(now())
+  isRevoked   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isRevoked])
+  @@index([userId, lastActive(sort: Desc)])
 }
 
 model ContributorApplication {

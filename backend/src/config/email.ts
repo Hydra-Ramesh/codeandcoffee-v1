@@ -545,4 +545,314 @@ export async function sendInquiryResolvedUserEmail({
   });
 }
 
+/**
+ * Send security alert when a login from an unrecognized/new device is detected
+ */
+export async function sendNewDeviceLoginAlertEmail({
+  toEmail,
+  name,
+  deviceType,
+  browser,
+  os,
+  ipAddress,
+  time,
+}: {
+  toEmail: string;
+  name: string;
+  deviceType: string;
+  browser: string;
+  os: string;
+  ipAddress: string;
+  time: Date;
+}): Promise<boolean> {
+  const securityUrl = `${config.clientUrl}/user/profile`;
+  const resetPasswordUrl = `${config.clientUrl}/auth/forgot-password`;
+  const formattedTime = time.toUTCString();
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; margin: 0; padding: 24px; }
+          .container { max-width: 580px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.6); }
+          .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%); padding: 26px 28px; text-align: left; }
+          .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+          .content { padding: 32px 28px; }
+          .badge { display: inline-block; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 8px; margin-bottom: 16px; }
+          .title { color: #ffffff; font-size: 18px; font-weight: 800; margin: 0 0 12px 0; }
+          .greeting { font-size: 14px; color: #d1d5db; line-height: 1.6; margin-bottom: 18px; }
+          .info-table { width: 100%; border-collapse: collapse; margin: 18px 0; background: #0b0f19; border: 1px solid #1f2937; border-radius: 10px; overflow: hidden; }
+          .info-table td { padding: 12px 16px; border-bottom: 1px solid #1f2937; font-size: 13px; color: #9ca3af; }
+          .info-table td strong { color: #ffffff; font-weight: 600; }
+          .info-table tr:last-child td { border-bottom: none; }
+          .warning-box { background: rgba(239, 68, 68, 0.08); border-left: 4px solid #ef4444; border-radius: 0 8px 8px 0; padding: 16px; margin: 20px 0; font-size: 13px; color: #fca5a5; line-height: 1.6; }
+          .btn-container { text-align: center; margin: 26px 0 10px 0; display: flex; justify-content: center; gap: 12px; }
+          .btn-danger { display: inline-block; background: #ef4444; color: #ffffff !important; font-weight: 700; font-size: 13px; text-decoration: none; padding: 12px 24px; border-radius: 10px; }
+          .btn-outline { display: inline-block; background: transparent; border: 1px solid #374151; color: #d1d5db !important; font-weight: 600; font-size: 13px; text-decoration: none; padding: 12px 20px; border-radius: 10px; }
+          .footer { background: #0b0f19; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #1f2937; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🛡️ Code &amp; Coffee • Security Alert</h1>
+          </div>
+          <div class="content">
+            <span class="badge">New Device Sign-In Detected</span>
+            <h2 class="title">New login to your account</h2>
+            <p class="greeting">Hi ${name || 'Developer'},<br/>We detected a login to your Code &amp; Coffee account from a new or unrecognized device:</p>
+            
+            <table class="info-table">
+              <tr>
+                <td>Device &amp; Browser</td>
+                <td><strong>${browser} on ${os} (${deviceType})</strong></td>
+              </tr>
+              <tr>
+                <td>IP Address</td>
+                <td><strong>${ipAddress}</strong></td>
+              </tr>
+              <tr>
+                <td>Date &amp; Time</td>
+                <td><strong>${formattedTime}</strong></td>
+              </tr>
+            </table>
+
+            <div class="warning-box">
+              <strong>Was this you?</strong> If you recently logged in from this browser or device, you can safely disregard this message.
+              <br/><br/>
+              <strong>If this wasn't you:</strong> Someone else may have accessed your account. We strongly recommend resetting your password immediately and terminating all other active sessions from your profile.
+            </div>
+
+            <div class="btn-container">
+              <a href="${securityUrl}" class="btn-danger" target="_blank">Review Devices &amp; Sessions</a>
+              <a href="${resetPasswordUrl}" class="btn-outline" target="_blank">Reset Password</a>
+            </div>
+          </div>
+          <div class="footer">
+            Code &amp; Coffee Security Infrastructure • Khejuri, East Medinipur, West Bengal, India, 721430
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: toEmail,
+    subject: `🛡️ [Security Alert] New sign-in detected on ${browser} (${os})`,
+    html: htmlContent,
+  });
+}
+
+/**
+ * Send notification when account deletion is requested (with 15-day cool-off period)
+ */
+export async function sendAccountDeletionScheduledEmail({
+  toEmail,
+  name,
+  scheduledDate,
+}: {
+  toEmail: string;
+  name: string;
+  scheduledDate: Date;
+}): Promise<boolean> {
+  const recoveryUrl = `${config.clientUrl}/user/profile`;
+  const formattedDate = scheduledDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; margin: 0; padding: 24px; }
+          .container { max-width: 580px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.6); }
+          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%); padding: 26px 28px; text-align: left; }
+          .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+          .content { padding: 32px 28px; }
+          .badge { display: inline-block; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 8px; margin-bottom: 16px; }
+          .title { color: #ffffff; font-size: 18px; font-weight: 800; margin: 0 0 12px 0; }
+          .notice-box { background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; padding: 18px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 14px; color: #fde68a; line-height: 1.6; }
+          .date-badge { display: inline-block; background: #1f2937; border: 1px solid #374151; color: #ffffff; font-weight: 700; font-size: 15px; padding: 8px 16px; border-radius: 8px; margin: 10px 0; }
+          .btn-container { text-align: center; margin: 28px 0 10px 0; }
+          .btn-primary { display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff !important; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 30px; border-radius: 10px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3); }
+          .footer { background: #0b0f19; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #1f2937; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>⏳ Code &amp; Coffee • Account Deletion Notice</h1>
+          </div>
+          <div class="content">
+            <span class="badge">15-Day Cool-off Period Active</span>
+            <h2 class="title">Your account deletion is scheduled</h2>
+            <p style="font-size: 14px; color: #d1d5db; line-height: 1.6;">
+              Hello ${name || 'Developer'},<br/>
+              We have received a request to permanently delete your Code &amp; Coffee account. In accordance with our security and data recovery policies, we provide a <strong>15-day cooling period</strong> before any permanent data erasure occurs.
+            </p>
+
+            <div class="notice-box">
+              Scheduled Permanent Deletion Date:<br/>
+              <div class="date-badge">${formattedDate}</div>
+              <br/>
+              During this 15-day window, your profile and comments will be placed in pending deletion state.
+            </div>
+
+            <p style="font-size: 14px; color: #d1d5db; line-height: 1.6;">
+              <strong>Changed your mind?</strong><br/>
+              You can cancel this request and restore your account immediately at any time during the 15 days simply by signing in and clicking <em>"Restore Account"</em> in your profile banner.
+            </p>
+
+            <div class="btn-container">
+              <a href="${recoveryUrl}" class="btn-primary" target="_blank">Restore / Recover Account &rarr;</a>
+            </div>
+          </div>
+          <div class="footer">
+            Code &amp; Coffee Account Protection • Khejuri, East Medinipur, West Bengal, India, 721430
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: toEmail,
+    subject: `⏳ [Action Required] Account deletion scheduled (15-day recovery period active)`,
+    html: htmlContent,
+  });
+}
+
+/**
+ * Send confirmation when an account deletion request is cancelled / restored
+ */
+export async function sendAccountRecoveredEmail({
+  toEmail,
+  name,
+}: {
+  toEmail: string;
+  name: string;
+}): Promise<boolean> {
+  const profileUrl = `${config.clientUrl}/user/profile`;
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; margin: 0; padding: 24px; }
+          .container { max-width: 580px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.6); }
+          .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 26px 28px; text-align: left; }
+          .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 800; }
+          .content { padding: 32px 28px; }
+          .badge { display: inline-block; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 8px; margin-bottom: 16px; }
+          .title { color: #ffffff; font-size: 18px; font-weight: 800; margin: 0 0 12px 0; }
+          .btn-container { text-align: center; margin: 26px 0 10px 0; }
+          .btn-primary { display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #090d16 !important; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 30px; border-radius: 10px; }
+          .footer { background: #0b0f19; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #1f2937; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>✅ Code &amp; Coffee • Account Restored</h1>
+          </div>
+          <div class="content">
+            <span class="badge">Account Active &amp; Protected</span>
+            <h2 class="title">Deletion request successfully cancelled</h2>
+            <p style="font-size: 14px; color: #d1d5db; line-height: 1.6;">
+              Hello ${name || 'Developer'},<br/><br/>
+              Your account deletion request has been cancelled, and your account has been fully restored to active status. Your publications, bookmarks, comments, and profile remain completely intact.
+            </p>
+            <div class="btn-container">
+              <a href="${profileUrl}" class="btn-primary" target="_blank">Go to Profile &rarr;</a>
+            </div>
+          </div>
+          <div class="footer">
+            Code &amp; Coffee • Khejuri, East Medinipur, West Bengal, India, 721430
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: toEmail,
+    subject: `✅ Your Code & Coffee account deletion has been cancelled`,
+    html: htmlContent,
+  });
+}
+
+/**
+ * Send password reset direct email with both OTP verification code and 1-click reset URL
+ */
+export async function sendPasswordResetDirectEmail({
+  toEmail,
+  name,
+  otpCode,
+  resetUrl,
+}: {
+  toEmail: string;
+  name: string;
+  otpCode: string;
+  resetUrl: string;
+}): Promise<boolean> {
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; margin: 0; padding: 24px; }
+          .container { max-width: 540px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.6); }
+          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%); padding: 28px 24px; text-align: center; }
+          .header h1 { margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; }
+          .content { padding: 32px 28px; text-align: center; }
+          .greeting { font-size: 15px; color: #d1d5db; margin-bottom: 20px; }
+          .otp-badge { display: inline-block; background: #1f2937; border: 2px dashed #f59e0b; color: #fbbf24; font-size: 30px; font-weight: 800; letter-spacing: 6px; padding: 14px 28px; border-radius: 12px; margin: 18px 0; }
+          .btn-container { text-align: center; margin: 26px 0 14px 0; }
+          .btn { display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #090d16 !important; font-weight: 800; font-size: 14px; text-decoration: none; padding: 13px 32px; border-radius: 12px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3); }
+          .info { color: #9ca3af; font-size: 13px; line-height: 1.6; margin-top: 18px; }
+          .footer { background: #0b0f19; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #1f2937; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔒 Password Reset Request</h1>
+          </div>
+          <div class="content">
+            <p class="greeting">Hi ${name || 'Developer'},<br/>You requested to reset your password directly from your account profile.</p>
+            <p style="font-size: 13px; color: #9ca3af; margin: 0;">Use the 6-digit one-time code below:</p>
+            <div class="otp-badge">${otpCode}</div>
+            <div class="btn-container">
+              <a href="${resetUrl}" class="btn" target="_blank">Reset Password Directly &rarr;</a>
+            </div>
+            <p class="info">
+              This code and link will expire in <strong>10 minutes</strong>.<br/>
+              If you did not request this password reset, please ensure your account is secure.
+            </p>
+          </div>
+          <div class="footer">
+            Code &amp; Coffee Security Infrastructure • Khejuri, East Medinipur, West Bengal, India, 721430
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: toEmail,
+    subject: `🔒 [Code & Coffee] Password Reset Instructions & Code`,
+    html: htmlContent,
+  });
+}
+
 
