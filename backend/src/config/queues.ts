@@ -153,13 +153,18 @@ export async function queueNewBlogBroadcast(blogData: BlogBroadcastData): Promis
 
   setImmediate(async () => {
     try {
-      // Fetch all active, non-banned registered users
+      // Fetch active registered users (excluding banned users and those who requested account deletion)
+      const maxRecipients = Math.max(1, parseInt(process.env.MAX_BROADCAST_RECIPIENTS || '50', 10));
       const users = await prisma.user.findMany({
-        where: { isBanned: false },
+        where: {
+          isBanned: false,
+          deletionScheduledAt: null,
+        },
         select: { email: true, name: true },
+        take: maxRecipients,
       });
 
-      console.log(`📬 Found ${users.length} active registered users to notify for new blog.`);
+      console.log(`📬 Found ${users.length} active registered users to notify for new blog (safety cap: ${maxRecipients}).`);
 
       for (const user of users) {
         if (!user.email) continue;

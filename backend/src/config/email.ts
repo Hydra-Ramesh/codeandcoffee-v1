@@ -43,7 +43,11 @@ export async function sendEmail({
   html?: string;
   replyTo?: string;
 }): Promise<boolean> {
-  const from = config.smtp.from || 'Code & Coffee <noreply@rameshdas.online>';
+  const from =
+    process.env.RESEND_FROM ||
+    process.env.SMTP_FROM ||
+    config.smtp.from ||
+    'Code & Coffee <noreply@codeandcoffee.live>';
   const resendApiKey =
     process.env.RESEND_API_KEY ||
     (config.smtp.pass?.startsWith('re_') ? config.smtp.pass : null);
@@ -111,8 +115,6 @@ export async function sendEmail({
  * Send 6-digit OTP verification email
  */
 export async function sendOtpEmail(toEmail: string, otpCode: string, name?: string): Promise<boolean> {
-  const mailTransporter = getEmailTransporter();
-
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -160,7 +162,6 @@ export async function sendOtpEmail(toEmail: string, otpCode: string, name?: stri
  * Send Welcome / Registration confirmation email to new users
  */
 export async function sendWelcomeEmail(toEmail: string, name: string): Promise<boolean> {
-  const mailTransporter = getEmailTransporter();
   const exploreUrl = `${config.clientUrl}/blogs`;
 
   const htmlContent = `
@@ -247,7 +248,6 @@ export async function sendNewBlogNotificationEmail(
   recipientName: string,
   blog: BlogBroadcastData
 ): Promise<boolean> {
-  const mailTransporter = getEmailTransporter();
   const blogUrl = `${config.clientUrl}/blogs/${blog.slug}`;
   const readingTimeText = `${blog.readingTime || 5} min read`;
 
@@ -316,23 +316,11 @@ export async function sendNewBlogNotificationEmail(
     </html>
   `;
 
-  if (mailTransporter) {
-    try {
-      await mailTransporter.sendMail({
-        from: config.smtp.from || `"Code & Coffee" <${config.smtp.user}>`,
-        to: toEmail,
-        subject: `☕ New Post: ${blog.title}`,
-        html: htmlContent,
-      });
-      console.log(`✅ New post notification email sent to ${toEmail}`);
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed sending new post email to ${toEmail}:`, (error as Error).message);
-    }
-  }
-
-  console.log(`📨 [DEV EMAIL - NEW POST] To: ${toEmail} | Title: ${blog.title} | Link: ${blogUrl}`);
-  return true;
+  return sendEmail({
+    to: toEmail,
+    subject: `☕ New Post: ${blog.title}`,
+    html: htmlContent,
+  });
 }
 
 /**
@@ -408,7 +396,6 @@ export async function sendAdminNewInquiryNotificationEmail(inquiry: {
   message: string;
   createdAt: Date;
 }): Promise<boolean> {
-  const mailTransporter = getEmailTransporter();
   const adminEmail =
     process.env.ADMIN_NOTIFICATION_EMAIL ||
     (config.initialAdmin.email && !config.initialAdmin.email.includes('codeandcoffee.dev')

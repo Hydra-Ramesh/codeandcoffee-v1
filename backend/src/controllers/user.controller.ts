@@ -44,7 +44,7 @@ export class UserController {
         ];
       }
 
-      if (role && (role === 'ADMIN' || role === 'USER')) {
+      if (role && (role === 'ADMIN' || role === 'USER' || role === 'CONTRIBUTOR')) {
         where.role = role;
       }
 
