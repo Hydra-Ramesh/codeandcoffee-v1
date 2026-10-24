@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
-import { sendAdminWaitlistNotificationEmail } from '../config/email.js';
 import { broadcastNewWaitlistEntry, broadcastWaitlistCount } from '../config/socket.js';
 
 const joinWaitlistSchema = z.object({
@@ -83,17 +82,7 @@ export class WaitlistController {
         },
       });
 
-      // Dispatch async admin email notification
-      sendAdminWaitlistNotificationEmail({
-        name: userName,
-        email: userEmail,
-        track: track,
-        notes: notes,
-      }).catch((err) => {
-        console.error('❌ Failed sending admin waitlist email notification:', (err as Error).message);
-      });
-
-      // Broadcast real-time event to Admin Console
+      // Broadcast real-time event to Admin Console (No email to admin, displayed directly in panel)
       try {
         const totalWaitlistCount = await prisma.waitlistEntry.count();
         broadcastNewWaitlistEntry(entry);
