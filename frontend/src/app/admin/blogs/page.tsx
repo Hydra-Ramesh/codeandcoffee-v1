@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
 import AdminTableSkeleton from '../../../components/skeletons/AdminTableSkeleton';
+import { useToast } from '../../../context/ToastContext';
+import WarningCardModal, { WarningDetail } from '../../../components/WarningCardModal';
 
 export default function AdminBlogManagementPage() {
   const [blogs, setBlogs] = useState<any[]>([]);
@@ -35,15 +37,54 @@ export default function AdminBlogManagementPage() {
     setLoading(false);
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to permanently delete "${title}"?`)) return;
+  const { success, error: toastError } = useToast();
 
-    const res = await fetchApi(`/blogs/${id}`, { method: 'DELETE' });
-    if (res.success) {
-      setBlogs(blogs.filter((b) => b.id !== id));
-    } else {
-      alert(res.message || 'Failed to delete article.');
-    }
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    actionVerb: string;
+    badgeText?: string;
+    variant: 'danger' | 'warning' | 'success';
+    details: WarningDetail[];
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    actionVerb: '',
+    variant: 'danger',
+    details: [],
+    onConfirm: async () => {},
+  });
+  const [modalLoading, setModalLoading] = useState(false);
+
+  const promptDeleteBlog = (id: string, title: string, category: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: 'Permanently Delete Article',
+      badgeText: 'IRREVERSIBLE ACTION',
+      variant: 'danger',
+      actionVerb: 'Delete Article',
+      description: `Are you sure you want to permanently delete "${title}"? This publication will be removed from all discovery feeds, search indexes, and readers' bookmark lists.`,
+      details: [
+        { label: 'Article Title', value: title },
+        { label: 'Category', value: category },
+        { label: 'Impact', value: 'Purged from PostgreSQL & Redis buffer' },
+      ],
+      onConfirm: async () => {
+        setModalLoading(true);
+        const res = await fetchApi(`/blogs/${id}`, { method: 'DELETE' });
+        if (res.success) {
+          setBlogs((prev) => prev.filter((b) => b.id !== id));
+          success(`Article "${title}" deleted successfully.`);
+        } else {
+          toastError(res.message || 'Failed to delete article.');
+        }
+        setModalLoading(false);
+        setModalConfig((m) => ({ ...m, isOpen: false }));
+      },
+    });
   };
 
   const handleTogglePublish = async (blog: any) => {
@@ -55,6 +96,9 @@ export default function AdminBlogManagementPage() {
 
     if (res.success) {
       setBlogs(blogs.map((b) => (b.id === blog.id ? { ...b, isPublished: nextState } : b)));
+      success(nextState ? `Published "${blog.title}" to public feed.` : `Saved "${blog.title}" as draft.`);
+    } else {
+      toastError(res.message || 'Failed to update publication status.');
     }
   };
 
@@ -180,8 +224,8 @@ export default function AdminBlogManagementPage() {
                         <Edit className="w-4 h-4" />
                       </Link>
                       <button
-                        onClick={() => handleDelete(blog.id, blog.title)}
-                        className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 inline-block"
+                        onClick={() => promptDeleteBlog(blog.id, blog.title, blog.category)}
+                        className="p-2 min-h-[36px] min-w-[36px] rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 inline-flex items-center justify-center transition-all border border-transparent hover:border-red-500/20 active:scale-95 cursor-pointer"
                         title="Delete Article"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -194,6 +238,20 @@ export default function AdminBlogManagementPage() {
           </div>
         )}
       </div>
+
+      {/* Warning Card Modal for Article Deletion */}
+      <WarningCardModal
+        isOpen={modalConfig.isOpen}
+        onClose={() => !modalLoading && setModalConfig((m) => ({ ...m, isOpen: false }))}
+        onConfirm={modalConfig.onConfirm}
+        title={modalConfig.title}
+        description={modalConfig.description}
+        actionVerb={modalConfig.actionVerb}
+        badgeText={modalConfig.badgeText}
+        variant={modalConfig.variant}
+        details={modalConfig.details}
+        confirmLoading={modalLoading}
+      />
     </div>
   );
 }

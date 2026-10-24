@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ThumbsUp, ThumbsDown, Share2, Bookmark, Check, LogIn } from 'lucide-react';
 import { fetchApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { getSocket } from '../lib/socket';
 import Link from 'next/link';
 
@@ -23,6 +24,7 @@ export default function LikeDislikeBar({
   initialUserDisliked = false,
 }: LikeDislikeBarProps) {
   const { user } = useAuth();
+  const { success, error: toastError } = useToast();
   const [likes, setLikes] = useState(initialLikes);
   const [dislikes, setDislikes] = useState(initialDislikes);
   const [userLiked, setUserLiked] = useState(initialUserLiked);
@@ -59,7 +61,9 @@ export default function LikeDislikeBar({
       return;
     }
 
-    // Optimistic UI calculation
+    // Save snapshot for optimistic rollback
+    const snapshot = { likes, dislikes, userLiked, userDisliked };
+
     const willBeLiked = !userLiked;
     setUserLiked(willBeLiked);
     setLikes((prev) => (willBeLiked ? prev + 1 : Math.max(0, prev - 1)));
@@ -69,12 +73,28 @@ export default function LikeDislikeBar({
       setDislikes((prev) => Math.max(0, prev - 1));
     }
 
-    const res = await fetchApi(`/blogs/${blogId}/like`, { method: 'POST' });
-    if (res.success && res.data) {
-      setLikes(res.data.likesCount);
-      setDislikes(res.data.dislikesCount);
-      setUserLiked(res.data.userLiked);
-      setUserDisliked(res.data.userDisliked);
+    try {
+      const res = await fetchApi(`/blogs/${blogId}/like`, { method: 'POST' });
+      if (res.success && res.data) {
+        setLikes(res.data.likesCount);
+        setDislikes(res.data.dislikesCount);
+        setUserLiked(res.data.userLiked);
+        setUserDisliked(res.data.userDisliked);
+      } else {
+        // Rollback on failure
+        setLikes(snapshot.likes);
+        setDislikes(snapshot.dislikes);
+        setUserLiked(snapshot.userLiked);
+        setUserDisliked(snapshot.userDisliked);
+        toastError(res.message || 'Could not record reaction. Reverted.');
+      }
+    } catch {
+      // Rollback on network exception
+      setLikes(snapshot.likes);
+      setDislikes(snapshot.dislikes);
+      setUserLiked(snapshot.userLiked);
+      setUserDisliked(snapshot.userDisliked);
+      toastError('Connection error. Reaction reverted.');
     }
   };
 
@@ -85,7 +105,9 @@ export default function LikeDislikeBar({
       return;
     }
 
-    // Optimistic UI calculation
+    // Save snapshot for optimistic rollback
+    const snapshot = { likes, dislikes, userLiked, userDisliked };
+
     const willBeDisliked = !userDisliked;
     setUserDisliked(willBeDisliked);
     setDislikes((prev) => (willBeDisliked ? prev + 1 : Math.max(0, prev - 1)));
@@ -95,12 +117,28 @@ export default function LikeDislikeBar({
       setLikes((prev) => Math.max(0, prev - 1));
     }
 
-    const res = await fetchApi(`/blogs/${blogId}/dislike`, { method: 'POST' });
-    if (res.success && res.data) {
-      setLikes(res.data.likesCount);
-      setDislikes(res.data.dislikesCount);
-      setUserLiked(res.data.userLiked);
-      setUserDisliked(res.data.userDisliked);
+    try {
+      const res = await fetchApi(`/blogs/${blogId}/dislike`, { method: 'POST' });
+      if (res.success && res.data) {
+        setLikes(res.data.likesCount);
+        setDislikes(res.data.dislikesCount);
+        setUserLiked(res.data.userLiked);
+        setUserDisliked(res.data.userDisliked);
+      } else {
+        // Rollback on failure
+        setLikes(snapshot.likes);
+        setDislikes(snapshot.dislikes);
+        setUserLiked(snapshot.userLiked);
+        setUserDisliked(snapshot.userDisliked);
+        toastError(res.message || 'Could not record reaction. Reverted.');
+      }
+    } catch {
+      // Rollback on network exception
+      setLikes(snapshot.likes);
+      setDislikes(snapshot.dislikes);
+      setUserLiked(snapshot.userLiked);
+      setUserDisliked(snapshot.userDisliked);
+      toastError('Connection error. Reaction reverted.');
     }
   };
 
@@ -108,6 +146,7 @@ export default function LikeDislikeBar({
     if (typeof window !== 'undefined') {
       navigator.clipboard.writeText(window.location.href);
       setCopied(true);
+      success('Article link copied to clipboard!');
       setTimeout(() => setCopied(false), 2500);
     }
   };

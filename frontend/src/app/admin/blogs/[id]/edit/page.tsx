@@ -7,6 +7,7 @@ import { fetchApi } from '../../../../../lib/api';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import EditorSkeleton from '../../../../../components/skeletons/EditorSkeleton';
+import { useToast } from '../../../../../context/ToastContext';
 
 const MarkdownEditor = dynamic(() => import('../../../../../components/MarkdownEditor'), {
   ssr: false,
@@ -21,6 +22,7 @@ const MarkdownEditor = dynamic(() => import('../../../../../components/MarkdownE
 export default function EditBlogPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const id = params?.id as string;
 
   const [title, setTitle] = useState('');
@@ -61,7 +63,7 @@ export default function EditBlogPage() {
 
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) {
-      alert('Title and content are required.');
+      toast.warning('Title and content are required to save an article.');
       return;
     }
 
@@ -82,12 +84,12 @@ export default function EditBlogPage() {
     });
 
     if (res.success) {
-      setNotification('Article updated successfully!');
+      toast.success('Article updated successfully!');
       setTimeout(() => {
         router.push('/admin/blogs');
-      }, 1000);
+      }, 700);
     } else {
-      alert(res.message || 'Failed to update article.');
+      toast.error(res.message || 'Failed to update article.');
     }
     setSaving(false);
   };

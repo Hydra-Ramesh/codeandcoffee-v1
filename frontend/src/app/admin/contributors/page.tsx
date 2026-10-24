@@ -19,6 +19,8 @@ import { getSocket } from '../../../lib/socket';
 import { optimizeImageUrl } from '../../../lib/image';
 import { useDebounce } from '../../../hooks/useDebounce';
 import ContributorAppSkeleton from '../../../components/skeletons/ContributorAppSkeleton';
+import { useToast } from '../../../context/ToastContext';
+import WarningCardModal, { WarningDetail } from '../../../components/WarningCardModal';
 
 interface ContributorApplication {
   id: string;
@@ -83,43 +85,75 @@ export default function AdminContributorApplicationsPage() {
     }
   };
 
-  const handleUpdateStatus = async (app: ContributorApplication, newStatus: 'APPROVED' | 'REJECTED') => {
-    const actionVerb = newStatus === 'APPROVED' ? 'approve' : 'reject';
-    if (!confirm(`Are you sure you want to ${actionVerb} ${app.user.name} (${app.email}) as a Contributor?`)) {
-      return;
-    }
+  const { success, error: toastError } = useToast();
 
-    setProcessingId(app.id);
-    setNotification(null);
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    actionVerb: string;
+    badgeText?: string;
+    variant: 'danger' | 'warning' | 'success';
+    details: WarningDetail[];
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    actionVerb: '',
+    variant: 'warning',
+    details: [],
+    onConfirm: async () => {},
+  });
+  const [modalLoading, setModalLoading] = useState(false);
 
-    try {
-      const res = await fetchApi(`/contributors/applications/${app.id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: newStatus }),
-      });
+  const promptUpdateStatus = (app: ContributorApplication, newStatus: 'APPROVED' | 'REJECTED') => {
+    const isApproving = newStatus === 'APPROVED';
 
-      if (res.success) {
-        setNotification({
-          type: 'success',
-          text: newStatus === 'APPROVED'
-            ? `Successfully promoted ${app.user.name} to Contributor. Notification email sent to ${app.email}!`
-            : `Application from ${app.user.name} marked as rejected.`,
-        });
-        loadApplications();
-      } else {
-        setNotification({
-          type: 'error',
-          text: res.message || 'Failed to update application status.',
-        });
-      }
-    } catch (err: any) {
-      setNotification({
-        type: 'error',
-        text: err.message || 'An error occurred while updating status.',
-      });
-    } finally {
-      setProcessingId(null);
-    }
+    setModalConfig({
+      isOpen: true,
+      title: isApproving ? 'Grant Technical Contributor Access' : 'Decline Contributor Query',
+      badgeText: isApproving ? 'EDITORIAL PRIVILEGE GRANT' : 'EDITORIAL REVIEW',
+      variant: isApproving ? 'success' : 'danger',
+      actionVerb: isApproving ? 'Approve as Contributor' : 'Decline Application',
+      description: isApproving
+        ? `Approving ${app.user.name} will immediately upgrade their account to Contributor, unlock the Author Studio, and dispatch an automated onboarding notification to ${app.email}.`
+        : `Declining this application will mark the query as rejected. A notification email will be dispatched to ${app.email}.`,
+      details: [
+        { label: 'Applicant', value: app.user.name },
+        { label: 'Email', value: app.email },
+        { label: 'Current Role', value: app.user.role },
+        { label: 'New Role', value: isApproving ? 'CONTRIBUTOR' : 'USER' },
+      ],
+      onConfirm: async () => {
+        setModalLoading(true);
+        setProcessingId(app.id);
+
+        try {
+          const res = await fetchApi(`/contributors/applications/${app.id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: newStatus }),
+          });
+
+          if (res.success) {
+            success(
+              isApproving
+                ? `Promoted ${app.user.name} to Contributor! Notification email queued for ${app.email}.`
+                : `Application from ${app.user.name} marked as declined.`
+            );
+            loadApplications();
+          } else {
+            toastError(res.message || 'Failed to update application status.');
+          }
+        } catch (err: any) {
+          toastError(err.message || 'An error occurred while updating status.');
+        } finally {
+          setProcessingId(null);
+          setModalLoading(false);
+          setModalConfig((m) => ({ ...m, isOpen: false }));
+        }
+      },
+    });
   };
 
   const filtered = applications.filter((app) => {
@@ -310,8 +344,8 @@ export default function AdminContributorApplicationsPage() {
                         <button
                           type="button"
                           disabled={isProcessing}
-                          onClick={() => handleUpdateStatus(app, 'APPROVED')}
-                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                          onClick={() => promptUpdateStatus(app, 'APPROVED')}
+                          className="px-4 py-2 min-h-[40px] rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Approve as Contributor</span>
@@ -320,8 +354,8 @@ export default function AdminContributorApplicationsPage() {
                         <button
                           type="button"
                           disabled={isProcessing}
-                          onClick={() => handleUpdateStatus(app, 'REJECTED')}
-                          className="px-3.5 py-2 rounded-xl glass-card hover:bg-red-500/10 text-red-400 font-semibold text-xs border border-white/10 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                          onClick={() => promptUpdateStatus(app, 'REJECTED')}
+                          className="px-3.5 py-2 min-h-[40px] rounded-xl glass-card hover:bg-red-500/10 text-red-400 font-semibold text-xs border border-white/10 transition-colors flex items-center gap-1.5 disabled:opacity-50 active:scale-95 cursor-pointer"
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span>Decline</span>
@@ -333,8 +367,8 @@ export default function AdminContributorApplicationsPage() {
                       <button
                         type="button"
                         disabled={isProcessing}
-                        onClick={() => handleUpdateStatus(app, 'REJECTED')}
-                        className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold border border-red-500/20 transition-colors"
+                        onClick={() => promptUpdateStatus(app, 'REJECTED')}
+                        className="px-3 py-2 min-h-[36px] rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold border border-red-500/20 transition-colors active:scale-95 cursor-pointer"
                       >
                         Revoke Contributor Access
                       </button>
@@ -344,8 +378,8 @@ export default function AdminContributorApplicationsPage() {
                       <button
                         type="button"
                         disabled={isProcessing}
-                        onClick={() => handleUpdateStatus(app, 'APPROVED')}
-                        className="px-3.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-colors flex items-center gap-1"
+                        onClick={() => promptUpdateStatus(app, 'APPROVED')}
+                        className="px-3.5 py-2 min-h-[36px] rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-colors flex items-center gap-1 active:scale-95 cursor-pointer"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         Re-Approve as Contributor
@@ -358,6 +392,20 @@ export default function AdminContributorApplicationsPage() {
           })}
         </div>
       )}
+
+      {/* Warning Card Modal for Contributor Reviews */}
+      <WarningCardModal
+        isOpen={modalConfig.isOpen}
+        onClose={() => !modalLoading && setModalConfig((m) => ({ ...m, isOpen: false }))}
+        onConfirm={modalConfig.onConfirm}
+        title={modalConfig.title}
+        description={modalConfig.description}
+        actionVerb={modalConfig.actionVerb}
+        badgeText={modalConfig.badgeText}
+        variant={modalConfig.variant}
+        details={modalConfig.details}
+        confirmLoading={modalLoading}
+      />
     </div>
   );
 }

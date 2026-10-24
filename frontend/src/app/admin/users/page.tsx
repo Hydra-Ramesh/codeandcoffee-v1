@@ -17,6 +17,8 @@ import { fetchApi } from '../../../lib/api';
 import { optimizeImageUrl } from '../../../lib/image';
 import { useDebounce } from '../../../hooks/useDebounce';
 import AdminTableSkeleton from '../../../components/skeletons/AdminTableSkeleton';
+import { useToast } from '../../../context/ToastContext';
+import WarningCardModal, { WarningDetail } from '../../../components/WarningCardModal';
 
 export default function AdminUserGovernancePage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -44,50 +46,129 @@ export default function AdminUserGovernancePage() {
     setLoading(false);
   };
 
-  const handleToggleBan = async (user: any) => {
-    const actionName = user.isBanned ? 'reactivate' : 'suspend';
-    if (!confirm(`Are you sure you want to ${actionName} access for ${user.email}?`)) return;
+  const { success, error: toastError } = useToast();
 
-    const res = await fetchApi(`/users/${user.id}/ban`, { method: 'PATCH' });
-    if (res.success && res.data) {
-      setUsers(users.map((u) => (u.id === user.id ? { ...u, isBanned: res.data.isBanned } : u)));
-      setMessage(res.message || 'User status updated successfully.');
-      setTimeout(() => setMessage(null), 3000);
-    } else {
-      alert(res.message || 'Operation failed.');
-    }
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    actionVerb: string;
+    badgeText?: string;
+    variant: 'danger' | 'warning' | 'success';
+    details: WarningDetail[];
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    actionVerb: '',
+    variant: 'warning',
+    details: [],
+    onConfirm: async () => {},
+  });
+  const [modalLoading, setModalLoading] = useState(false);
+
+  const promptToggleBan = (targetUser: any) => {
+    const isSuspending = !targetUser.isBanned;
+
+    setModalConfig({
+      isOpen: true,
+      title: isSuspending ? 'Suspend Developer Account' : 'Reactivate Developer Account',
+      badgeText: isSuspending ? 'ACCOUNT SUSPENSION' : 'ACCESS RESTORATION',
+      variant: isSuspending ? 'danger' : 'success',
+      actionVerb: isSuspending ? 'Suspend Account' : 'Reactivate Account',
+      description: isSuspending
+        ? `Suspending ${targetUser.name} (${targetUser.email}) will immediately terminate their active session, block further authentication, and prevent commenting.`
+        : `Reactivating ${targetUser.name} will restore their login credentials and re-enable active participation in discussions and reading.`,
+      details: [
+        { label: 'Developer', value: targetUser.name },
+        { label: 'Email', value: targetUser.email },
+        { label: 'Current Status', value: targetUser.isBanned ? 'Suspended' : 'Active' },
+        { label: 'New Status', value: isSuspending ? 'Suspended' : 'Active' },
+      ],
+      onConfirm: async () => {
+        setModalLoading(true);
+        const res = await fetchApi(`/users/${targetUser.id}/ban`, { method: 'PATCH' });
+        if (res.success && res.data) {
+          setUsers((prev) => prev.map((u) => (u.id === targetUser.id ? { ...u, isBanned: res.data.isBanned } : u)));
+          success(res.message || `Account status updated for ${targetUser.name}.`);
+        } else {
+          toastError(res.message || 'Operation failed.');
+        }
+        setModalLoading(false);
+        setModalConfig((m) => ({ ...m, isOpen: false }));
+      },
+    });
   };
 
-  const handleToggleRole = async (targetUser: any, specificRole?: string) => {
+  const promptToggleRole = (targetUser: any, specificRole?: string) => {
     const newRole = specificRole || (targetUser.role === 'ADMIN' ? 'USER' : 'ADMIN');
     if (newRole === targetUser.role) return;
-    if (!confirm(`Change role of ${targetUser.name} to ${newRole}?`)) return;
 
-    const res = await fetchApi(`/users/${targetUser.id}/role`, {
-      method: 'PATCH',
-      body: JSON.stringify({ role: newRole }),
+    const isElevating = newRole === 'ADMIN';
+    const isContributor = newRole === 'CONTRIBUTOR';
+
+    setModalConfig({
+      isOpen: true,
+      title: isElevating ? 'Elevate to Platform Administrator' : `Change Role to ${newRole}`,
+      badgeText: isElevating ? 'PRIVILEGE ESCALATION' : 'ROLE MODIFICATION',
+      variant: 'warning',
+      actionVerb: `Grant ${newRole} Role`,
+      description: isElevating
+        ? `Granting ${targetUser.name} Administrator privileges provides full access to database governance, user suspensions, and publication deletion.`
+        : isContributor
+        ? `Granting Contributor access will allow ${targetUser.name} to write, edit, and publish technical articles directly to the publication.`
+        : `Demoting ${targetUser.name} to Standard User will revoke their technical authoring and platform administration rights.`,
+      details: [
+        { label: 'Developer', value: targetUser.name },
+        { label: 'Email', value: targetUser.email },
+        { label: 'Current Permission', value: targetUser.role },
+        { label: 'Target Permission', value: newRole },
+      ],
+      onConfirm: async () => {
+        setModalLoading(true);
+        const res = await fetchApi(`/users/${targetUser.id}/role`, {
+          method: 'PATCH',
+          body: JSON.stringify({ role: newRole }),
+        });
+        if (res.success && res.data) {
+          setUsers((prev) => prev.map((u) => (u.id === targetUser.id ? { ...u, role: newRole } : u)));
+          success(`Role for ${targetUser.name} updated to ${newRole}.`);
+        } else {
+          toastError(res.message || 'Failed to update user role.');
+        }
+        setModalLoading(false);
+        setModalConfig((m) => ({ ...m, isOpen: false }));
+      },
     });
-
-    if (res.success && res.data) {
-      setUsers(users.map((u) => (u.id === targetUser.id ? { ...u, role: newRole } : u)));
-      setMessage(res.message || `Role updated to ${newRole}`);
-      setTimeout(() => setMessage(null), 3000);
-    } else {
-      alert(res.message || 'Operation failed.');
-    }
   };
 
-  const handleDeleteUser = async (user: any) => {
-    if (!confirm(`Permanently delete user ${user.email} and all related data?`)) return;
-
-    const res = await fetchApi(`/users/${user.id}`, { method: 'DELETE' });
-    if (res.success) {
-      setUsers(users.filter((u) => u.id !== user.id));
-      setMessage('User deleted permanently.');
-      setTimeout(() => setMessage(null), 3000);
-    } else {
-      alert(res.message || 'Failed to delete user.');
-    }
+  const promptDeleteUser = (targetUser: any) => {
+    setModalConfig({
+      isOpen: true,
+      title: 'Permanently Delete User Account',
+      badgeText: 'IRREVERSIBLE ACTION',
+      variant: 'danger',
+      actionVerb: 'Delete Permanently',
+      description: `Are you sure you want to completely erase ${targetUser.name} (${targetUser.email})? This will purge their profile, delete all their comments, and remove all database records. This cannot be undone.`,
+      details: [
+        { label: 'Developer', value: targetUser.name },
+        { label: 'Email', value: targetUser.email },
+        { label: 'Registered Role', value: targetUser.role },
+      ],
+      onConfirm: async () => {
+        setModalLoading(true);
+        const res = await fetchApi(`/users/${targetUser.id}`, { method: 'DELETE' });
+        if (res.success) {
+          setUsers((prev) => prev.filter((u) => u.id !== targetUser.id));
+          success(`User ${targetUser.email} was permanently deleted.`);
+        } else {
+          toastError(res.message || 'Failed to delete user.');
+        }
+        setModalLoading(false);
+        setModalConfig((m) => ({ ...m, isOpen: false }));
+      },
+    });
   };
 
   const filteredUsers = users.filter((u) =>
@@ -189,8 +270,8 @@ export default function AdminUserGovernancePage() {
                     <td className="p-4">
                       <select
                         value={u.role}
-                        onChange={(e) => handleToggleRole(u, e.target.value)}
-                        className={`px-2 py-1 rounded text-[10px] font-bold border cursor-pointer outline-none ${
+                        onChange={(e) => promptToggleRole(u, e.target.value)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border cursor-pointer outline-none transition-all ${
                           u.role === 'ADMIN'
                             ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
                             : u.role === 'CONTRIBUTOR'
@@ -205,7 +286,7 @@ export default function AdminUserGovernancePage() {
                     </td>
                     <td className="p-4">
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold ${
                           u.isBanned
                             ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                             : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
@@ -214,27 +295,27 @@ export default function AdminUserGovernancePage() {
                         {u.isBanned ? 'Suspended' : 'Active'}
                       </span>
                     </td>
-                    <td className="p-4 text-gray-400">
+                    <td className="p-4 text-gray-400 text-xs">
                       {u._count?.likes || 0} likes • {u._count?.comments || 0} comments
                     </td>
                     <td className="p-4 text-right space-x-2">
                       {/* Toggle Role Button */}
                       <button
-                        onClick={() => handleToggleRole(u)}
+                        onClick={() => promptToggleRole(u)}
                         title={u.role === 'ADMIN' ? 'Demote to Standard User' : 'Elevate to Administrator'}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors border border-white/10"
+                        className="px-3 py-1.5 min-h-[36px] rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-gray-200 hover:text-white transition-all border border-white/10 active:scale-95 cursor-pointer"
                       >
                         {u.role === 'ADMIN' ? 'Demote User' : 'Promote Admin'}
                       </button>
 
                       {/* Ban/Unban Toggle */}
                       <button
-                        onClick={() => handleToggleBan(u)}
+                        onClick={() => promptToggleBan(u)}
                         title={u.isBanned ? 'Reactivate Account' : 'Suspend Account'}
-                        className={`p-1.5 rounded-lg transition-colors inline-block ${
+                        className={`p-2 min-h-[36px] min-w-[36px] rounded-xl transition-all inline-flex items-center justify-center active:scale-95 cursor-pointer ${
                           u.isBanned
-                            ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-                            : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
+                            : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30'
                         }`}
                       >
                         {u.isBanned ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
@@ -242,9 +323,9 @@ export default function AdminUserGovernancePage() {
 
                       {/* Delete User */}
                       <button
-                        onClick={() => handleDeleteUser(u)}
+                        onClick={() => promptDeleteUser(u)}
                         title="Delete User Permanently"
-                        className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 inline-block transition-colors"
+                        className="p-2 min-h-[36px] min-w-[36px] rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 inline-flex items-center justify-center transition-all border border-transparent hover:border-red-500/20 active:scale-95 cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -256,6 +337,20 @@ export default function AdminUserGovernancePage() {
           </div>
         )}
       </div>
+
+      {/* Warning Card Modal for Privileged / Destructive Actions */}
+      <WarningCardModal
+        isOpen={modalConfig.isOpen}
+        onClose={() => !modalLoading && setModalConfig((m) => ({ ...m, isOpen: false }))}
+        onConfirm={modalConfig.onConfirm}
+        title={modalConfig.title}
+        description={modalConfig.description}
+        actionVerb={modalConfig.actionVerb}
+        badgeText={modalConfig.badgeText}
+        variant={modalConfig.variant}
+        details={modalConfig.details}
+        confirmLoading={modalLoading}
+      />
     </div>
   );
 }

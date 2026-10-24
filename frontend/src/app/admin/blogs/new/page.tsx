@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { fetchApi } from '../../../../lib/api';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '../../../../context/ToastContext';
 
 const MarkdownEditor = dynamic(() => import('../../../../components/MarkdownEditor'), {
   ssr: false,
@@ -19,6 +20,7 @@ const MarkdownEditor = dynamic(() => import('../../../../components/MarkdownEdit
 
 export default function NewBlogPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
@@ -45,7 +47,7 @@ await redis.setex(cacheKey, 60, JSON.stringify({ status: "processed" }));
 
   const handleSave = async () => {
     if (!title.trim() || !content.trim() || !excerpt.trim()) {
-      alert('Please fill out the title, excerpt, and markdown content.');
+      toast.warning('Please fill out the title, excerpt, and markdown content.');
       return;
     }
 
@@ -66,12 +68,12 @@ await redis.setex(cacheKey, 60, JSON.stringify({ status: "processed" }));
     });
 
     if (res.success && res.data) {
-      setNotification('Article published successfully!');
+      toast.success('Article published successfully!');
       setTimeout(() => {
         router.push(`/blogs/${res.data.slug}`);
-      }, 1000);
+      }, 700);
     } else {
-      alert(res.message || 'Failed to save blog post.');
+      toast.error(res.message || 'Failed to save blog post.');
     }
     setSaving(false);
   };

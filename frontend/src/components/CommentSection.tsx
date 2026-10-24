@@ -5,6 +5,7 @@ import { MessageSquare, Send, Trash2, ShieldCheck, User as UserIcon } from 'luci
 import { fetchApi } from '../lib/api';
 import { optimizeImageUrl } from '../lib/image';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { getSocket } from '../lib/socket';
 import Link from 'next/link';
 
@@ -26,6 +27,7 @@ interface CommentSectionProps {
 
 export default function CommentSection({ postId }: CommentSectionProps) {
   const { user, isAdmin } = useAuth();
+  const { success, warning, error: toastError } = useToast();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -71,27 +73,85 @@ export default function CommentSection({ postId }: CommentSectionProps) {
 
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !user) return;
+    const content = newComment.trim();
+    if (!content || !user) return;
 
+    // Optimistic comment insert
+    const tempId = `optimistic-${Date.now()}`;
+    const optimisticComment: Comment = {
+      id: tempId,
+      content,
+      createdAt: new Date().toISOString(),
+      author: {
+        id: user.id,
+        name: user.name,
+        avatar: user.avatar,
+        role: user.role,
+      },
+    };
+
+    setComments((prev) => [optimisticComment, ...prev]);
+    setNewComment('');
     setSubmitting(true);
-    const res = await fetchApi('/comments', {
-      method: 'POST',
-      body: JSON.stringify({ content: newComment, postId }),
-    });
 
-    if (res.success && res.data) {
-      setComments([res.data, ...comments]);
-      setNewComment('');
+    try {
+      const res = await fetchApi('/comments', {
+        method: 'POST',
+        body: JSON.stringify({ content, postId }),
+      });
+
+      if (res.success && res.data) {
+        // Replace temporary optimistic comment with verified server record
+        setComments((prev) => prev.map((c) => (c.id === tempId ? res.data : c)));
+        success('Comment posted to discussion!');
+      } else {
+        // Rollback
+        setComments((prev) => prev.filter((c) => c.id !== tempId));
+        setNewComment(content);
+        toastError(res.message || 'Failed to submit comment. Draft restored.');
+      }
+    } catch {
+      // Rollback on network failure
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      setNewComment(content);
+      toastError('Connection error. Draft restored.');
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const handleDeleteComment = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this comment?')) return;
-    const res = await fetchApi(`/comments/${id}`, { method: 'DELETE' });
-    if (res.success) {
-      setComments(comments.filter((c) => c.id !== id));
-    }
+    const deletedComment = comments.find((c) => c.id === id);
+    if (!deletedComment) return;
+
+    // Optimistic UI removal
+    setComments((prev) => prev.filter((c) => c.id !== id));
+
+    let isUndone = false;
+    const timer = setTimeout(async () => {
+      if (!isUndone) {
+        const res = await fetchApi(`/comments/${id}`, { method: 'DELETE' });
+        if (!res.success) {
+          // Rollback if server rejects delete
+          setComments((prev) => [deletedComment, ...prev]);
+          toastError(res.message || 'Failed to delete comment on server.');
+        }
+      }
+    }, 5000);
+
+    // Provide immediate non-blocking "Undo" safety net
+    warning('Comment removed from discussion', {
+      durationMs: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          isUndone = true;
+          clearTimeout(timer);
+          setComments((prev) => [deletedComment, ...prev]);
+          success('Comment restored.');
+        },
+      },
+    });
   };
 
   return (

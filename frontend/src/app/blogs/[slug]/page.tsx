@@ -33,6 +33,21 @@ export default function BlogDetailPage() {
   const [blog, setBlog] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  // Track window scroll progress for top reading bar
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (totalHeight > 0) {
+        const progress = Math.min(100, Math.max(0, (window.scrollY / totalHeight) * 100));
+        setScrollProgress(progress);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // If unauthenticated once auth verification completes, redirect to sign-in page with return URL
   useEffect(() => {
@@ -122,7 +137,18 @@ export default function BlogDetailPage() {
   }
 
   return (
-    <article className="max-w-4xl mx-auto py-6 space-y-8">
+    <>
+      {/* Top Fixed Reading Progress Bar */}
+      <div
+        className="fixed top-0 left-0 h-1 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-300 z-[9999] transition-all duration-75 ease-out shadow-[0_0_12px_rgba(245,158,11,0.6)]"
+        style={{ width: `${scrollProgress}%` }}
+        role="progressbar"
+        aria-valuenow={Math.round(scrollProgress)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      />
+
+      <article className="max-w-4xl mx-auto py-6 space-y-8">
       {/* Back button & Breadcrumb */}
       <div className="flex items-center justify-between text-xs text-gray-400">
         <button
@@ -257,5 +283,6 @@ export default function BlogDetailPage() {
       {/* Interactive Developer Comments Section */}
       <CommentSection postId={blog.id} />
     </article>
+    </>
   );
 }

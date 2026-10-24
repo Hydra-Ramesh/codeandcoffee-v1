@@ -4,7 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../context/AuthContext';
-import { Coffee, User, Mail, Lock, Sparkles } from 'lucide-react';
+import { Coffee, User, Mail, Lock, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 function RegisterFormContent() {
   const router = useRouter();
@@ -19,12 +19,19 @@ function RegisterFormContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [touched, setTouched] = useState({ name: false, email: false, password: false });
+
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isNameValid = name.trim().length >= 2;
+  const isPasswordValid = password.length >= 6;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setTouched({ name: true, email: true, password: true });
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+    if (!isNameValid || !isEmailValid || !isPasswordValid) {
+      setError('Please resolve the highlighted field errors before continuing.');
       return;
     }
 
@@ -125,54 +132,108 @@ function RegisterFormContent() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5">Full Name</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-gray-300">Full Name</label>
+              {touched.name && isNameValid && (
+                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 animate-fade-in">
+                  <CheckCircle2 className="w-3 h-3" /> Valid
+                </span>
+              )}
+            </div>
             <div className="relative">
               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, name: true }))}
                 placeholder="Ada Lovelace"
                 required
-                className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl glass-input text-white"
+                className={`w-full pl-10 pr-9 py-2.5 min-h-[44px] text-xs rounded-xl glass-input text-white ${
+                  touched.name && !isNameValid ? 'border-red-500/60 focus:border-red-500' : ''
+                }`}
               />
+              {touched.name && isNameValid && (
+                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+              )}
             </div>
+            {touched.name && !isNameValid && (
+              <p className="text-[11px] text-red-400 mt-1 flex items-center gap-1 animate-fade-in">
+                <AlertCircle className="w-3 h-3 shrink-0" /> Name must be at least 2 characters.
+              </p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5">Email Address</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-gray-300">Email Address</label>
+              {touched.email && isEmailValid && (
+                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 animate-fade-in">
+                  <CheckCircle2 className="w-3 h-3" /> Valid format
+                </span>
+              )}
+            </div>
             <div className="relative">
               <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, email: true }))}
                 placeholder="ada@computing.org"
                 required
-                className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl glass-input text-white"
+                className={`w-full pl-10 pr-9 py-2.5 min-h-[44px] text-xs rounded-xl glass-input text-white ${
+                  touched.email && !isEmailValid ? 'border-red-500/60 focus:border-red-500' : ''
+                }`}
               />
+              {touched.email && isEmailValid && (
+                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+              )}
             </div>
+            {touched.email && !isEmailValid && (
+              <p className="text-[11px] text-red-400 mt-1 flex items-center gap-1 animate-fade-in">
+                <AlertCircle className="w-3 h-3 shrink-0" /> Enter a valid email (e.g. dev@company.com).
+              </p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5">Password</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-gray-300">Password</label>
+              {touched.password && isPasswordValid && (
+                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 animate-fade-in">
+                  <CheckCircle2 className="w-3 h-3" /> Secure
+                </span>
+              )}
+            </div>
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+                placeholder="At least 6 characters"
                 required
-                className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl glass-input text-white"
+                className={`w-full pl-10 pr-9 py-2.5 min-h-[44px] text-xs rounded-xl glass-input text-white ${
+                  touched.password && !isPasswordValid ? 'border-red-500/60 focus:border-red-500' : ''
+                }`}
               />
+              {touched.password && isPasswordValid && (
+                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+              )}
             </div>
+            {touched.password && !isPasswordValid && (
+              <p className="text-[11px] text-red-400 mt-1 flex items-center gap-1 animate-fade-in">
+                <AlertCircle className="w-3 h-3 shrink-0" /> Password must be at least 6 characters.
+              </p>
+            )}
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-xs transition-all shadow-lg shadow-amber-500/20"
+            className="w-full py-3 min-h-[44px] rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-xs transition-all shadow-lg shadow-amber-500/20 active:scale-98 cursor-pointer flex items-center justify-center"
           >
             {loading ? 'Creating Account...' : 'Complete Registration'}
           </button>

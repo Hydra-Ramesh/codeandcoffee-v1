@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
 import { fetchApi } from '../lib/api';
+import { useToast } from '../context/ToastContext';
 
 interface MarkdownEditorProps {
   title: string;
@@ -59,6 +60,7 @@ export default function MarkdownEditor({
   onSave,
   saving = false,
 }: MarkdownEditorProps) {
+  const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'split' | 'edit' | 'preview'>('split');
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [uploadingInline, setUploadingInline] = useState(false);
@@ -97,8 +99,9 @@ export default function MarkdownEditor({
 
     if (res.success && res.data?.url) {
       setBannerImage(res.data.url);
+      toast.success('Hero banner uploaded successfully!');
     } else {
-      alert(res.message || 'Image upload failed.');
+      toast.error(res.message || 'Image upload failed.');
     }
     setUploadingBanner(false);
   };
@@ -118,8 +121,9 @@ export default function MarkdownEditor({
 
     if (res.success && res.data?.url) {
       insertText(`\n![${file.name.replace(/\.[^/.]+$/, '')}](${res.data.url})\n`);
+      toast.success('Inline figure uploaded and inserted into article!');
     } else {
-      alert(res.message || 'Inline image upload failed.');
+      toast.error(res.message || 'Inline image upload failed.');
     }
     setUploadingInline(false);
   };

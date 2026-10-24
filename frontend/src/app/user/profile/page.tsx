@@ -6,6 +6,7 @@ import { fetchApi } from '../../../lib/api';
 import { optimizeImageUrl } from '../../../lib/image';
 import Link from 'next/link';
 import ProfileSkeleton from '../../../components/skeletons/ProfileSkeleton';
+import { useToast } from '../../../context/ToastContext';
 import {
   User,
   Mail,
@@ -24,6 +25,7 @@ import {
 
 export default function UserProfilePage() {
   const { user, refreshUser, logout } = useAuth();
+  const { toast } = useToast();
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -57,12 +59,12 @@ export default function UserProfilePage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image file (PNG, JPG, WEBP, GIF).');
+      toast.error('Please select a valid image file (PNG, JPG, WEBP, GIF).');
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Image file size must be less than 10MB.');
+      toast.warning('Image file size must be less than 10MB.');
       return;
     }
 
@@ -77,11 +79,10 @@ export default function UserProfilePage() {
 
     if (res.success && res.data?.url) {
       setAvatar(res.data.url);
-      setMessage('Profile photo uploaded! Click "Save Profile" to finalize.');
+      toast.success('Profile photo uploaded! Click "Save Profile" to finalize.');
       setIsEditing(true);
-      setTimeout(() => setMessage(null), 4000);
     } else {
-      alert(res.message || 'Image upload failed. Please try again.');
+      toast.error(res.message || 'Image upload failed. Please try again.');
     }
     setUploadingImage(false);
   };
@@ -95,13 +96,12 @@ export default function UserProfilePage() {
     });
 
     if (res.success) {
-      setMessage('Profile updated successfully!');
+      toast.success('Profile updated successfully!');
       setIsEditing(false);
       await refreshUser();
       await loadProfile();
-      setTimeout(() => setMessage(null), 3000);
     } else {
-      alert(res.message || 'Failed to update profile.');
+      toast.error(res.message || 'Failed to update profile.');
     }
     setUpdating(false);
   };
