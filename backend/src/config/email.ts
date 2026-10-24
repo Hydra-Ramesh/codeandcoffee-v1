@@ -412,8 +412,9 @@ export async function sendAdminNewInquiryNotificationEmail(inquiry: {
   const mailTransporter = getEmailTransporter();
   const adminEmail =
     process.env.ADMIN_NOTIFICATION_EMAIL ||
-    config.initialAdmin.email ||
-    'dasramesh8343003905@gmail.com';
+    (config.initialAdmin.email && !config.initialAdmin.email.includes('codeandcoffee.dev')
+      ? config.initialAdmin.email
+      : 'dasramesh8343003905@gmail.com');
   const inquiriesUrl = `${config.clientUrl}/admin/inquiries`;
 
   const htmlContent = `
