@@ -11,7 +11,7 @@ interface MarkdownViewerProps {
 
 export default function MarkdownViewer({ content }: MarkdownViewerProps) {
   return (
-    <div className="markdown-content max-w-none text-gray-200">
+    <div className="markdown-content max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
@@ -25,30 +25,41 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
           },
           pre({ children, ...props }) {
             return (
-              <pre className="relative group my-6 overflow-x-auto p-4 rounded-xl bg-slate-950 border border-white/10 font-mono text-sm leading-relaxed" {...props}>
+              <pre
+                className="relative group my-6 overflow-x-auto p-4 sm:p-5 rounded-2xl bg-[#0b0f19] border border-slate-700/50 text-[#f1f5f9] font-mono text-sm leading-relaxed shadow-xl"
+                {...props}
+              >
                 {children}
               </pre>
             );
           },
           blockquote({ children }) {
             return (
-              <blockquote className="my-6 border-l-4 border-amber-500 pl-4 py-2 italic text-gray-300 bg-amber-500/5 rounded-r-xl">
+              <blockquote className="my-6 border-l-4 border-amber-500 pl-4 py-2 italic text-[var(--md-blockquote-text)] bg-[var(--md-blockquote-bg)] rounded-r-xl">
                 {children}
               </blockquote>
             );
           },
           table({ children }) {
             return (
-              <div className="overflow-x-auto my-6 rounded-xl border border-white/10">
+              <div className="overflow-x-auto my-6 rounded-xl border border-[var(--md-table-border)]">
                 <table className="w-full text-left border-collapse text-sm">{children}</table>
               </div>
             );
           },
           th({ children }) {
-            return <th className="bg-slate-900/90 text-amber-300 p-3 font-semibold border-b border-white/10">{children}</th>;
+            return (
+              <th className="bg-[var(--md-th-bg)] text-amber-500 font-semibold p-3 border-b border-[var(--md-table-border)]">
+                {children}
+              </th>
+            );
           },
           td({ children }) {
-            return <td className="p-3 border-b border-white/5 text-gray-300">{children}</td>;
+            return (
+              <td className="p-3 border-b border-[var(--md-table-border)] text-[var(--md-td-text)]">
+                {children}
+              </td>
+            );
           },
           a({ href, children, ...props }) {
             // Strict XSS Prevention: Disallow javascript: schemes

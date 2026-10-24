@@ -19,26 +19,62 @@
     --scrollbar-track: #090d16;
     --scrollbar-thumb: #1f2937;
     --scrollbar-thumb-hover: #374151;
+
+    /* Markdown typography tokens for Night mode */
+    --md-h1: #f9fafb;
+    --md-h2: #f3f4f6;
+    --md-h3: #e5e7eb;
+    --md-text: #e2e8f0;
+    --md-muted: #9ca3af;
+    --md-inline-code-bg: rgba(31, 41, 55, 0.8);
+    --md-inline-code-text: #fbbf24;
+    --md-pre-bg: #0b0f19;
+    --md-pre-text: #f1f5f9;
+    --md-pre-border: rgba(255, 255, 255, 0.1);
+    --md-blockquote-bg: rgba(245, 158, 11, 0.06);
+    --md-blockquote-text: #d1d5db;
+    --md-table-border: rgba(255, 255, 255, 0.1);
+    --md-th-bg: #111827;
+    --md-th-text: #f59e0b;
+    --md-td-text: #d1d5db;
   }
 
   html.light {
     color-scheme: light;
     --background: #f8fafc;
     --foreground: #0f172a;
-    --card-bg: rgba(255, 255, 255, 0.88);
-    --card-border: rgba(15, 23, 42, 0.09);
-    --card-hover-border: rgba(217, 119, 6, 0.45);
-    --card-hover-shadow: rgba(217, 119, 6, 0.15);
-    --input-bg: rgba(255, 255, 255, 0.95);
-    --input-border: rgba(15, 23, 42, 0.16);
+    --card-bg: rgba(255, 255, 255, 0.92);
+    --card-border: rgba(15, 23, 42, 0.1);
+    --card-hover-border: rgba(217, 119, 6, 0.5);
+    --card-hover-shadow: rgba(217, 119, 6, 0.18);
+    --input-bg: rgba(255, 255, 255, 0.98);
+    --input-border: rgba(15, 23, 42, 0.18);
     --accent-amber: #d97706;
-    --accent-glow: rgba(217, 119, 6, 0.14);
-    --mesh-1: rgba(245, 158, 11, 0.08);
-    --mesh-2: rgba(139, 92, 246, 0.06);
-    --mesh-3: rgba(14, 165, 233, 0.05);
+    --accent-glow: rgba(217, 119, 6, 0.16);
+    --mesh-1: rgba(245, 158, 11, 0.09);
+    --mesh-2: rgba(139, 92, 246, 0.07);
+    --mesh-3: rgba(14, 165, 233, 0.06);
     --scrollbar-track: #f1f5f9;
     --scrollbar-thumb: #cbd5e1;
     --scrollbar-thumb-hover: #94a3b8;
+
+    /* Markdown typography tokens for Day mode (Ultra-crisp 12:1+ WCAG AAA contrast) */
+    --md-h1: #0f172a;
+    --md-h2: #0f172a;
+    --md-h3: #1e293b;
+    --md-text: #1e293b;
+    --md-muted: #475569;
+    --md-inline-code-bg: #f1f5f9;
+    --md-inline-code-text: #b45309;
+    --md-pre-bg: #0b0f19;
+    --md-pre-text: #f8fafc;
+    --md-pre-border: rgba(15, 23, 42, 0.25);
+    --md-blockquote-bg: rgba(245, 158, 11, 0.08);
+    --md-blockquote-text: #334155;
+    --md-table-border: #e2e8f0;
+    --md-th-bg: #f8fafc;
+    --md-th-text: #b45309;
+    --md-td-text: #1e293b;
   }
 
   * {
@@ -110,11 +146,14 @@
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-/* Day Mode Text & Surface Harmonization */
+/* ==============================================================================
+   Day Mode Surface & Typography Harmonization
+   ============================================================================== */
 html.light .text-white {
   color: #0f172a;
 }
 
+/* Retain high-contrast text on solid/gradient colored buttons, tags, and badges */
 html.light [class*="bg-amber-"] .text-white,
 html.light [class*="bg-purple-"] .text-white,
 html.light [class*="bg-indigo-"] .text-white,
@@ -125,6 +164,7 @@ html.light .text-white.text-slate-950,
 html.light button[class*="from-"],
 html.light a[class*="from-"],
 html.light [class*="bg-gradient-to"] span,
+html.light [class*="bg-gradient-to"] div,
 html.light .badge-solid {
   color: inherit;
 }
@@ -132,7 +172,9 @@ html.light .badge-solid {
 html.light h1,
 html.light h2,
 html.light h3,
-html.light h4 {
+html.light h4,
+html.light h5,
+html.light h6 {
   color: #0f172a;
 }
 
@@ -141,22 +183,35 @@ html.light .text-gray-200 {
 }
 
 html.light .text-gray-300 {
-  color: #334155;
+  color: #1e293b;
 }
 
 html.light .text-gray-400 {
-  color: #64748b;
+  color: #475569; /* Slate 600 - crisp, easily readable secondary text */
 }
 
 html.light .text-gray-500 {
-  color: #94a3b8;
+  color: #64748b;
 }
 
+/* Light mode amber link enhancement for AAA contrast */
+html.light .text-amber-400 {
+  color: #b45309 !important;
+}
+html.light .text-amber-300 {
+  color: #92400e !important;
+}
+html.light .hover\:text-amber-400:hover,
+html.light .hover\:text-amber-300:hover {
+  color: #78350f !important;
+}
+
+/* Light mode subtle borders and card backgrounds */
 html.light .border-white\/10,
 html.light .border-white\/5,
 html.light .border-white\/15,
 html.light .border-white\/20 {
-  border-color: rgba(15, 23, 42, 0.09) !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
 }
 
 html.light .bg-white\/5,
@@ -164,17 +219,22 @@ html.light .bg-white\/10 {
   background-color: rgba(15, 23, 42, 0.04) !important;
 }
 
-html.light .bg-slate-900 {
-  background-color: #f1f5f9;
-}
-
-html.light .bg-slate-950 {
-  background-color: #e2e8f0;
-}
-
 html.light footer {
   background-color: #f1f5f9 !important;
-  border-color: rgba(15, 23, 42, 0.08) !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  color: #334155 !important;
+}
+
+html.light input.glass-input,
+html.light textarea.glass-input,
+html.light .glass-input {
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.16) !important;
+  color: #0f172a !important;
+}
+
+html.light .glass-input::placeholder {
+  color: #94a3b8 !important;
 }
 
 html.light .bg-slate-800,
@@ -182,16 +242,6 @@ html.light .bg-slate-800\/60,
 html.light .bg-slate-800\/80,
 html.light .bg-slate-700\/60 {
   background-color: #e2e8f0 !important;
-}
-
-html.light .markdown-content th,
-html.light .markdown-content td {
-  border-color: #e2e8f0;
-}
-
-html.light .markdown-content th {
-  background: #f8fafc;
-  color: #0f172a;
 }
 
 html.light .gradient-text-hero {
@@ -287,24 +337,32 @@ html.light .gradient-text-hero {
   animation: scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Markdown typography styling */
+/* ==============================================================================
+   Markdown Typography & Syntax Highlighting
+   ============================================================================== */
+.markdown-content {
+  color: var(--md-text);
+  line-height: 1.8;
+  font-size: 1.05rem;
+}
+
 .markdown-content h1 {
   font-size: 2.25rem;
   font-weight: 800;
   margin-top: 2rem;
   margin-bottom: 1rem;
-  color: #f9fafb;
+  color: var(--md-h1);
   letter-spacing: -0.025em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--card-border);
   padding-bottom: 0.5rem;
 }
 
 .markdown-content h2 {
   font-size: 1.75rem;
   font-weight: 700;
-  margin-top: 1.75rem;
-  margin-bottom: 0.75rem;
-  color: #f3f4f6;
+  margin-top: 2rem;
+  margin-bottom: 0.85rem;
+  color: var(--md-h2);
   letter-spacing: -0.02em;
 }
 
@@ -312,59 +370,21 @@ html.light .gradient-text-hero {
   font-size: 1.35rem;
   font-weight: 600;
   margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
-  color: #e5e7eb;
+  margin-bottom: 0.6rem;
+  color: var(--md-h3);
 }
 
 .markdown-content p {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
-  line-height: 1.75;
-  color: #d1d5db;
-  font-size: 1.05rem;
-}
-
-.markdown-content pre {
-  background: #0f172a;
-  border: 1px solid #1e293b;
-  border-radius: 0.75rem;
-  padding: 1.25rem;
-  overflow-x: auto;
-  margin: 1.5rem 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.95rem;
-  line-height: 1.6;
-}
-
-.markdown-content code {
-  background: rgba(31, 41, 55, 0.8);
-  color: #fbbf24;
-  padding: 0.2rem 0.4rem;
-  border-radius: 0.25rem;
-  font-size: 0.9em;
-}
-
-.markdown-content pre code {
-  background: transparent;
-  color: #e2e8f0;
-  padding: 0;
-}
-
-.markdown-content blockquote {
-  border-left: 4px solid #f59e0b;
-  padding-left: 1rem;
-  margin: 1.5rem 0;
-  color: #9ca3af;
-  font-style: italic;
-  background: rgba(245, 158, 11, 0.05);
-  padding: 0.75rem 1rem;
-  border-radius: 0 0.5rem 0.5rem 0;
+  margin-top: 1.1rem;
+  margin-bottom: 1.1rem;
+  line-height: 1.8;
+  color: var(--md-text);
 }
 
 .markdown-content ul, .markdown-content ol {
   padding-left: 1.5rem;
-  margin: 1rem 0;
-  color: #d1d5db;
+  margin: 1.1rem 0;
+  color: var(--md-text);
 }
 
 .markdown-content ul {
@@ -377,17 +397,55 @@ html.light .gradient-text-hero {
 
 .markdown-content li {
   margin-bottom: 0.5rem;
-  line-height: 1.6;
+  line-height: 1.7;
+  color: var(--md-text);
+}
+
+.markdown-content li strong,
+.markdown-content p strong {
+  color: var(--md-h1);
+  font-weight: 700;
+}
+
+.markdown-content pre {
+  background: var(--md-pre-bg) !important;
+  border: 1px solid var(--md-pre-border) !important;
+  color: var(--md-pre-text) !important;
+}
+
+.markdown-content pre code {
+  background: transparent !important;
+  color: var(--md-pre-text) !important;
+}
+
+.markdown-content code:not(pre code) {
+  background: var(--md-inline-code-bg);
+  color: var(--md-inline-code-text);
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid var(--accent-amber);
+  background: var(--md-blockquote-bg);
+  color: var(--md-blockquote-text);
+  padding: 0.85rem 1.25rem;
+  margin: 1.5rem 0;
+  font-style: italic;
+  border-radius: 0 0.75rem 0.75rem 0;
 }
 
 .markdown-content a {
-  color: #f59e0b;
+  color: var(--accent-amber);
   text-decoration: underline;
   text-underline-offset: 4px;
+  font-weight: 500;
 }
 
 .markdown-content a:hover {
-  color: #fbbf24;
+  filter: brightness(1.15);
 }
 
 .markdown-content table {
@@ -397,15 +455,19 @@ html.light .gradient-text-hero {
 }
 
 .markdown-content th, .markdown-content td {
-  border: 1px solid #1f2937;
+  border: 1px solid var(--md-table-border);
   padding: 0.75rem 1rem;
   text-align: left;
 }
 
 .markdown-content th {
-  background: #111827;
-  color: #f3f4f6;
+  background: var(--md-th-bg);
+  color: var(--md-th-text);
   font-weight: 600;
+}
+
+.markdown-content td {
+  color: var(--md-td-text);
 }
 
 .markdown-content img {
@@ -413,5 +475,5 @@ html.light .gradient-text-hero {
   max-width: 100%;
   height: auto;
   margin: 1.5rem 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--card-border);
 }
