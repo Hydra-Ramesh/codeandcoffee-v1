@@ -18,9 +18,9 @@ export function getEmailTransporter(): nodemailer.Transporter | null {
           pass: config.smtp.pass,
         },
       });
-      console.log('✅ Google SMTP transporter configured for:', config.smtp.user);
+      console.log(`✅ SMTP transporter configured for [${config.smtp.host}]:`, config.smtp.user);
     } catch (err) {
-      console.warn('⚠️ Could not configure Google SMTP, using dev console logger:', (err as Error).message);
+      console.warn(`⚠️ Could not configure SMTP [${config.smtp.host}], using dev console logger:`, (err as Error).message);
     }
   }
   return transporter;
