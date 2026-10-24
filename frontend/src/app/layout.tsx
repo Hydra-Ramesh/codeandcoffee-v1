@@ -47,29 +47,50 @@ export const metadata: Metadata = {
 };
 
 import React, { Suspense } from 'react';
+import { ThemeProvider } from '../context/ThemeContext';
 
-// ...
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" data-scroll-behavior="smooth">
-      <body className="bg-[#090d16] text-[#f3f4f6] min-h-screen flex flex-col justify-between selection:bg-amber-500 selection:text-slate-950">
-        <AuthProvider>
-          <ToastProvider>
-            <div className="relative min-h-screen flex flex-col justify-between bg-mesh-radial">
-              <Suspense fallback={<div className="h-20" />}>
-                <Navbar />
-              </Suspense>
-              <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {children}
-              </main>
-              <Footer />
-            </div>
-          </ToastProvider>
-        </AuthProvider>
+    <html lang="en" className="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var stored = localStorage.getItem('code_coffee_theme');
+                  var theme = stored === 'light' || stored === 'dark'
+                    ? stored
+                    : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+                  document.documentElement.classList.remove('light', 'dark');
+                  document.documentElement.classList.add(theme);
+                  document.documentElement.style.colorScheme = theme;
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body className="bg-[var(--background)] text-[var(--foreground)] min-h-screen flex flex-col justify-between selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300">
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <div className="relative min-h-screen flex flex-col justify-between bg-mesh-radial transition-colors duration-300">
+                <Suspense fallback={<div className="h-20" />}>
+                  <Navbar />
+                </Suspense>
+                <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                  {children}
+                </main>
+                <Footer />
+              </div>
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

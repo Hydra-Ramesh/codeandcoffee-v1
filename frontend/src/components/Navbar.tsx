@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext';
 import { Coffee, ShieldAlert, User, LogOut, Menu, X, Sparkles, PenTool } from 'lucide-react';
 import { optimizeImageUrl } from '../lib/image';
 
+import ThemeToggle from './ThemeToggle';
+
 export default function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -60,6 +62,8 @@ export default function Navbar() {
 
         {/* Action Buttons & Profile */}
         <div className="hidden md:flex items-center gap-3">
+          <ThemeToggle />
+
           {user ? (
             <div className="flex items-center gap-3">
               {isAdmin && (
@@ -126,10 +130,12 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile menu button */}
-        <div className="flex md:hidden">
+        {/* Mobile menu button & Theme Toggle */}
+        <div className="flex md:hidden items-center gap-2">
+          <ThemeToggle />
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle mobile navigation menu"
             className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -228,6 +234,11 @@ export default function Navbar() {
               </Link>
             </div>
           )}
+
+          <div className="pt-3 border-t border-white/10 flex items-center justify-between px-3 py-2">
+            <span className="text-sm font-medium text-gray-400">Appearance</span>
+            <ThemeToggle showLabel={true} />
+          </div>
         </div>
       )}
     </header>
