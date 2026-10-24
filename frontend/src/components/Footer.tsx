@@ -1,14 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Coffee, Mail, MapPin, CheckCircle, Heart } from 'lucide-react';
+import { Mail, MapPin, Heart } from 'lucide-react';
 
 export default function Footer() {
   const pathname = usePathname();
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
 
   // Hide footer on authentication flows, admin dashboard, and the Explore Blogs catalog (/blogs)
   if (
@@ -19,77 +17,11 @@ export default function Footer() {
     return null;
   }
 
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail('');
-    }
-  };
-
   return (
-    <footer className="w-full bg-[#060911] border-t border-white/10 pt-16 pb-12 mt-20 text-gray-400">
+    <footer className="w-full bg-[#060911] border-t border-white/10 py-12 mt-20 text-gray-400">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Top Section: Brand + Newsletter */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 pb-16 border-b border-white/10">
-          <div className="lg:col-span-5 space-y-4">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                <Coffee className="w-5 h-5" />
-              </div>
-              <span className="text-xl font-extrabold text-white">
-                Code <span className="gradient-text-amber">&amp; Coffee</span>
-              </span>
-            </Link>
-            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-              The premier developer publication for distributed systems, serverless database engineering,
-              high-throughput caching, and modern web application craftsmanship.
-            </p>
-            <div className="flex items-center gap-2 text-xs text-emerald-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-beacon" />
-              <span>All Systems Operational • Real-Time Telemetry Active</span>
-            </div>
-          </div>
-
-          {/* Newsletter Box */}
-          <div className="lg:col-span-7 flex flex-col justify-center">
-            <div className="p-6 rounded-2xl glass-card border border-white/10">
-              <h3 className="text-base font-semibold text-white mb-1.5 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-amber-400" />
-                Subscribe to The Sunday Espresso Briefing
-              </h3>
-              <p className="text-xs text-gray-400 mb-4">
-                Curated deep-dives on system architecture, database internals, and Next.js performance. Zero spam.
-              </p>
-              {subscribed ? (
-                <div className="flex items-center gap-2 text-sm text-amber-300 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
-                  <CheckCircle className="w-5 h-5 text-amber-400" />
-                  <span>You&apos;re in! Welcome to the Code &amp; Coffee community.</span>
-                </div>
-              ) : (
-                <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-2.5">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="developer@company.com"
-                    required
-                    className="flex-1 px-4 py-2.5 rounded-xl glass-input text-sm text-white placeholder-gray-500"
-                  />
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-semibold text-sm transition-all shadow-lg shadow-amber-500/20"
-                  >
-                    Subscribe
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Middle Section: Links & Contact Info */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 py-14 border-b border-white/10 text-sm">
+        {/* Links & Contact Info Section */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pb-12 border-b border-white/10 text-sm">
           {/* Engineering Tracks */}
           <div>
             <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-4">
