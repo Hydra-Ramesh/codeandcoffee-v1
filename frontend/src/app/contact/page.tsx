@@ -17,10 +17,16 @@ export default function ContactPage() {
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [honeypotTrap, setHoneypotTrap] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (honeypotTrap.trim().length > 0) {
+      // Automated bot trapped! Silently succeed without processing
+      setSubmitted(true);
+      return;
+    }
     if (name && email && message) {
       setSubmitted(true);
     }
@@ -56,6 +62,20 @@ export default function ContactPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Anti-Bot Honeypot Trap */}
+              <div className="hidden" aria-hidden="true" style={{ display: 'none' }}>
+                <label htmlFor="contact_website_trap">Website</label>
+                <input
+                  id="contact_website_trap"
+                  type="text"
+                  name="website_trap"
+                  value={honeypotTrap}
+                  onChange={(e) => setHoneypotTrap(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1.5">

@@ -30,11 +30,22 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(6, 'Password must be at least 6 characters long'),
 });
 
+const AUTH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+};
+
 export class AuthController {
   static async register(req: Request, res: Response, next: NextFunction) {
     try {
       const data = registerSchema.parse(req.body);
       const result = await AuthService.register(data.name, data.email, data.password);
+      if (result.accessToken) {
+        res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
+      }
       res.status(201).json({
         success: true,
         message: 'Account registered successfully.',
@@ -49,6 +60,9 @@ export class AuthController {
     try {
       const data = loginSchema.parse(req.body);
       const result = await AuthService.login(data.email, data.password);
+      if (result.accessToken) {
+        res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
+      }
       res.status(200).json({
         success: true,
         message: 'Logged in successfully.',
@@ -57,6 +71,19 @@ export class AuthController {
     } catch (err) {
       next(err);
     }
+  }
+
+  static async logout(req: Request, res: Response) {
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully.',
+    });
   }
 
   static async getMe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -168,6 +195,10 @@ export class AuthController {
         avatar: googleProfile.picture,
       });
 
+      if (result.accessToken) {
+        res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
+      }
+
       // Redirect to frontend callback page with tokens
       res.redirect(
         `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}&refreshToken=${encodeURIComponent(
@@ -265,6 +296,10 @@ export class AuthController {
         avatar: githubProfile.avatar_url,
       });
 
+      if (result.accessToken) {
+        res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
+      }
+
       res.redirect(
         `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}&refreshToken=${encodeURIComponent(
           result.refreshToken
@@ -290,6 +325,11 @@ export class AuthController {
         name: name || (provider === 'google' ? 'Google Developer' : 'GitHub Coder'),
         avatar,
       });
+
+      if (result.accessToken) {
+        res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
+      }
+
       res.status(200).json({
         success: true,
         message: `Successfully authenticated via ${provider}`,

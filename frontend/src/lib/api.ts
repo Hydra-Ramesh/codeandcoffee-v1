@@ -57,6 +57,7 @@ export async function fetchApi<T = any>(
 
   try {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      credentials: 'include',
       ...options,
       headers,
     });

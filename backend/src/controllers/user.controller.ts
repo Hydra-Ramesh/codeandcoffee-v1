@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { CacheService } from '../services/cache.service.js';
 import { z } from 'zod';
+import { sanitizeText } from '../utils/sanitize.js';
 
 const updateProfileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
@@ -258,9 +259,14 @@ export class UserController {
 
       const data = updateProfileSchema.parse(req.body);
 
+      const updatePayload: any = {};
+      if (data.name !== undefined) updatePayload.name = sanitizeText(data.name);
+      if (data.bio !== undefined) updatePayload.bio = sanitizeText(data.bio);
+      if (data.avatar !== undefined) updatePayload.avatar = data.avatar;
+
       const updated = await prisma.user.update({
         where: { id: req.user.id },
-        data,
+        data: updatePayload,
         select: {
           id: true,
           name: true,

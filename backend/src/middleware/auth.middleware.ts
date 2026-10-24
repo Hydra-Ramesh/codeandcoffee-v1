@@ -22,12 +22,14 @@ export async function authenticate(
 ): Promise<void> {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ success: false, message: 'Authentication required. No token provided.' });
+    const cookieToken = req.cookies?.token;
+    const token = cookieToken || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+
+    if (!token) {
+      res.status(401).json({ success: false, message: 'Authentication required. No session or token provided.' });
       return;
     }
 
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, config.jwtSecret) as AuthUser;
 
     // Check user in database
@@ -101,12 +103,14 @@ export async function optionalAuth(
   next: NextFunction
 ): Promise<void> {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const cookieToken = req.cookies?.token;
+  const token = cookieToken || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+
+  if (!token) {
     return next();
   }
 
   try {
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, config.jwtSecret) as AuthUser;
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },

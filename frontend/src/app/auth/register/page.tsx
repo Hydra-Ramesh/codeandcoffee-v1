@@ -131,6 +131,18 @@ function RegisterFormContent() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Anti-Bot Honeypot Trap (Hidden from real users, caught if bots fill it) */}
+          <div className="hidden" aria-hidden="true" style={{ display: 'none' }}>
+            <label htmlFor="reg_website_trap">Website</label>
+            <input
+              id="reg_website_trap"
+              type="text"
+              name="website_trap"
+              tabIndex={-1}
+              autoComplete="off"
+            />
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs font-semibold text-gray-300">Full Name</label>

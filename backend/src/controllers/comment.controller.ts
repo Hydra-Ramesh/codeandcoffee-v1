@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { CacheService } from '../services/cache.service.js';
 import { broadcastCommentUpdate } from '../config/socket.js';
 
+import { sanitizeText } from '../utils/sanitize.js';
+
 const commentSchema = z.object({
   content: z.string().min(2, 'Comment must be at least 2 characters long').max(1000, 'Comment is too long'),
   postId: z.string().min(1, 'Post ID is required'),
@@ -56,10 +58,16 @@ export class CommentController {
       }
 
       const data = commentSchema.parse(req.body);
+      const cleanContent = sanitizeText(data.content);
+
+      if (cleanContent.length < 2) {
+        res.status(400).json({ success: false, message: 'Comment content cannot be empty after sanitization.' });
+        return;
+      }
 
       const comment = await prisma.comment.create({
         data: {
-          content: data.content,
+          content: cleanContent,
           postId: data.postId,
           authorId: req.user.id,
         },

@@ -168,6 +168,18 @@ export default function CommentSection({ postId }: CommentSectionProps) {
       {/* Comment Input Box */}
       {user ? (
         <form onSubmit={handlePostComment} className="mb-10 glass-card p-5 rounded-2xl border border-white/10">
+          {/* Anti-Bot Honeypot Trap */}
+          <div className="hidden" aria-hidden="true" style={{ display: 'none' }}>
+            <label htmlFor="comment_website_trap">Website</label>
+            <input
+              id="comment_website_trap"
+              type="text"
+              name="website_trap"
+              tabIndex={-1}
+              autoComplete="off"
+            />
+          </div>
+
           <div className="flex items-center gap-3 mb-3">
             <img
               src={

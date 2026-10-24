@@ -3,6 +3,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
 
 interface MarkdownViewerProps {
   content: string;
@@ -13,6 +14,7 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
     <div className="markdown-content max-w-none text-gray-200">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeSanitize]}
         components={{
           code({ className, children, ...props }) {
             return (

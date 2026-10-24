@@ -35,3 +35,27 @@ export const heartbeatLimiter = rateLimit({
     message: 'Heartbeat rate limit reached.',
   },
 });
+
+// Comment submission rate limiter (prevents spam floods)
+export const commentLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 15, // Up to 15 comments per 5 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many comments submitted in a short period. Please wait a few minutes.',
+  },
+});
+
+// Contributor application limiter
+export const contributorLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // Up to 5 submission attempts per hour per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Application submission limit exceeded. Please wait an hour before submitting again.',
+  },
+});

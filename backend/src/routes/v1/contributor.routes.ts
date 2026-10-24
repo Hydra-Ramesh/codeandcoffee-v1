@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { ContributorController } from '../../controllers/contributor.controller.js';
 import { authenticate, requireAdmin } from '../../middleware/auth.middleware.js';
+import { contributorLimiter } from '../../middleware/rateLimiter.middleware.js';
+import { honeypotCheck } from '../../middleware/honeypot.middleware.js';
 
 const router = Router();
 
 // Authenticated user: Apply to become a contributor
-router.post('/apply', authenticate, ContributorController.applyForContributor);
+router.post('/apply', authenticate, contributorLimiter, honeypotCheck, ContributorController.applyForContributor);
 
 // Authenticated user: View own application status
 router.get('/my-application', authenticate, ContributorController.getMyApplication);

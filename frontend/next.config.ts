@@ -29,6 +29,9 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error'] } : false,
+  },
   async headers() {
     const cspHeader = `
       default-src 'self';

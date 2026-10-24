@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import v1Routes from './routes/v1/index.js';
@@ -30,6 +31,9 @@ export function createApp() {
       allowedHeaders: ['Content-Type', 'Authorization'],
     })
   );
+
+  // Cookie parser for secure HttpOnly session tokens
+  app.use(cookieParser());
 
   // Body parsers
   app.use(express.json({ limit: '10mb' }));

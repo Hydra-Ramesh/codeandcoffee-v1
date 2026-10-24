@@ -34,30 +34,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('token');
+    const savedToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (savedToken) {
       setToken(savedToken);
-      fetchApi('/auth/me', {
-        headers: { Authorization: `Bearer ${savedToken}` },
-      })
-        .then((res) => {
-          if (res.success && res.data?.user) {
-            setUser(res.data.user);
-          } else {
-            localStorage.removeItem('token');
-            setToken(null);
-            setUser(null);
-          }
-        })
-        .catch(() => {
+    }
+
+    // Verifies HttpOnly session cookie automatically via credentials: include, with Bearer header fallback
+    fetchApi('/auth/me', {
+      headers: savedToken ? { Authorization: `Bearer ${savedToken}` } : {},
+    })
+      .then((res) => {
+        if (res.success && res.data?.user) {
+          setUser(res.data.user);
+        } else {
           localStorage.removeItem('token');
           setToken(null);
           setUser(null);
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -105,14 +105,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetchApi('/auth/logout', { method: 'POST' });
+    } catch {
+      // Non-fatal
+    }
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
   };
 
   const refreshUser = async () => {
-    if (!token) return;
     const res = await fetchApi('/auth/me');
     if (res.success && res.data?.user) {
       setUser(res.data.user);
