@@ -46,6 +46,12 @@ export class AuthController {
       if (result.accessToken) {
         res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
       }
+      if (result.refreshToken) {
+        res.cookie('refreshToken', result.refreshToken, {
+          ...AUTH_COOKIE_OPTIONS,
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+      }
       res.status(201).json({
         success: true,
         message: 'Account registered successfully.',
@@ -63,6 +69,12 @@ export class AuthController {
       if (result.accessToken) {
         res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
       }
+      if (result.refreshToken) {
+        res.cookie('refreshToken', result.refreshToken, {
+          ...AUTH_COOKIE_OPTIONS,
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+      }
       res.status(200).json({
         success: true,
         message: 'Logged in successfully.',
@@ -73,8 +85,43 @@ export class AuthController {
     }
   }
 
+  static async refreshToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const incomingToken = req.body?.refreshToken || req.cookies?.refreshToken;
+      if (!incomingToken) {
+        res.status(401).json({
+          success: false,
+          message: 'Refresh token is required.',
+        });
+        return;
+      }
+
+      const result = await AuthService.rotateRefreshToken(incomingToken);
+
+      res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
+      res.cookie('refreshToken', result.refreshToken, {
+        ...AUTH_COOKIE_OPTIONS,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Tokens rotated successfully.',
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async logout(req: Request, res: Response) {
     res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+    res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

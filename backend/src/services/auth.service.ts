@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from '../config/database.js';
+import { redisClient } from '../config/redis.js';
 import { Role } from '@prisma/client';
 import { config } from '../config/env.js';
 import { queueOtpEmail, queueWelcomeEmail } from '../config/queues.js';
@@ -20,11 +21,86 @@ export class AuthService {
       expiresIn: config.jwtExpiresIn as jwt.SignOptions['expiresIn'],
     });
 
-    const refreshToken = jwt.sign({ id: payload.id }, config.jwtRefreshSecret, {
+    const refreshToken = jwt.sign({ id: payload.id, jti: crypto.randomUUID() }, config.jwtRefreshSecret, {
       expiresIn: config.jwtRefreshExpiresIn as jwt.SignOptions['expiresIn'],
     });
 
     return { accessToken, refreshToken };
+  }
+
+  static async storeRefreshToken(userId: string, token: string): Promise<void> {
+    try {
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const key = `refresh_token:${userId}:${tokenHash}`;
+      // Store in Redis with 7-day TTL (604800s)
+      await redisClient.setex(key, 7 * 24 * 60 * 60, 'active');
+    } catch (err) {
+      console.warn('⚠️ Could not persist refresh token in Redis:', (err as Error).message);
+    }
+  }
+
+  static async revokeAllUserRefreshTokens(userId: string): Promise<void> {
+    try {
+      const keys = await redisClient.keys(`refresh_token:${userId}:*`);
+      if (keys.length > 0) {
+        await Promise.all(keys.map((k) => redisClient.del(k)));
+        console.warn(`🚨 [Security:FamilyInvalidation] Revoked ${keys.length} active sessions for compromised user: ${userId}`);
+      }
+    } catch (err) {
+      console.warn('⚠️ Could not revoke user refresh tokens:', err);
+    }
+  }
+
+  static async rotateRefreshToken(incomingToken: string) {
+    let decoded: any;
+    try {
+      decoded = jwt.verify(incomingToken, config.jwtRefreshSecret);
+    } catch {
+      throw new Error('Invalid or expired refresh token.');
+    }
+
+    const userId = decoded.id;
+    const tokenHash = crypto.createHash('sha256').update(incomingToken).digest('hex');
+    const key = `refresh_token:${userId}:${tokenHash}`;
+
+    const exists = await redisClient.get(key);
+
+    if (!exists) {
+      // Replay attack detected: token reuse after rotation! Invalidate all sessions.
+      await this.revokeAllUserRefreshTokens(userId);
+      throw new Error('Refresh token reuse detected. All active sessions have been terminated for security.');
+    }
+
+    // Invalidate consumed single-use refresh token
+    await redisClient.del(key);
+
+    // Verify user is still valid and not banned
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.isBanned) {
+      throw new Error('User account is invalid or suspended.');
+    }
+
+    // Issue brand-new token pair (Access + rotated Refresh token)
+    const tokens = this.generateTokens({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    });
+
+    await this.storeRefreshToken(user.id, tokens.refreshToken);
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+      },
+    };
   }
 
   static generateOtp(length: number = 6): string {
@@ -65,6 +141,8 @@ export class AuthService {
       name: user.name,
       role: user.role,
     });
+
+    await this.storeRefreshToken(user.id, tokens.refreshToken);
 
     return {
       user: {
@@ -107,6 +185,8 @@ export class AuthService {
       name: user.name,
       role: user.role,
     });
+
+    await this.storeRefreshToken(user.id, tokens.refreshToken);
 
     return {
       user: {

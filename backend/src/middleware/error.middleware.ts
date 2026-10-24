@@ -21,6 +21,7 @@ export function errorHandler(
     res.status(400).json({
       success: false,
       message: 'Validation failed for request data.',
+      requestId: req.id,
       errors: err.errors.map((e) => ({
         field: e.path.join('.'),
         message: e.message,
@@ -34,6 +35,7 @@ export function errorHandler(
     res.status(401).json({
       success: false,
       message: 'Invalid authorization token.',
+      requestId: req.id,
     });
     return;
   }
@@ -42,6 +44,7 @@ export function errorHandler(
     res.status(401).json({
       success: false,
       message: 'Authorization token has expired. Please log in again.',
+      requestId: req.id,
     });
     return;
   }
@@ -52,6 +55,7 @@ export function errorHandler(
     res.status(409).json({
       success: false,
       message: `A record with this ${target} already exists.`,
+      requestId: req.id,
     });
     return;
   }
@@ -60,6 +64,7 @@ export function errorHandler(
     res.status(404).json({
       success: false,
       message: 'The requested record could not be found or has already been removed.',
+      requestId: req.id,
     });
     return;
   }
@@ -68,6 +73,7 @@ export function errorHandler(
     res.status(400).json({
       success: false,
       message: 'Database relationship constraint violation.',
+      requestId: req.id,
     });
     return;
   }
@@ -76,15 +82,23 @@ export function errorHandler(
     res.status(503).json({
       success: false,
       message: 'Database service is temporarily unavailable. Please retry in a few moments.',
+      requestId: req.id,
     });
     return;
   }
 
-  // Handle invalid login credentials
-  if (err.message === 'Invalid email or password.' || err.message?.includes('Invalid credentials')) {
+  // Handle invalid login credentials & refresh token errors
+  if (
+    err.message === 'Invalid email or password.' ||
+    err.message?.includes('Invalid credentials') ||
+    err.message?.includes('refresh token') ||
+    err.message?.includes('Refresh token') ||
+    err.message?.includes('token reuse')
+  ) {
     res.status(401).json({
       success: false,
       message: err.message,
+      requestId: req.id,
     });
     return;
   }
@@ -100,6 +114,7 @@ export function errorHandler(
   res.status(statusCode).json({
     success: false,
     message: userFacingMessage,
+    requestId: req.id,
     ...(isProd ? {} : { stack: err.stack }),
   });
 }

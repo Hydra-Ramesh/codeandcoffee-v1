@@ -8,11 +8,15 @@ import analyticsRoutes from './analytics.routes.js';
 import uploadRoutes from './upload.routes.js';
 import contributorRoutes from './contributor.routes.js';
 import healthRoutes from './health.routes.js';
+import metricsRoutes from './metrics.routes.js';
 
 const router = Router();
 
 // Health Check Routes (shallow and deep)
 router.use('/health', healthRoutes);
+
+// Prometheus OpenMetrics Scrape Endpoint
+router.use('/metrics', metricsRoutes);
 
 router.use('/auth', authRoutes);
 router.use('/blogs', blogRoutes);

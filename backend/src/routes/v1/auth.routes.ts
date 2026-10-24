@@ -8,6 +8,7 @@ const router = Router();
 
 router.post('/register', authLimiter, honeypotCheck, AuthController.register);
 router.post('/login', authLimiter, AuthController.login);
+router.post('/refresh', authLimiter, AuthController.refreshToken);
 router.post('/logout', AuthController.logout);
 router.get('/me', authenticate, AuthController.getMe);
 router.post('/forgot-password', authLimiter, AuthController.forgotPassword);

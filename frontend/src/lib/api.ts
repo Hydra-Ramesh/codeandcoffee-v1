@@ -23,12 +23,13 @@ export interface FetchApiOptions extends RequestInit {
   skipCache?: boolean;
   cacheTtlMs?: number; // default 15000 (15 seconds) for GET requests
   idempotencyKey?: string;
+  _isRetry?: boolean;
 }
 
 export async function fetchApi<T = any>(
   endpoint: string,
   options: FetchApiOptions = {}
-): Promise<{ success: boolean; data?: T; message?: string; errors?: Array<string | Record<string, unknown>> }> {
+): Promise<{ success: boolean; data?: T; message?: string; errors?: Array<string | Record<string, unknown>>; requestId?: string }> {
   const method = (options.method || 'GET').toUpperCase();
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const isGet = method === 'GET';
@@ -74,12 +75,51 @@ export async function fetchApi<T = any>(
     });
 
     const data = await res.json();
+    const serverRequestId = res.headers.get('x-request-id') || data.requestId;
+
+    // Automatic Refresh Token Rotation: on 401, attempt silent rotation and replay once
+    if (
+      res.status === 401 &&
+      !options._isRetry &&
+      !endpoint.includes('/auth/login') &&
+      !endpoint.includes('/auth/register') &&
+      !endpoint.includes('/auth/refresh')
+    ) {
+      try {
+        const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          if (refreshData.success && refreshData.data?.accessToken) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('token', refreshData.data.accessToken);
+            }
+            // Transparently replay original request with newly issued token
+            return fetchApi<T>(endpoint, {
+              ...options,
+              _isRetry: true,
+              headers: {
+                ...headers,
+                Authorization: `Bearer ${refreshData.data.accessToken}`,
+              },
+            });
+          }
+        }
+      } catch {
+        // Fall through to standard 401 return
+      }
+    }
 
     if (!res.ok) {
       return {
         success: false,
         message: data.message || `Request failed with status ${res.status}`,
         errors: data.errors,
+        requestId: serverRequestId,
       };
     }
 
@@ -97,7 +137,10 @@ export async function fetchApi<T = any>(
       clearApiCache();
     }
 
-    return data;
+    return {
+      ...data,
+      requestId: serverRequestId,
+    };
   } catch (error: unknown) {
     console.error(`API Fetch Error on ${endpoint}:`, error);
     const message = error instanceof Error ? error.message : 'Unable to communicate with Code & Coffee API server.';

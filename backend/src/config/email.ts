@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { config } from './env.js';
+import { smtpCircuitBreaker } from '../utils/circuitBreaker.js';
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -41,19 +42,24 @@ export async function sendEmail({
 }): Promise<boolean> {
   const mailTransporter = getEmailTransporter();
   if (mailTransporter) {
-    try {
-      await mailTransporter.sendMail({
-        from: config.smtp.from || `"Code & Coffee" <${config.smtp.user}>`,
-        to,
-        subject,
-        text,
-        html,
-      });
-      console.log(`✅ Email dispatched to ${to}: ${subject}`);
-      return true;
-    } catch (err) {
-      console.error(`❌ Failed sending email to ${to}:`, (err as Error).message);
-    }
+    return smtpCircuitBreaker.execute(
+      async () => {
+        await mailTransporter.sendMail({
+          from: config.smtp.from || `"Code & Coffee" <${config.smtp.user}>`,
+          to,
+          subject,
+          text,
+          html,
+        });
+        console.log(`✅ Email dispatched to ${to}: ${subject}`);
+        return true;
+      },
+      (err: Error) => {
+        console.warn(`📨 [CircuitBreaker Fallback] Bypassing SMTP for ${to}: ${err.message}`);
+        console.log(`📨 [DEV EMAIL FALLBACK] To: ${to} | Subject: ${subject}`);
+        return true;
+      }
+    );
   }
   console.log(`📨 [DEV EMAIL] To: ${to} | Subject: ${subject}`);
   return true;

@@ -9,6 +9,8 @@ import { errorHandler } from './middleware/error.middleware.js';
 import { apiLimiter } from './middleware/rateLimiter.middleware.js';
 import { idempotency } from './middleware/idempotency.middleware.js';
 import { requestLogger } from './middleware/logger.middleware.js';
+import { requestIdMiddleware } from './middleware/requestId.middleware.js';
+import { requestTimeout } from './middleware/timeout.middleware.js';
 import { config } from './config/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,8 +19,14 @@ const __dirname = path.dirname(__filename);
 export function createApp() {
   const app = express();
 
+  // Distributed correlation ID assignment
+  app.use(requestIdMiddleware);
+
   // Request latency and access logger
   app.use(requestLogger);
+
+  // Global HTTP connection timeout protection (15s)
+  app.use(requestTimeout(15000));
 
   // Helmet for security headers
   app.use(
@@ -72,6 +80,7 @@ export function createApp() {
     res.status(404).json({
       success: false,
       message: `Resource not found on Code & Coffee API: ${req.method} ${req.originalUrl}`,
+      requestId: req.id,
     });
   });
 
