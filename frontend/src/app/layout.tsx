@@ -56,8 +56,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
-      <head>
+      <head suppressHydrationWarning>
         <script
+          id="theme-init"
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -75,7 +77,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-[var(--background)] text-[var(--foreground)] min-h-screen flex flex-col justify-between selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300">
+      <body
+        suppressHydrationWarning
+        className="bg-[var(--background)] text-[var(--foreground)] min-h-screen flex flex-col justify-between selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300"
+      >
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>
