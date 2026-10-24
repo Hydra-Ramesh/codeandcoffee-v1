@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   ArrowRight,
   Mail,
+  Rocket,
 } from 'lucide-react';
 import { fetchApi } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -25,12 +26,14 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [pendingApps, setPendingApps] = useState<any[]>([]);
   const [pendingInquiries, setPendingInquiries] = useState<any[]>([]);
+  const [waitlistData, setWaitlistData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadStats();
     loadContributorApps();
     loadInquiries();
+    loadWaitlistStats();
 
     const socket = getSocket();
     const handleNewInquiry = () => {
@@ -39,19 +42,40 @@ export default function AdminDashboardPage() {
     const handleInquiryCount = () => {
       loadInquiries();
     };
+    const handleNewWaitlist = () => {
+      loadWaitlistStats();
+    };
+    const handleWaitlistCount = () => {
+      loadWaitlistStats();
+    };
 
     if (socket && socket.on) {
       socket.on('admin:new_inquiry', handleNewInquiry);
       socket.on('admin:inquiry_count', handleInquiryCount);
+      socket.on('admin:new_waitlist', handleNewWaitlist);
+      socket.on('admin:waitlist_count', handleWaitlistCount);
     }
 
     return () => {
       if (socket && socket.off) {
         socket.off('admin:new_inquiry', handleNewInquiry);
         socket.off('admin:inquiry_count', handleInquiryCount);
+        socket.off('admin:new_waitlist', handleNewWaitlist);
+        socket.off('admin:waitlist_count', handleWaitlistCount);
       }
     };
   }, []);
+
+  const loadWaitlistStats = async () => {
+    try {
+      const res = await fetchApi('/waitlist/stats');
+      if (res.success && res.data) {
+        setWaitlistData(res.data);
+      }
+    } catch {
+      // non-fatal
+    }
+  };
 
   const loadStats = async () => {
     setLoading(true);
@@ -153,6 +177,66 @@ export default function AdminDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Early Access Waitlist Notification Card */}
+      {waitlistData && waitlistData.totalCount > 0 && (
+        <div className="p-6 rounded-2xl glass-card border border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-purple-500/5 to-transparent space-y-4 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                <Rocket className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>VIP Early Access Waiting List</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950">
+                    {waitlistData.waitlistedCount} PENDING • {waitlistData.totalCount} TOTAL
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Developers who requested early notifications for the upcoming &ldquo;What&apos;s Coming&rdquo; platform.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/admin/waitlist"
+              className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-semibold"
+            >
+              <span>Manage Waiting List</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {waitlistData.recentEntries && waitlistData.recentEntries.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              {waitlistData.recentEntries.slice(0, 2).map((entry: any) => (
+                <div key={entry.id} className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-white flex items-center gap-2">
+                      <span>{entry.name}</span>
+                      <span className="text-gray-400 font-normal font-mono text-[11px]">({entry.email})</span>
+                    </div>
+                    <span className="text-[10px] text-gray-500 font-mono">
+                      {new Date(entry.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      {entry.track}
+                    </span>
+                    <span className="text-[10px] font-mono text-amber-400">
+                      STATUS: {entry.status}
+                    </span>
+                  </div>
+                  {entry.notes && (
+                    <p className="text-gray-300 italic text-[11px] line-clamp-1">&ldquo;{entry.notes}&rdquo;</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Contact Inquiries Notification Card */}
       {pendingInquiries.length > 0 && (

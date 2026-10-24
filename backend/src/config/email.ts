@@ -855,4 +855,76 @@ export async function sendPasswordResetDirectEmail({
   });
 }
 
+/**
+ * Send notification to Admin when a user joins the What's Coming VIP Waitlist
+ */
+export async function sendAdminWaitlistNotificationEmail({
+  name,
+  email,
+  track,
+  notes,
+}: {
+  name: string;
+  email: string;
+  track: string;
+  notes?: string | null;
+}): Promise<boolean> {
+  const adminEmail =
+    process.env.ADMIN_NOTIFICATION_EMAIL ||
+    (config.initialAdmin.email && !config.initialAdmin.email.includes('codeandcoffee.dev')
+      ? config.initialAdmin.email
+      : 'dasramesh8343003905@gmail.com');
+  const waitlistDashboardUrl = `${config.clientUrl}/admin/waitlist`;
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; margin: 0; padding: 24px; }
+          .container { max-width: 600px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.6); }
+          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%); padding: 24px 28px; text-align: left; }
+          .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+          .content { padding: 32px 28px; }
+          .badge { display: inline-block; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 8px; margin-bottom: 16px; }
+          .field { margin-bottom: 14px; font-size: 13px; color: #9ca3af; }
+          .field strong { color: #ffffff; font-weight: 600; }
+          .track-box { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 18px 0; font-size: 14px; color: #fde68a; font-weight: 700; }
+          .btn-container { text-align: center; margin: 28px 0 10px 0; }
+          .btn { display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #090d16 !important; font-weight: 800; font-size: 14px; text-decoration: none; padding: 12px 32px; border-radius: 10px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35); }
+          .footer { background: #0b0f19; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #1f2937; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🚀 Code &amp; Coffee • Early Access Waitlist</h1>
+          </div>
+          <div class="content">
+            <span class="badge">Job-Ready Platform Notification</span>
+            <div class="field"><strong>Developer:</strong> ${name} (<a href="mailto:${email}" style="color: #fbbf24;">${email}</a>)</div>
+            <div class="field"><strong>Registered At:</strong> ${new Date().toLocaleString()}</div>
+            <div class="track-box">Requested Track: ${track}</div>
+            ${notes ? `<div class="field"><strong>Notes:</strong> ${notes}</div>` : ''}
+            <div class="btn-container">
+              <a href="${waitlistDashboardUrl}" class="btn" target="_blank">View in Waitlist Dashboard &rarr;</a>
+            </div>
+          </div>
+          <div class="footer">
+            Administrator Telemetry • Code &amp; Coffee Engineering Journal
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: adminEmail,
+    replyTo: email,
+    subject: `🚀 [VIP Waitlist] ${name} requested early access for: ${track}`,
+    html: htmlContent,
+  });
+}
+
 

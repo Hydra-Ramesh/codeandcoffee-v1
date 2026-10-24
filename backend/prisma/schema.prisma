@@ -44,6 +44,7 @@ model User {
   dislikes      Dislike[]
   applications  ContributorApplication[]
   sessions      UserSession[]
+  waitlistEntries WaitlistEntry[]
 
   @@index([email])
 }
@@ -180,5 +181,23 @@ model Inquiry {
   updatedAt  DateTime      @updatedAt
 
   @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name      String
+  email     String
+  track     String   @default("All Tracks (Full Job-Ready Bundle)")
+  notes     String?
+  status    String   @default("WAITLISTED") // "WAITLISTED" | "INVITED" | "ONBOARDED"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([email, track])
+  @@index([status])
+  @@index([track])
   @@index([createdAt(sort: Desc)])
 }

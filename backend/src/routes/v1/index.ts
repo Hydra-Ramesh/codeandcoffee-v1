@@ -8,6 +8,7 @@ import analyticsRoutes from './analytics.routes.js';
 import uploadRoutes from './upload.routes.js';
 import contributorRoutes from './contributor.routes.js';
 import inquiryRoutes from './inquiry.routes.js';
+import waitlistRoutes from './waitlist.routes.js';
 import healthRoutes from './health.routes.js';
 import metricsRoutes from './metrics.routes.js';
 
@@ -28,5 +29,6 @@ router.use('/analytics', analyticsRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/contributors', contributorRoutes);
 router.use('/inquiries', inquiryRoutes);
+router.use('/waitlist', waitlistRoutes);
 
 export default router;

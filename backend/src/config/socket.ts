@@ -253,6 +253,28 @@ export function broadcastNewInquiry(inquiry: any) {
 }
 
 /**
+ * Broadcast new early access waitlist entry to admin console
+ */
+export function broadcastNewWaitlistEntry(entry: any) {
+  if (!io) return;
+  io.emit('admin:new_waitlist', {
+    entry,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
+ * Broadcast updated waitlist count to admin console
+ */
+export function broadcastWaitlistCount(count: number) {
+  if (!io) return;
+  io.emit('admin:waitlist_count', {
+    count,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
  * Fast O(1) in-memory reader count for a blog post
  */
 export function getActiveBlogReadersCount(blogId: string): number {

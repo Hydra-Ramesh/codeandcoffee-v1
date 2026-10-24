@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Sparkles,
@@ -16,33 +16,87 @@ import {
   CheckCircle2,
   ArrowRight,
   Clock,
-  Compass,
-  Coffee,
-  Check,
   Send,
   Loader2,
-  Users,
-  Target,
   FileCode,
-  ShieldCheck,
   Rocket,
-  ChevronRight,
+  Lock,
+  LogIn,
+  UserPlus,
+  ShieldAlert,
+  Terminal,
 } from 'lucide-react';
 import { fetchApi } from '../../lib/api';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 
 export default function WhatsComingPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [activePillar, setActivePillar] = useState<'learn' | 'practice' | 'read' | 'apply'>('learn');
   const [selectedTrack, setSelectedTrack] = useState<string | null>('ai');
-  const [waitlistEmail, setWaitlistEmail] = useState('');
-  const [waitlistName, setWaitlistName] = useState('');
   const [interestTrack, setInterestTrack] = useState('All Tracks (Full Job-Ready Bundle)');
+  const [notes, setNotes] = useState('');
   const [submittingWaitlist, setSubmittingWaitlist] = useState(false);
   const [waitlistJoined, setWaitlistJoined] = useState(false);
+  const [userEntries, setUserEntries] = useState<any[]>([]);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      loadMyWaitlistStatus();
+    }
+  }, [user]);
+
+  const loadMyWaitlistStatus = async () => {
+    try {
+      setLoadingStatus(true);
+      const res = await fetchApi('/waitlist/my-status');
+      if (res.success && res.data) {
+        setUserEntries(res.data.entries || []);
+        if (res.data.hasJoined) {
+          setWaitlistJoined(true);
+        }
+      }
+    } catch {
+      // non-fatal
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      toast.error('Authentication Required: Please sign in or create an account to join the Early Access waiting list.');
+      return;
+    }
+
+    setSubmittingWaitlist(true);
+    try {
+      const res = await fetchApi('/waitlist/join', {
+        method: 'POST',
+        body: JSON.stringify({
+          track: interestTrack,
+          notes: notes.trim() || undefined,
+        }),
+      });
+
+      if (res.success) {
+        toast.success('🎉 Registered for Early Access! The admin panel has been notified and you are now on the VIP waiting list.');
+        setWaitlistJoined(true);
+        loadMyWaitlistStatus();
+      } else {
+        toast.error(res.message || 'Could not complete registration. Please try again.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Network error occurred. Please try again.');
+    } finally {
+      setSubmittingWaitlist(false);
+    }
+  };
 
   const pillars = [
     {
@@ -168,383 +222,341 @@ export default function WhatsComingPage() {
         'Distributed Caching strategies: Redis caching patterns, cache-aside & invalidation',
         'Message Queues & Event Streaming: Kafka partitioning & idempotency',
         'Database Sharding, Replication, Consistency Models & CAP Theorem',
-        'Rate limiters, Load balancers, API gateways & consistent hashing',
-        'LLD: SOLID principles, Factory, Strategy, Observer & Decorator patterns',
+        'Rate Limiting algorithms (Token Bucket, Leaky Bucket, Sliding Window)',
+        'Object-Oriented Design Patterns, SOLID Principles & Clean Architecture in practice',
       ],
     },
     {
       id: 'devops',
       title: 'DevOps, Cloud & SRE',
-      subtitle: 'Containerization, CI/CD & Production Reliability',
-      badge: 'Production Reliability',
+      subtitle: 'Kubernetes, CI/CD, Terraform & Observability',
+      badge: 'Production Ready',
       badgeColor: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
       icon: Cloud,
       iconColor: 'text-emerald-400',
       gradient: 'from-emerald-900/30 via-slate-900/60 to-slate-900/40',
       borderColor: 'border-emerald-500/30 hover:border-emerald-500/60',
       summary:
-        'Take full ownership of the production lifecycle. Learn how to package, deploy, automate, scale, and monitor modern cloud applications.',
+        'Zero downtime deployments. Master container orchestration, automated delivery pipelines, Infrastructure as Code, and real-time observability.',
       topics: [
-        'Docker container multi-stage builds & image optimization',
-        'Kubernetes orchestration: Deployments, Services, Ingress & Helm charts',
-        'CI/CD Pipelines: Automated testing & zero-downtime rolling releases with GitHub Actions',
-        'Infrastructure as Code (IaC) with Terraform & Cloudflare zero-trust',
-        'Observability: Metrics, traces & logs with Prometheus and Grafana',
+        'Docker container multi-stage build optimization and security scanning',
+        'Kubernetes pod scheduling, ingress controllers, HPA, and Helm charts',
+        'CI/CD workflows with GitHub Actions, canary releases, and blue/green deploys',
+        'Terraform modular infrastructure provisioning on AWS / GCP',
+        'Prometheus metrics, Grafana dashboards, and distributed tracing with OpenTelemetry',
       ],
     },
     {
       id: 'coding',
       title: 'Modern Coding & Fullstack Systems',
-      subtitle: 'Enterprise-Grade Software Development',
-      badge: 'Hands-on Engineering',
-      badgeColor: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+      subtitle: 'Clean Code, Modern TS/Node/Go & High-Performance UI',
+      badge: 'Daily Craftsmanship',
+      badgeColor: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
       icon: Code2,
-      iconColor: 'text-indigo-400',
-      gradient: 'from-indigo-900/30 via-slate-900/60 to-slate-900/40',
-      borderColor: 'border-indigo-500/30 hover:border-indigo-500/60',
+      iconColor: 'text-blue-400',
+      gradient: 'from-blue-900/30 via-slate-900/60 to-slate-900/40',
+      borderColor: 'border-blue-500/30 hover:border-blue-500/60',
       summary:
-        'Build production web applications with clean architecture, type safety, resilient database transactions, and real-time bidirectional communication.',
+        'Write expressive, testable, and maintainable code. Master concurrent backends in Go and Node.js, reactive state architectures, and sub-100ms UI rendering.',
       topics: [
-        'Next.js App Router, Server Components & Streaming SSR',
-        'High-concurrency Node.js, Express & Go microservices',
-        'WebSockets, Socket.io & Redis Pub/Sub for real-time collaboration',
-        'PostgreSQL optimization: Indexes, query planning & connection pooling',
-        'Authentication, OAuth2, session families & OWASP security standards',
+        'Modern TypeScript strict type modeling, generics & utility types',
+        'High-performance backend concurrency with Go routines and channels',
+        'Database query tuning, Prisma indexes, and transaction isolation levels',
+        'Next.js Server Actions, streaming SSR, and edge compute performance',
+        'Comprehensive unit, integration, and E2E testing strategies with Vitest & Playwright',
       ],
     },
     {
       id: 'cp',
       title: 'Competitive Programming',
-      subtitle: 'Speed, Algorithms & Math Rigor',
-      badge: 'Elite Contest Track',
+      subtitle: 'Speed, Mathematical Depth & Contest Excellence',
+      badge: 'Hardcore Problem Solving',
       badgeColor: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
       icon: Trophy,
       iconColor: 'text-rose-400',
       gradient: 'from-rose-900/30 via-slate-900/60 to-slate-900/40',
       borderColor: 'border-rose-500/30 hover:border-rose-500/60',
       summary:
-        'Hone lightning-fast problem decomposition and mathematical intuition for competitive coding contests, ICPC, and elite coding challenges.',
+        'Push algorithmic reflexes to the absolute edge. Master mathematical thinking, bit manipulation, number theory, and speed coding for global programming contests.',
       topics: [
-        'Number Theory: Sieve of Eratosthenes, Modular Arithmetic, GCD/LCM',
-        'Bit manipulation tricks and binary exponentiation algorithms',
-        'Greedy algorithms, coordinate compression & two-pointer contest idioms',
-        'Speed optimization techniques and edge-case eradication',
-        'Codeforces & CodeChef rating growth blueprints',
+        'Number Theory: Modular arithmetic, Euclidean GCD, Sieve of Eratosthenes',
+        'Bitwise tricks, Fast I/O, and constant-factor optimization in C++',
+        'Advanced Range Queries: Fenwick Trees, Segment Trees with Lazy Propagation',
+        'Game Theory: Nim games, Sprague-Grundy Theorem & minimax pruning',
+        'Contest strategy: Time allocation, stress-testing scripts & corner case isolation',
       ],
     },
   ];
 
   const milestones = [
     {
-      quarter: 'Current Phase',
-      title: 'Technical Journal & Author Guild',
-      status: 'Live in Production',
-      statusColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-      description:
-        'High-performance technical blog platform with real-time reader telemetry, rich Markdown editing, author approval workflow, and transactional newsletter alerts.',
+      quarter: 'Phase 1 • Live Now',
+      title: 'Technical Publishing Journal',
+      description: 'In-depth architecture articles, reader engagement, active reader telemetries, and community feedback.',
+      status: 'Live & Operational',
+      statusColor: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
       isCurrent: true,
     },
     {
-      quarter: 'Phase 2 (Q1 2027)',
-      title: 'Interactive System Design & DSA Practice Arena',
-      status: 'In Active Engineering',
-      statusColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      description:
-        'Interactive in-browser code editor, curated DSA pattern problem sets, and interactive system design visualizers with simulated load generators.',
+      quarter: 'Phase 2 • Q4 2026',
+      title: 'Interactive Code Playground & DSA Tracks',
+      description: 'In-browser multi-language execution sandbox with curated algorithmic patterns and test suites.',
+      status: 'In Active Development',
+      statusColor: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
       isCurrent: false,
     },
     {
-      quarter: 'Phase 3 (Q2 2027)',
-      title: 'Exploring AI & Generative Engineering Studio',
-      status: 'Curriculum & Labs Staging',
-      statusColor: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
-      description:
-        'Hands-on RAG architectures, local LLM execution sandboxes, and autonomous AI Agent builders integrated with real database connections.',
+      quarter: 'Phase 3 • Q1 2027',
+      title: 'System Design Canvas & AI Agent Labs',
+      description: 'Visual drag-and-drop system design architecture board with live QPS calculator and autonomous LLM agent builder.',
+      status: 'Prototyped',
+      statusColor: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
       isCurrent: false,
     },
     {
-      quarter: 'Phase 4 (Q3 2027)',
-      title: 'Job-Ready Portfolios, Mock Interviews & Hiring Match',
+      quarter: 'Phase 4 • Q2 2027',
+      title: 'Competitive Arena & Job-Ready Capstones',
+      description: 'Simulated rating contests, resume-grade project evaluations, and direct hiring partner referrals.',
       status: 'Roadmap Milestone',
-      statusColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
-      description:
-        'Resume review pipelines, capstone project verification badges, and direct introductions to engineering hiring partners.',
+      statusColor: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
       isCurrent: false,
     },
   ];
 
-  const handleWaitlistSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const emailToUse = waitlistEmail.trim() || user?.email;
-    const nameToUse = waitlistName.trim() || user?.name || 'Fellow Engineer';
-
-    if (!emailToUse) {
-      toast.error('Please enter a valid email address.');
-      return;
-    }
-
-    setSubmittingWaitlist(true);
-
-    try {
-      // Submit interest via official inquiry endpoint
-      const res = await fetchApi('/inquiries', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: nameToUse,
-          email: emailToUse,
-          subject: `VIP Early Access Waitlist: ${interestTrack}`,
-          message: `User ${nameToUse} (${emailToUse}) requested early access and roadmap notifications for the Job-Ready platform. Track of primary interest: ${interestTrack}.`,
-        }),
-      });
-
-      if (res.success) {
-        setWaitlistJoined(true);
-        toast.success("🎉 You're on the VIP Waitlist! We will notify you the moment early access opens.");
-      } else {
-        toast.error(res.message || 'Could not join waitlist. Please try again.');
-      }
-    } catch {
-      toast.error('Network error. Please try again later.');
-    } finally {
-      setSubmittingWaitlist(false);
-    }
-  };
-
+  const activePillarData = pillars.find((p) => p.id === activePillar) || pillars[0];
   const selectedTrackData = tracks.find((t) => t.id === selectedTrack) || tracks[0];
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-16 animate-fade-in">
+    <div className="space-y-16 py-6 max-w-6xl mx-auto">
       {/* HERO SECTION */}
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 glass-card p-8 sm:p-14 text-center space-y-6">
-        {/* Background glow effects */}
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 right-10 w-80 h-80 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          <span>The Roadmap to Job-Readiness • What's Coming</span>
+      <div className="text-center space-y-6 relative">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider shadow-lg shadow-amber-500/10 animate-pulse">
+          <Sparkles className="w-4 h-4" />
+          <span>Platform Evolution • What&apos;s Coming</span>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight max-w-4xl mx-auto">
-          We Are Building Your <br />
-          <span className="gradient-text-amber">One-Stop Developer Ecosystem</span>
+        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight max-w-4xl mx-auto">
+          We are Building the Ultimate{' '}
+          <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-200 bg-clip-text text-transparent">
+            Job-Ready Engineering
+          </span>{' '}
+          Ecosystem
         </h1>
 
-        <p className="text-base sm:text-lg text-gray-300 max-w-3xl mx-auto leading-relaxed">
-          We are actively working to make you completely <strong>Job-Ready</strong>. Gain true production-grade exposure to{' '}
-          <strong className="text-amber-400">Exploring AI</strong>, <strong className="text-cyan-400">DSA</strong>,{' '}
-          <strong className="text-purple-400">System Design</strong>, <strong className="text-emerald-400">DevOps</strong>,{' '}
-          <strong className="text-indigo-400">Systems Coding</strong>, and{' '}
-          <strong className="text-rose-400">Competitive Programming</strong>.
+        <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto leading-relaxed">
+          From foundational concepts to Staff-level execution. We provide deep exposure across{' '}
+          <strong className="text-amber-400 font-semibold">AI &amp; LLMs</strong>,{' '}
+          <strong className="text-amber-400 font-semibold">DSA Mastery</strong>,{' '}
+          <strong className="text-amber-400 font-semibold">High-Scale System Design</strong>,{' '}
+          <strong className="text-amber-400 font-semibold">DevOps &amp; Cloud</strong>, and{' '}
+          <strong className="text-amber-400 font-semibold">Competitive Programming</strong>.
         </p>
 
-        {/* 4-Pillar Pill Badges */}
-        <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
-          {['Learn Concepts', 'Practice Problems', 'Read Deep Dives', 'Apply in Projects'].map((pillar, idx) => (
-            <span
-              key={pillar}
-              className="px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-white/10 text-xs font-bold text-gray-200 flex items-center gap-1.5 shadow-sm"
-            >
-              <Check className="w-3.5 h-3.5 text-amber-400" />
-              {pillar}
-            </span>
-          ))}
-        </div>
+        {/* AUTHENTICATION STATUS BANNER */}
+        {!authLoading && !user && (
+          <div className="max-w-2xl mx-auto mt-6 p-6 rounded-2xl glass-card border border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-slate-900 to-amber-500/5 text-left space-y-3 shadow-xl">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Authentication Required</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 uppercase tracking-wider">
+                    Member Access
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Please sign in or create an account to view curriculum breakdowns and join the early access waiting list.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+              <Link
+                href="/auth/login?redirect=/whats-coming"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In to Unlock &amp; Join Waitlist</span>
+              </Link>
+              <Link
+                href="/auth/register?redirect=/whats-coming"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl glass-card hover:bg-white/10 text-white font-semibold text-xs border border-white/10 flex items-center justify-center gap-2"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Create Free Account</span>
+              </Link>
+            </div>
+          </div>
+        )}
 
-        <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+        {user && (
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>Authenticated as <strong>{user.name}</strong> ({user.email})</span>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           <a
-            href="#tracks"
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-500/25 transition-all cursor-pointer"
+            href="#pillars"
+            className="px-6 py-3 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm shadow-xl shadow-amber-500/25 hover:bg-amber-400 transition-all flex items-center gap-2"
           >
-            <span>Explore Engineering Tracks</span>
+            <span>Explore 4 Pillars</span>
             <ArrowRight className="w-4 h-4" />
           </a>
           <a
             href="#waitlist"
-            className="flex items-center gap-2 px-6 py-3 rounded-xl glass-card hover:bg-white/10 text-white font-semibold text-sm border border-white/15 transition-all cursor-pointer"
+            className="px-6 py-3 rounded-xl glass-card hover:bg-white/10 text-white font-semibold text-sm border border-white/10 transition-all flex items-center gap-2"
           >
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span>Join Early Access Waitlist</span>
+            <Rocket className="w-4 h-4 text-amber-400" />
+            <span>VIP Early Access Waiting List</span>
           </a>
         </div>
       </div>
 
-      {/* THE 4 PILLARS: ONE-STOP SOLUTION */}
-      <div className="space-y-8">
+      {/* 4 PILLARS FRAMEWORK */}
+      <div id="pillars" className="space-y-8 scroll-mt-24">
         <div className="text-center space-y-2">
           <div className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono">
-            Methodology That Guarantees Mastery
+            Our 4-Pillar Mastery Framework
           </div>
           <h2 className="text-2xl sm:text-4xl font-extrabold text-white">
-            The 4-Pillar One-Stop Solution
+            Learn • Practice • Read • Apply
           </h2>
-          <p className="text-sm text-gray-400 max-w-2xl mx-auto">
-            Traditional platforms separate blogs, problem solving, and project building. Code &amp; Coffee unifies all 4 into a singular learning journey.
+          <p className="text-sm text-gray-400 max-w-xl mx-auto">
+            A comprehensive, one-stop pedagogical pipeline crafted so you never get stuck between theory and real-world execution.
           </p>
         </div>
 
-        {/* Pillar Switcher Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto">
-          {pillars.map((p) => {
-            const Icon = p.icon;
-            const isSelected = activePillar === p.id;
+        {/* Pillar Switcher Buttons */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
+          {pillars.map((pillar) => {
+            const Icon = pillar.icon;
+            const isActive = activePillar === pillar.id;
             return (
               <button
-                key={p.id}
-                onClick={() => setActivePillar(p.id as any)}
-                className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-2 ${
-                  isSelected
-                    ? 'bg-amber-500/15 border-amber-500/50 shadow-lg shadow-amber-500/10'
-                    : 'glass-card border-white/10 hover:border-white/20'
+                key={pillar.id}
+                onClick={() => setActivePillar(pillar.id as any)}
+                className={`p-4 rounded-2xl border transition-all text-left flex flex-col justify-between space-y-3 cursor-pointer ${
+                  isActive
+                    ? 'glass-card border-amber-500/60 bg-amber-500/10 shadow-lg shadow-amber-500/10'
+                    : 'glass-card border-white/5 hover:border-white/20'
                 }`}
               >
-                <div
-                  className={`p-2 rounded-xl bg-gradient-to-br ${
-                    isSelected ? p.color : 'from-slate-800 to-slate-900'
-                  } text-white`}
-                >
-                  <Icon className="w-5 h-5" />
+                <div className="flex items-center justify-between">
+                  <div className={`p-2.5 rounded-xl ${isActive ? 'bg-amber-500 text-slate-950' : 'bg-white/5 text-gray-400'}`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  {isActive && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  )}
                 </div>
                 <div>
-                  <div className={`text-sm font-bold ${isSelected ? 'text-amber-300' : 'text-white'}`}>
-                    {p.title}
-                  </div>
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">
-                    Pillar
-                  </div>
+                  <div className="text-sm font-bold text-white">{pillar.title}</div>
+                  <div className="text-[11px] text-gray-400">{pillar.subtitle}</div>
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* Selected Pillar Card Detail */}
-        {(() => {
-          const current = pillars.find((p) => p.id === activePillar) || pillars[0];
-          const CurrentIcon = current.icon;
-          return (
-            <div className="glass-card p-6 sm:p-10 rounded-3xl border border-white/15 relative overflow-hidden">
-              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pb-6 border-b border-white/10">
-                <div className="flex items-center gap-4">
-                  <div className={`p-4 rounded-2xl bg-gradient-to-br ${current.color} text-white shadow-xl`}>
-                    <CurrentIcon className="w-8 h-8" />
-                  </div>
-                  <div>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border uppercase tracking-wider ${current.badgeBg}`}>
-                      Pillar: {current.title}
-                    </span>
-                    <h3 className="text-xl sm:text-2xl font-bold text-white mt-1">
-                      {current.subtitle}
-                    </h3>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-300 leading-relaxed">{current.description}</p>
-                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                      Why this matters for your career:
-                    </span>
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                      Most applicants fail technical loops because they memorize syntax without understanding real trade-offs. The{' '}
-                      <strong className="text-white">{current.title}</strong> pillar bridges this gap directly.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
-                    What You Will Experience:
-                  </span>
-                  {current.highlights.map((h, i) => (
-                    <div
-                      key={i}
-                      className="p-3 rounded-xl bg-slate-900/60 border border-white/5 flex items-start gap-3 text-xs text-gray-200"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                      <span>{h}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+        {/* Active Pillar Card */}
+        <div className="glass-card rounded-3xl p-6 sm:p-10 border border-white/10 space-y-6 bg-gradient-to-br from-slate-900/80 via-slate-900/40 to-black/60">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
+            <div className="space-y-1">
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold border ${activePillarData.badgeBg}`}>
+                Pillar: {activePillarData.title}
+              </span>
+              <h3 className="text-2xl font-extrabold text-white">{activePillarData.subtitle}</h3>
             </div>
-          );
-        })()}
+            <p className="text-xs sm:text-sm text-gray-300 max-w-md leading-relaxed">
+              {activePillarData.description}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono">
+              Key Capabilities &amp; Features:
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {activePillarData.highlights.map((h, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-xl bg-white/5 border border-white/5 flex items-start gap-3 text-xs sm:text-sm text-gray-200"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span>{h}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* THE 6 CORE ENGINEERING DOMAINS */}
-      <div id="tracks" className="space-y-8 scroll-mt-24">
+      {/* 6 CORE CURRICULUM TRACKS */}
+      <div className="space-y-8">
         <div className="text-center space-y-2">
           <div className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono">
-            6 High-Impact Specialization Tracks
+            Engineered For Modern High-Scale Careers
           </div>
           <h2 className="text-2xl sm:text-4xl font-extrabold text-white">
-            Engineering Tracks Under Active Development
+            6 Specialized Technical Tracks
           </h2>
-          <p className="text-sm text-gray-400 max-w-2xl mx-auto">
-            Comprehensive curriculum, code sandboxes, and architectural labs tailored to make you a standout candidate for Tier-1 engineering teams.
+          <p className="text-sm text-gray-400 max-w-xl mx-auto">
+            Deep dive into any track or master all six to become an indisputable 10x Fullstack &amp; Systems Engineer.
           </p>
         </div>
 
-        {/* Track Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tracks.map((t) => {
-            const Icon = t.icon;
-            const isSelected = selectedTrack === t.id;
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tracks.map((track) => {
+            const Icon = track.icon;
+            const isSelected = selectedTrack === track.id;
             return (
               <div
-                key={t.id}
-                onClick={() => setSelectedTrack(t.id)}
-                className={`glass-card p-6 rounded-3xl border transition-all duration-300 flex flex-col justify-between space-y-4 cursor-pointer group hover:-translate-y-1 ${
+                key={track.id}
+                onClick={() => setSelectedTrack(track.id)}
+                className={`p-6 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-4 ${
                   isSelected
-                    ? 'border-amber-500/60 shadow-xl shadow-amber-500/10 bg-slate-900/90'
-                    : 'border-white/10 hover:border-white/20'
+                    ? `glass-card ${track.borderColor} shadow-xl shadow-amber-500/10 bg-gradient-to-b ${track.gradient}`
+                    : 'glass-card border-white/10 hover:border-white/20'
                 }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className={`p-3 rounded-2xl bg-slate-900 border border-white/10 ${t.iconColor} group-hover:scale-105 transition-transform`}>
+                    <div className={`p-3 rounded-xl bg-white/5 ${track.iconColor}`}>
                       <Icon className="w-6 h-6" />
                     </div>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${t.badgeColor}`}>
-                      {t.badge}
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${track.badgeColor}`}>
+                      {track.badge}
                     </span>
                   </div>
 
                   <div>
-                    <h3 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
-                      {t.title}
-                    </h3>
-                    <p className="text-xs text-gray-400 font-mono">{t.subtitle}</p>
+                    <h3 className="text-base font-bold text-white">{track.title}</h3>
+                    <p className="text-xs text-gray-400">{track.subtitle}</p>
                   </div>
 
-                  <p className="text-xs text-gray-300 leading-relaxed line-clamp-3">
-                    {t.summary}
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    {track.summary}
                   </p>
                 </div>
 
-                <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                  <span className="text-[11px] text-gray-400">
-                    {t.topics.length} Mastery Modules
-                  </span>
-                  <span className="flex items-center gap-1 font-semibold text-amber-400 group-hover:translate-x-1 transition-transform">
-                    <span>Inspect Track</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </span>
+                <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-semibold text-amber-400">
+                  <span>{isSelected ? 'Viewing Detailed Topics' : 'Click to View Curriculum'}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Selected Track Deep-Dive Card */}
+        {/* Selected Track Detailed Topic Breakdown */}
         {selectedTrackData && (
-          <div className="p-6 sm:p-8 rounded-3xl border border-amber-500/30 glass-card bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-slate-950/90 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+          <div className="p-6 sm:p-8 rounded-3xl glass-card border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-slate-900 to-black/60 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
               <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-xl bg-slate-900 border border-white/10 ${selectedTrackData.iconColor}`}>
+                <div className={`p-3 rounded-2xl bg-white/5 ${selectedTrackData.iconColor}`}>
                   <selectedTrackData.icon className="w-6 h-6" />
                 </div>
                 <div>
@@ -641,73 +653,152 @@ export default function WhatsComingPage() {
             </h2>
 
             <p className="text-sm text-gray-300 leading-relaxed">
-              We are opening closed beta cohorts for dedicated developers. Join the priority waitlist to get early invites, private coding sandboxes, and direct platform announcements.
+              We are opening closed beta cohorts for dedicated developers. Request early access notification to be prioritized on the administrator waiting list, receive private sandbox credentials, and get invited directly.
             </p>
 
-            {waitlistJoined ? (
-              <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2 animate-fade-in">
+            {/* UNREGISTERED / GUEST VISITOR LOCK */}
+            {!authLoading && !user ? (
+              <div className="p-8 rounded-2xl bg-black/40 border border-amber-500/30 text-center space-y-4 mt-6">
+                <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-white">Sign In Required to Request Early Access</h3>
+                  <p className="text-xs text-gray-300 max-w-md mx-auto">
+                    To prevent duplicate bots and ensure direct communication with real builders, early access requests are reserved for authenticated members.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                  <Link
+                    href="/auth/login?redirect=/whats-coming#waitlist"
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>Sign In to Request Early Access</span>
+                  </Link>
+                  <Link
+                    href="/auth/register?redirect=/whats-coming#waitlist"
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl glass-card hover:bg-white/10 text-white font-semibold text-xs border border-white/10 flex items-center justify-center gap-2"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>Register New Account</span>
+                  </Link>
+                </div>
+              </div>
+            ) : waitlistJoined && userEntries.length > 0 ? (
+              /* ALREADY ON WAITLIST */
+              <div className="p-6 sm:p-8 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-4 animate-fade-in mt-6">
                 <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-bold text-white">You're on the VIP List!</h3>
-                <p className="text-xs text-emerald-200">
-                  We'll dispatch your private early access invite directly to your inbox. Thank you for building the future of code with us!
-                </p>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">You Are on the VIP Early Access Waiting List!</h3>
+                  <p className="text-xs text-emerald-200">
+                    The administrator panel has recorded your request. When early access cohort slots open, an invite email will be dispatched to <strong>{user?.email}</strong>.
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-2 text-left">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
+                    Your Registered Cohort Tracks:
+                  </div>
+                  {userEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="p-3.5 rounded-xl bg-black/40 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <span className="font-bold text-white">{entry.track}</span>
+                        {entry.notes && (
+                          <p className="text-[11px] text-gray-400 italic">&ldquo;{entry.notes}&rdquo;</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          STATUS: {entry.status}
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-mono">
+                          {new Date(entry.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => setWaitlistJoined(false)}
+                    className="text-xs text-amber-400 hover:underline cursor-pointer"
+                  >
+                    + Register for another track or submit additional notes
+                  </button>
+                </div>
               </div>
             ) : (
-              <form onSubmit={handleWaitlistSubmit} className="space-y-4 pt-2 text-left">
+              /* AUTHENTICATED WAITLIST SUBMISSION FORM */
+              <form onSubmit={handleWaitlistSubmit} className="space-y-4 pt-4 text-left">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Your Name</label>
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">Developer Name</label>
                     <input
                       type="text"
-                      value={waitlistName}
-                      onChange={(e) => setWaitlistName(e.target.value)}
-                      placeholder={user?.name || 'e.g. Ramesh Das'}
-                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
+                      disabled
+                      value={user?.name || ''}
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-gray-300 bg-white/5 cursor-not-allowed opacity-80"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Your Email</label>
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">Verified Email</label>
                     <input
                       type="email"
-                      value={waitlistEmail}
-                      onChange={(e) => setWaitlistEmail(e.target.value)}
-                      required
-                      placeholder={user?.email || 'developer@example.com'}
-                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
+                      disabled
+                      value={user?.email || ''}
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-gray-300 bg-white/5 cursor-not-allowed opacity-80"
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1">
-                    Primary Area of Interest
+                    Select Your Desired Early Access Track
                   </label>
                   <select
                     value={interestTrack}
                     onChange={(e) => setInterestTrack(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white bg-slate-900"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white bg-slate-900 border border-white/10"
                   >
                     <option value="All Tracks (Full Job-Ready Bundle)">All Tracks (Full Job-Ready Bundle)</option>
-                    <option value="Exploring AI & LLM Systems">Exploring AI & LLM Systems</option>
-                    <option value="DSA & Algorithmic Problem Solving">DSA & Algorithmic Problem Solving</option>
-                    <option value="High-Scale System Design">High-Scale System Design</option>
-                    <option value="DevOps, Cloud & SRE">DevOps, Cloud & SRE</option>
-                    <option value="Modern Coding & Fullstack Systems">Modern Coding & Fullstack Systems</option>
+                    <option value="Exploring AI & LLM Systems">Exploring AI &amp; LLM Systems</option>
+                    <option value="DSA & Algorithmic Problem Solving">DSA &amp; Algorithmic Mastery</option>
+                    <option value="High-Scale System Design">High-Scale System Design (HLD &amp; LLD)</option>
+                    <option value="DevOps, Cloud & SRE">DevOps, Cloud &amp; SRE</option>
+                    <option value="Modern Coding & Fullstack Systems">Modern Coding &amp; Fullstack Systems</option>
                     <option value="Competitive Programming">Competitive Programming</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    What would you most like to learn or build? (Optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="e.g. Currently preparing for SDE-2 interviews, excited for AI agents and distributed caching modules..."
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 resize-none"
+                  />
                 </div>
 
                 <button
                   type="submit"
                   disabled={submittingWaitlist}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-sm shadow-xl shadow-amber-500/25 transition-all cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-sm shadow-xl shadow-amber-500/25 transition-all cursor-pointer"
                 >
                   {submittingWaitlist ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Registering VIP Access...</span>
+                      <span>Transmitting Request to Admin Panel...</span>
                     </>
                   ) : (
                     <>
@@ -718,7 +809,7 @@ export default function WhatsComingPage() {
                 </button>
 
                 <p className="text-[11px] text-gray-500 text-center">
-                  Zero spam. We will only contact you regarding early access milestones and closed beta openings.
+                  Protected by Code &amp; Coffee security. We will only notify you when your requested early access cohort is ready.
                 </p>
               </form>
             )}

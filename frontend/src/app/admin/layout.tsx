@@ -17,6 +17,7 @@ import {
   UserCheck,
   PenTool,
   Mail,
+  Rocket,
 } from 'lucide-react';
 import AdminLayoutSkeleton from '../../components/skeletons/AdminLayoutSkeleton';
 
@@ -26,6 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const [pendingContributors, setPendingContributors] = useState(0);
   const [pendingInquiries, setPendingInquiries] = useState(0);
+  const [pendingWaitlist, setPendingWaitlist] = useState(0);
 
   useEffect(() => {
     if (isAdmin) {
@@ -42,16 +44,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           setPendingInquiries(data.pendingCount);
         }
       };
+      const handleWaitlistCount = (data: { count?: number; waitlistedCount?: number }) => {
+        if (typeof data?.waitlistedCount === 'number') {
+          setPendingWaitlist(data.waitlistedCount);
+        } else if (typeof data?.count === 'number') {
+          setPendingWaitlist(data.count);
+        }
+      };
+      const handleNewWaitlist = () => {
+        loadPendingCounts();
+      };
 
       if (socket && socket.on) {
         socket.on('admin:contributor_count', handleContributorCount);
         socket.on('admin:inquiry_count', handleInquiryCount);
+        socket.on('admin:waitlist_count', handleWaitlistCount);
+        socket.on('admin:new_waitlist', handleNewWaitlist);
       }
 
       return () => {
         if (socket && socket.off) {
           socket.off('admin:contributor_count', handleContributorCount);
           socket.off('admin:inquiry_count', handleInquiryCount);
+          socket.off('admin:waitlist_count', handleWaitlistCount);
+          socket.off('admin:new_waitlist', handleNewWaitlist);
         }
       };
     }
@@ -59,15 +75,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const loadPendingCounts = async () => {
     try {
-      const [resContributors, resInquiries] = await Promise.all([
+      const [resContributors, resInquiries, resWaitlist] = await Promise.all([
         fetchApi('/contributors/pending-count'),
         fetchApi('/inquiries/pending-count'),
+        fetchApi('/waitlist/stats'),
       ]);
       if (resContributors.success && resContributors.data?.pendingCount !== undefined) {
         setPendingContributors(resContributors.data.pendingCount);
       }
       if (resInquiries.success && resInquiries.data?.pendingCount !== undefined) {
         setPendingInquiries(resInquiries.data.pendingCount);
+      }
+      if (resWaitlist.success && resWaitlist.data?.waitlistedCount !== undefined) {
+        setPendingWaitlist(resWaitlist.data.waitlistedCount);
       }
     } catch {
       // non-fatal
@@ -107,13 +127,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // Security Check: Contributors have NO control over users or applications
+  // Security Check: Contributors have NO control over users, inquiries, or early access waitlists
   const isContributorRestrictedRoute =
     user.role === 'CONTRIBUTOR' &&
     (pathname === '/admin/users' ||
       pathname === '/admin/contributors' ||
       pathname === '/admin' ||
-      pathname.startsWith('/admin/inquiries'));
+      pathname.startsWith('/admin/inquiries') ||
+      pathname.startsWith('/admin/waitlist'));
 
   if (isContributorRestrictedRoute) {
     return (
@@ -147,6 +168,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Define Navigation based on Role
   const adminMenuItems: MenuItem[] = [
     { name: 'Dashboard Overview', href: '/admin', icon: LayoutDashboard },
+    {
+      name: 'Early Access Waitlist',
+      href: '/admin/waitlist',
+      icon: Rocket,
+      badge: pendingWaitlist > 0 ? pendingWaitlist : null,
+    },
     {
       name: 'Contributor Queries',
       href: '/admin/contributors',
