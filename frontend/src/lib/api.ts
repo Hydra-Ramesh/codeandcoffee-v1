@@ -22,6 +22,7 @@ export function clearApiCache(endpointPrefix?: string) {
 export interface FetchApiOptions extends RequestInit {
   skipCache?: boolean;
   cacheTtlMs?: number; // default 15000 (15 seconds) for GET requests
+  idempotencyKey?: string;
 }
 
 export async function fetchApi<T = any>(
@@ -48,6 +49,16 @@ export async function fetchApi<T = any>(
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  // Idempotency: Auto-assign transaction key on state mutations to prevent duplicate records on retry
+  if (!isGet && !headers['Idempotency-Key']) {
+    const generatedKey =
+      options.idempotencyKey ||
+      (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+    headers['Idempotency-Key'] = generatedKey;
   }
 
   // Remove Content-Type if uploading FormData

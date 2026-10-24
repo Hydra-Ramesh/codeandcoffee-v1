@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import v1Routes from './routes/v1/index.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { apiLimiter } from './middleware/rateLimiter.middleware.js';
+import { idempotency } from './middleware/idempotency.middleware.js';
 import { config } from './config/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,6 +46,9 @@ export function createApp() {
 
   // Global rate limiter
   app.use('/api/', apiLimiter);
+
+  // Global Idempotency protection for mutations & transactions
+  app.use('/api/', idempotency);
 
   // Root route
   app.get('/', (req, res) => {
