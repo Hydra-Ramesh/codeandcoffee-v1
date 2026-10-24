@@ -10,7 +10,11 @@ import {
   Clock,
   ShieldCheck,
   Building,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
+import { fetchApi } from '../../lib/api';
+import { useToast } from '../../context/ToastContext';
 
 export default function ContactPage() {
   const [name, setName] = useState('');
@@ -18,17 +22,51 @@ export default function ContactPage() {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [honeypotTrap, setHoneypotTrap] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { success, error: toastError } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
+
     if (honeypotTrap.trim().length > 0) {
       // Automated bot trapped! Silently succeed without processing
       setSubmitted(true);
       return;
     }
-    if (name && email && message) {
-      setSubmitted(true);
+
+    if (!name.trim() || !email.trim() || !subject.trim() || !message.trim()) {
+      setErrorMsg('Please complete all required fields.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetchApi('/inquiries', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          subject: subject.trim(),
+          message: message.trim(),
+          honeypot: honeypotTrap,
+        }),
+      });
+
+      if (res.success) {
+        setSubmitted(true);
+        success('Your inquiry has been dispatched to our engineering staff!');
+      } else {
+        setErrorMsg(res.message || 'Could not dispatch inquiry. Please check your details and try again.');
+        toastError(res.message || 'Transmission failed.');
+      }
+    } catch {
+      setErrorMsg('An unexpected network error occurred. Please try again.');
+      toastError('Network error.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -134,12 +172,29 @@ export default function ContactPage() {
                 />
               </div>
 
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                disabled={isSubmitting}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
               >
-                <Send className="w-4 h-4" />
-                Transmit Message
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Transmitting Inquiry...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Transmit Message
+                  </>
+                )}
               </button>
             </form>
           )}

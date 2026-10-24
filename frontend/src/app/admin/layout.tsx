@@ -16,6 +16,7 @@ import {
   Lock,
   UserCheck,
   PenTool,
+  Mail,
 } from 'lucide-react';
 import AdminLayoutSkeleton from '../../components/skeletons/AdminLayoutSkeleton';
 
@@ -24,35 +25,49 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [pendingContributors, setPendingContributors] = useState(0);
+  const [pendingInquiries, setPendingInquiries] = useState(0);
 
   useEffect(() => {
     if (isAdmin) {
-      loadPendingCount();
+      loadPendingCounts();
 
       const socket = getSocket();
-      const handleCountUpdate = (data: { pendingCount: number }) => {
+      const handleContributorCount = (data: { pendingCount: number }) => {
         if (typeof data?.pendingCount === 'number') {
           setPendingContributors(data.pendingCount);
         }
       };
+      const handleInquiryCount = (data: { pendingCount: number }) => {
+        if (typeof data?.pendingCount === 'number') {
+          setPendingInquiries(data.pendingCount);
+        }
+      };
 
       if (socket && socket.on) {
-        socket.on('admin:contributor_count', handleCountUpdate);
+        socket.on('admin:contributor_count', handleContributorCount);
+        socket.on('admin:inquiry_count', handleInquiryCount);
       }
 
       return () => {
         if (socket && socket.off) {
-          socket.off('admin:contributor_count', handleCountUpdate);
+          socket.off('admin:contributor_count', handleContributorCount);
+          socket.off('admin:inquiry_count', handleInquiryCount);
         }
       };
     }
   }, [isAdmin]);
 
-  const loadPendingCount = async () => {
+  const loadPendingCounts = async () => {
     try {
-      const res = await fetchApi('/contributors/pending-count');
-      if (res.success && res.data?.pendingCount !== undefined) {
-        setPendingContributors(res.data.pendingCount);
+      const [resContributors, resInquiries] = await Promise.all([
+        fetchApi('/contributors/pending-count'),
+        fetchApi('/inquiries/pending-count'),
+      ]);
+      if (resContributors.success && resContributors.data?.pendingCount !== undefined) {
+        setPendingContributors(resContributors.data.pendingCount);
+      }
+      if (resInquiries.success && resInquiries.data?.pendingCount !== undefined) {
+        setPendingInquiries(resInquiries.data.pendingCount);
       }
     } catch {
       // non-fatal
@@ -95,7 +110,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Security Check: Contributors have NO control over users or applications
   const isContributorRestrictedRoute =
     user.role === 'CONTRIBUTOR' &&
-    (pathname === '/admin/users' || pathname === '/admin/contributors' || pathname === '/admin');
+    (pathname === '/admin/users' ||
+      pathname === '/admin/contributors' ||
+      pathname === '/admin' ||
+      pathname.startsWith('/admin/inquiries'));
 
   if (isContributorRestrictedRoute) {
     return (
@@ -134,6 +152,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       href: '/admin/contributors',
       icon: UserCheck,
       badge: pendingContributors > 0 ? pendingContributors : null,
+    },
+    {
+      name: 'Contact Inquiries',
+      href: '/admin/inquiries',
+      icon: Mail,
+      badge: pendingInquiries > 0 ? pendingInquiries : null,
     },
     { name: 'Write New Article', href: '/admin/blogs/new', icon: FilePlus },
     { name: 'Manage Articles', href: '/admin/blogs', icon: BookOpen },

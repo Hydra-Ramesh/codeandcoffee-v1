@@ -398,3 +398,176 @@ export async function sendContributorApprovedEmail(
   return true;
 }
 
+/**
+ * Send notification to Admin when a new contact inquiry is submitted
+ */
+export async function sendAdminNewInquiryNotificationEmail(inquiry: {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  createdAt: Date;
+}): Promise<boolean> {
+  const mailTransporter = getEmailTransporter();
+  const adminEmail =
+    process.env.ADMIN_NOTIFICATION_EMAIL ||
+    config.initialAdmin.email ||
+    'dasramesh8343003905@gmail.com';
+  const inquiriesUrl = `${config.clientUrl}/admin/inquiries`;
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; margin: 0; padding: 24px; }
+          .container { max-width: 600px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.6); }
+          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%); padding: 24px 28px; text-align: left; }
+          .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+          .content { padding: 32px 28px; }
+          .badge { display: inline-block; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 8px; margin-bottom: 16px; }
+          .field { margin-bottom: 14px; font-size: 13px; color: #9ca3af; }
+          .field strong { color: #ffffff; font-weight: 600; }
+          .message-box { background: #0b0f19; border: 1px solid #1f2937; border-left: 4px solid #f59e0b; padding: 18px; border-radius: 8px; margin: 18px 0; font-size: 14px; color: #e5e7eb; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+          .btn-container { text-align: center; margin: 28px 0 10px 0; }
+          .btn { display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #090d16 !important; font-weight: 800; font-size: 14px; text-decoration: none; padding: 12px 32px; border-radius: 10px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35); }
+          .footer { background: #0b0f19; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #1f2937; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📬 Code &amp; Coffee • New User Inquiry</h1>
+          </div>
+          <div class="content">
+            <span class="badge">Action Required • Pending Inquiry</span>
+            <div class="field"><strong>Sender:</strong> ${inquiry.name} (<a href="mailto:${inquiry.email}" style="color: #fbbf24;">${inquiry.email}</a>)</div>
+            <div class="field"><strong>Subject:</strong> ${inquiry.subject}</div>
+            <div class="field"><strong>Submitted:</strong> ${new Date(inquiry.createdAt).toLocaleString()}</div>
+            <div class="message-box">${inquiry.message}</div>
+            <div class="btn-container">
+              <a href="${inquiriesUrl}" class="btn" target="_blank">Open Inquiry in Admin Panel &rarr;</a>
+            </div>
+          </div>
+          <div class="footer">
+            Admin Notification • Code &amp; Coffee Technical Journal
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  if (mailTransporter) {
+    try {
+      await mailTransporter.sendMail({
+        from: config.smtp.from || `"Code & Coffee System" <${config.smtp.user}>`,
+        to: adminEmail,
+        replyTo: inquiry.email,
+        subject: `📬 [New Inquiry] ${inquiry.subject} (from ${inquiry.name})`,
+        html: htmlContent,
+      });
+      console.log(`✅ Admin inquiry notification email dispatched to ${adminEmail}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed sending admin inquiry notification to ${adminEmail}:`, (error as Error).message);
+    }
+  }
+
+  console.log(`📨 [DEV EMAIL - NEW INQUIRY NOTIFICATION] To: ${adminEmail} | From: ${inquiry.email} | Subject: ${inquiry.subject}`);
+  return true;
+}
+
+/**
+ * Send inquiry resolution email to user with custom admin response body
+ */
+export async function sendInquiryResolvedUserEmail({
+  toEmail,
+  name,
+  subject,
+  adminReply,
+  originalMessage,
+}: {
+  toEmail: string;
+  name: string;
+  subject: string;
+  adminReply: string;
+  originalMessage: string;
+}): Promise<boolean> {
+  const mailTransporter = getEmailTransporter();
+  const exploreUrl = `${config.clientUrl}/blogs`;
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; margin: 0; padding: 24px; }
+          .container { max-width: 600px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.6); }
+          .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 24px 28px; text-align: left; }
+          .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+          .content { padding: 32px 28px; }
+          .badge { display: inline-block; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 8px; margin-bottom: 16px; }
+          .title { color: #ffffff; font-size: 18px; font-weight: 800; margin: 0 0 12px 0; }
+          .greeting { font-size: 14px; color: #d1d5db; line-height: 1.6; margin-bottom: 16px; }
+          .admin-reply-box { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-left: 4px solid #f59e0b; padding: 20px; border-radius: 10px; margin: 20px 0; font-size: 14px; color: #ffffff; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+          .original-quote { background: #0b0f19; border: 1px solid #1f2937; padding: 14px 18px; border-radius: 8px; margin: 18px 0; font-size: 12px; color: #9ca3af; line-height: 1.5; }
+          .btn-container { text-align: center; margin: 24px 0 10px 0; }
+          .btn { display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #090d16 !important; font-weight: 800; font-size: 13px; text-decoration: none; padding: 10px 26px; border-radius: 8px; }
+          .footer { background: #0b0f19; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #1f2937; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>☕ Code &amp; Coffee • Inquiry Resolved</h1>
+          </div>
+          <div class="content">
+            <span class="badge">Inquiry Resolved</span>
+            <h2 class="title">Response Regarding: ${subject}</h2>
+            <p class="greeting">Hi ${name},<br/><br/>Our engineering administration team has reviewed and resolved your inquiry. Please find our response below:</p>
+            <div class="admin-reply-box">
+              <strong>Admin Response:</strong><br/>
+              ${adminReply}
+            </div>
+            <div class="original-quote">
+              <strong style="color: #6b7280;">Your original message:</strong><br/>
+              ${originalMessage}
+            </div>
+            <p style="font-size: 13px; color: #9ca3af; margin-top: 20px;">
+              If you have any further questions or follow-up topics, feel free to reply directly to this email or submit another inquiry through our platform.
+            </p>
+            <div class="btn-container">
+              <a href="${exploreUrl}" class="btn" target="_blank">Explore Code &amp; Coffee &rarr;</a>
+            </div>
+          </div>
+          <div class="footer">
+            Code &amp; Coffee Engineering Journal • Khejuri, East Medinipur, West Bengal, India, 721430
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  if (mailTransporter) {
+    try {
+      await mailTransporter.sendMail({
+        from: config.smtp.from || `"Code & Coffee Support" <${config.smtp.user}>`,
+        to: toEmail,
+        subject: `☕ Response to your inquiry: ${subject}`,
+        html: htmlContent,
+      });
+      console.log(`✅ Inquiry resolution response email dispatched to ${toEmail}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed sending inquiry resolution response email to ${toEmail}:`, (error as Error).message);
+    }
+  }
+
+  console.log(`📨 [DEV EMAIL - INQUIRY RESOLVED] To: ${toEmail} | Subject: ${subject}`);
+  return true;
+}
+
+

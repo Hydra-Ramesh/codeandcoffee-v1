@@ -231,6 +231,28 @@ export function broadcastNewContributorApplication(application: any) {
 }
 
 /**
+ * Broadcast updated pending inquiry count to admin console
+ */
+export function broadcastPendingInquiryCount(pendingCount: number) {
+  if (!io) return;
+  io.emit('admin:inquiry_count', {
+    pendingCount,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
+ * Broadcast new inquiry submission event to admin console
+ */
+export function broadcastNewInquiry(inquiry: any) {
+  if (!io) return;
+  io.emit('admin:new_inquiry', {
+    inquiry,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
  * Fast O(1) in-memory reader count for a blog post
  */
 export function getActiveBlogReadersCount(blogId: string): number {
