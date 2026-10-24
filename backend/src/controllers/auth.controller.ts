@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, CookieOptions } from 'express';
 import { z } from 'zod';
 import { AuthService } from '../services/auth.service.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
@@ -30,10 +30,10 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(6, 'Password must be at least 6 characters long'),
 });
 
-const AUTH_COOKIE_OPTIONS = {
+const AUTH_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as const,
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
 };
