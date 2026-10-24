@@ -17,6 +17,7 @@ import {
 import { fetchApi } from '../../../lib/api';
 import { getSocket } from '../../../lib/socket';
 import { optimizeImageUrl } from '../../../lib/image';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 interface ContributorApplication {
   id: string;
@@ -41,6 +42,7 @@ export default function AdminContributorApplicationsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 250);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -120,7 +122,7 @@ export default function AdminContributorApplicationsPage() {
   };
 
   const filtered = applications.filter((app) => {
-    const term = search.toLowerCase();
+    const term = debouncedSearch.toLowerCase();
     return (
       app.user.name.toLowerCase().includes(term) ||
       app.email.toLowerCase().includes(term) ||

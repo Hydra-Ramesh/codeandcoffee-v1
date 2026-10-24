@@ -15,11 +15,13 @@ import {
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
 import { optimizeImageUrl } from '../../../lib/image';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 export default function AdminUserGovernancePage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 250);
   const [statusFilter, setStatusFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [message, setMessage] = useState<string | null>(null);
@@ -88,8 +90,8 @@ export default function AdminUserGovernancePage() {
   };
 
   const filteredUsers = users.filter((u) =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
+    u.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    u.email.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
 
   return (

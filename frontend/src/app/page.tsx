@@ -11,14 +11,17 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import BlogCard, { BlogPost } from '../components/BlogCard';
+import BlogCardSkeleton from '../components/BlogCardSkeleton';
 import { fetchApi } from '../lib/api';
 import { getSocket } from '../lib/socket';
+import { useDebounce } from '../hooks/useDebounce';
 
 export default function HomePage() {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const debouncedSearch = useDebounce(search, 250);
   const [globalStats, setGlobalStats] = useState({
     totalActiveBlogReaders: 14,
     totalActiveSiteVisitors: 42,
@@ -76,11 +79,11 @@ export default function HomePage() {
     }
   };
 
-  // Client-side quick search filter
+  // Client-side quick search filter with debouncing
   const filteredBlogs = blogs.filter((b) => {
     const matchesSearch =
-      b.title.toLowerCase().includes(search.toLowerCase()) ||
-      b.excerpt.toLowerCase().includes(search.toLowerCase());
+      b.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      b.excerpt.toLowerCase().includes(debouncedSearch.toLowerCase());
     return matchesSearch;
   });
 
@@ -191,8 +194,8 @@ export default function HomePage() {
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="h-80 rounded-2xl glass-card animate-pulse" />
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <BlogCardSkeleton key={n} />
             ))}
           </div>
         ) : filteredBlogs.length === 0 ? (

@@ -48,6 +48,34 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
           td({ children }) {
             return <td className="p-3 border-b border-white/5 text-gray-300">{children}</td>;
           },
+          a({ href, children, ...props }) {
+            // Strict XSS Prevention: Disallow javascript: schemes
+            const isSafe = href && !href.toLowerCase().trim().startsWith('javascript:');
+            const safeHref = isSafe ? href : '#';
+            const isExternal = safeHref.startsWith('http');
+            return (
+              <a
+                href={safeHref}
+                target={isExternal ? '_blank' : undefined}
+                rel={isExternal ? 'noopener noreferrer' : undefined}
+                className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors font-medium"
+                {...props}
+              >
+                {children}
+              </a>
+            );
+          },
+          img({ src, alt, ...props }) {
+            return (
+              <img
+                src={src}
+                alt={alt || 'Visual'}
+                className="rounded-2xl border border-white/10 my-6 max-h-[500px] w-full object-cover shadow-xl"
+                loading="lazy"
+                {...props}
+              />
+            );
+          },
         }}
       >
         {content}

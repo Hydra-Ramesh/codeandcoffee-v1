@@ -3,13 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, BookOpen } from 'lucide-react';
 import BlogCard, { BlogPost } from '../../components/BlogCard';
+import BlogCardSkeleton from '../../components/BlogCardSkeleton';
 import { fetchApi } from '../../lib/api';
+import { useDebounce } from '../../hooks/useDebounce';
 
 export default function AllBlogsPage() {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const debouncedSearch = useDebounce(search, 250);
 
   const categories = [
     'All',
@@ -36,8 +39,8 @@ export default function AllBlogsPage() {
 
   const filteredBlogs = blogs.filter(
     (b) =>
-      b.title.toLowerCase().includes(search.toLowerCase()) ||
-      b.excerpt.toLowerCase().includes(search.toLowerCase())
+      b.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      b.excerpt.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
 
   return (
@@ -85,7 +88,7 @@ export default function AllBlogsPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((n) => (
-            <div key={n} className="h-80 rounded-2xl glass-card animate-pulse" />
+            <BlogCardSkeleton key={n} />
           ))}
         </div>
       ) : filteredBlogs.length === 0 ? (

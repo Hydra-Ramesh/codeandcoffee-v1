@@ -2,10 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import MarkdownEditor from '../../../../../components/MarkdownEditor';
+import dynamic from 'next/dynamic';
 import { fetchApi } from '../../../../../lib/api';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
+
+const MarkdownEditor = dynamic(() => import('../../../../../components/MarkdownEditor'), {
+  ssr: false,
+  loading: () => (
+    <div className="glass-card p-8 rounded-3xl border border-white/10 space-y-4 animate-pulse my-4">
+      <div className="h-10 bg-slate-800 rounded-xl w-3/4" />
+      <div className="h-64 bg-slate-800/60 rounded-2xl w-full" />
+    </div>
+  ),
+});
 
 export default function EditBlogPage() {
   const params = useParams();
