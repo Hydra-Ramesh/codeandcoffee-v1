@@ -80,17 +80,17 @@ await redis.setex(cacheKey, 60, JSON.stringify({ status: "processed" }));
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between pb-2 border-b border-white/10">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/10">
         <div className="flex items-center gap-3">
           <Link
             href="/admin/blogs"
-            className="p-2 rounded-xl glass-card hover:bg-white/10 text-gray-400 hover:text-white"
+            className="p-2 rounded-xl glass-card hover:bg-slate-200/60 dark:hover:bg-white/10 text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-white">Create New Publication</h1>
-            <p className="text-xs text-gray-400">Write in rich Markdown with live split preview</p>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Create New Publication</h1>
+            <p className="text-xs text-slate-600 dark:text-gray-400">Write in rich Markdown with live split preview</p>
           </div>
         </div>
 
