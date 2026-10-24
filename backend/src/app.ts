@@ -36,10 +36,39 @@ export function createApp() {
     })
   );
 
-  // CORS configuration
+  // Dynamic and resilient CORS origin resolution
+  const rawClientOrigins = (config.clientUrl || '').split(',').map((u) => u.trim()).filter(Boolean);
+  const staticOrigins = new Set([
+    ...rawClientOrigins,
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+  ]);
+
   app.use(
     cors({
-      origin: [config.clientUrl, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+      origin: (requestOrigin, callback) => {
+        // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+        if (!requestOrigin) return callback(null, true);
+        if (staticOrigins.has(requestOrigin)) return callback(null, true);
+
+        try {
+          const parsed = new URL(requestOrigin);
+          if (
+            parsed.hostname.endsWith('.vercel.app') ||
+            parsed.hostname.endsWith('rameshdas.online') ||
+            parsed.hostname === 'localhost' ||
+            parsed.hostname === '127.0.0.1'
+          ) {
+            return callback(null, true);
+          }
+        } catch {
+          // If URL parsing fails, reject by default
+        }
+
+        callback(null, false);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: [

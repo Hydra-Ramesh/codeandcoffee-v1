@@ -16,7 +16,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
-    const res = await fetch('http://localhost:5000/api/v1/blogs?limit=100', {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://codeandcoffee-v1.onrender.com/api/v1';
+    const res = await fetch(`${apiUrl}/blogs?limit=100`, {
       next: { revalidate: 3600 },
     });
     const data = await res.json();

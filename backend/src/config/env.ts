@@ -1,6 +1,13 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+const defaultApiBaseUrl =
+  process.env.API_BASE_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://codeandcoffee-v1.onrender.com'
+    : `http://localhost:${process.env.PORT || '5000'}`);
+
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -31,12 +38,12 @@ export const config = {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-      callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/v1/auth/google/callback',
+      callbackUrl: process.env.GOOGLE_CALLBACK_URL || `${defaultApiBaseUrl}/api/v1/auth/google/callback`,
     },
     github: {
       clientId: process.env.GITHUB_CLIENT_ID || '',
       clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
-      callbackUrl: process.env.GITHUB_CALLBACK_URL || 'http://localhost:5000/api/v1/auth/github/callback',
+      callbackUrl: process.env.GITHUB_CALLBACK_URL || `${defaultApiBaseUrl}/api/v1/auth/github/callback`,
     },
   },
 

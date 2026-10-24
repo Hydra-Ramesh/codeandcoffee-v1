@@ -11,14 +11,35 @@ const activeBlogSockets = new Map<string, Set<string>>();
 const socketBlogsMap = new Map<string, Set<string>>();
 
 export function initSocketServer(httpServer: HttpServer): SocketIOServer {
+  const rawClientOrigins = (config.clientUrl || '').split(',').map((u) => u.trim()).filter(Boolean);
+  const staticOrigins = new Set([
+    ...rawClientOrigins,
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+  ]);
+
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: [
-        config.clientUrl,
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:3001',
-      ],
+      origin: (requestOrigin, callback) => {
+        if (!requestOrigin) return callback(null, true);
+        if (staticOrigins.has(requestOrigin)) return callback(null, true);
+
+        try {
+          const parsed = new URL(requestOrigin);
+          if (
+            parsed.hostname.endsWith('.vercel.app') ||
+            parsed.hostname.endsWith('rameshdas.online') ||
+            parsed.hostname === 'localhost' ||
+            parsed.hostname === '127.0.0.1'
+          ) {
+            return callback(null, true);
+          }
+        } catch {}
+
+        callback(null, false);
+      },
       credentials: true,
       methods: ['GET', 'POST'],
     },
