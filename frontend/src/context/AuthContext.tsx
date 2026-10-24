@@ -30,14 +30,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('token');
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const savedToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (savedToken) {
-      setToken(savedToken);
-    }
 
     // Verifies HttpOnly session cookie automatically via credentials: include, with Bearer header fallback
     fetchApi('/auth/me', {

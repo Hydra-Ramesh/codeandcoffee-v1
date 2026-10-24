@@ -8,6 +8,7 @@ import v1Routes from './routes/v1/index.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { apiLimiter } from './middleware/rateLimiter.middleware.js';
 import { idempotency } from './middleware/idempotency.middleware.js';
+import { requestLogger } from './middleware/logger.middleware.js';
 import { config } from './config/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,6 +16,9 @@ const __dirname = path.dirname(__filename);
 
 export function createApp() {
   const app = express();
+
+  // Request latency and access logger
+  app.use(requestLogger);
 
   // Helmet for security headers
   app.use(

@@ -7,18 +7,12 @@ import commentRoutes from './comment.routes.js';
 import analyticsRoutes from './analytics.routes.js';
 import uploadRoutes from './upload.routes.js';
 import contributorRoutes from './contributor.routes.js';
+import healthRoutes from './health.routes.js';
 
 const router = Router();
 
-// API Health Check
-router.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    platform: 'Code & Coffee Developer Journal API',
-  });
-});
+// Health Check Routes (shallow and deep)
+router.use('/health', healthRoutes);
 
 router.use('/auth', authRoutes);
 router.use('/blogs', blogRoutes);

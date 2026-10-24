@@ -4,11 +4,11 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { Coffee, Code2, ShieldAlert, User, LogOut, Menu, X, Sparkles, BookOpen, PenTool } from 'lucide-react';
+import { Coffee, ShieldAlert, User, LogOut, Menu, X, Sparkles, PenTool } from 'lucide-react';
 import { optimizeImageUrl } from '../lib/image';
 
 export default function Navbar() {
-  const { user, isAdmin, isContributor, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 

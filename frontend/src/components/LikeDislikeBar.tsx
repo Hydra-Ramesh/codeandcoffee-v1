@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ThumbsUp, ThumbsDown, Share2, Bookmark, Check, LogIn } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Share2, Check, LogIn } from 'lucide-react';
 import { fetchApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';

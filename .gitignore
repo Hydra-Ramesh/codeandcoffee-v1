@@ -22,9 +22,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Uploads
+# Uploads & Backups
 backend/uploads/*
 !backend/uploads/.gitkeep
+backend/backups/*
+!backend/backups/.gitkeep
 
 # OS Files
 .DS_Store

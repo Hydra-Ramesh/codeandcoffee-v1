@@ -36,7 +36,8 @@ export async function idempotency(
     const existing = await redisClient.get(cacheKey);
 
     if (existing) {
-      const parsed: CachedIdempotentResponse = JSON.parse(existing);
+      const parsed: CachedIdempotentResponse =
+        typeof existing === 'string' ? JSON.parse(existing) : (existing as CachedIdempotentResponse);
 
       if (parsed.status === 'PENDING') {
         res.status(409).json({

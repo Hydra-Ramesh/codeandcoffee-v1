@@ -1,11 +1,11 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
 interface CacheEntry<T> {
-  data: { success: boolean; data?: T; message?: string; errors?: any[] };
+  data: { success: boolean; data?: T; message?: string; errors?: Array<string | Record<string, unknown>> };
   expiresAt: number;
 }
 
-const clientMemoryCache = new Map<string, CacheEntry<any>>();
+const clientMemoryCache = new Map<string, CacheEntry<unknown>>();
 
 export function clearApiCache(endpointPrefix?: string) {
   if (!endpointPrefix) {
@@ -28,7 +28,7 @@ export interface FetchApiOptions extends RequestInit {
 export async function fetchApi<T = any>(
   endpoint: string,
   options: FetchApiOptions = {}
-): Promise<{ success: boolean; data?: T; message?: string; errors?: any[] }> {
+): Promise<{ success: boolean; data?: T; message?: string; errors?: Array<string | Record<string, unknown>> }> {
   const method = (options.method || 'GET').toUpperCase();
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const isGet = method === 'GET';
@@ -38,7 +38,7 @@ export async function fetchApi<T = any>(
   if (isGet && !options.skipCache) {
     const cached = clientMemoryCache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
-      return cached.data;
+      return cached.data as { success: boolean; data?: T; message?: string; errors?: Array<string | Record<string, unknown>> };
     }
   }
 
@@ -98,11 +98,12 @@ export async function fetchApi<T = any>(
     }
 
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`API Fetch Error on ${endpoint}:`, error);
+    const message = error instanceof Error ? error.message : 'Unable to communicate with Code & Coffee API server.';
     return {
       success: false,
-      message: error.message || 'Unable to communicate with Code & Coffee API server.',
+      message,
     };
   }
 }

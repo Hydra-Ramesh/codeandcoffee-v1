@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { ShieldAlert, AlertTriangle, Trash2, X, ArrowRight, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, Trash2, X, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export interface WarningDetail {
   label: string;

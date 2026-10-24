@@ -80,6 +80,15 @@ export function errorHandler(
     return;
   }
 
+  // Handle invalid login credentials
+  if (err.message === 'Invalid email or password.' || err.message?.includes('Invalid credentials')) {
+    res.status(401).json({
+      success: false,
+      message: err.message,
+    });
+    return;
+  }
+
   const statusCode = err.statusCode || (res.statusCode >= 400 ? res.statusCode : 500);
 
   // In production, prevent leaking raw database error messages or internal system paths

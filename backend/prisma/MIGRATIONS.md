@@ -25,3 +25,31 @@ All PostgreSQL database structures are strictly governed by [`backend/prisma/sch
    npx prisma generate
    ```
    Updates type-safe Prisma client bindings with zero runtime overhead.
+
+## 4. Disaster Recovery & Snapshot Backups
+Automated database snapshot and restore procedures are bundled directly in the codebase:
+- **Create Snapshot**:
+  ```bash
+  npm run db:backup
+  ```
+  Exports full relational data into timestamped JSON files (`backend/backups/db-snapshot-*.json`), computes SHA256 integrity checksums, and prunes files older than 14 days.
+- **Dry-Run Snapshot Verification**:
+  ```bash
+  npm run db:restore:dry
+  ```
+  Validates backup structure and SHA256 checksum integrity without modifying the live database.
+- **Full Database Restoration**:
+  ```bash
+  npm run db:restore
+  ```
+  Restores relational records using `upsert` in strict dependency order (Users -> Posts -> Comments).
+
+## 5. Cloud Point-in-Time Recovery (PITR)
+For cloud-level disaster recovery on Neon PostgreSQL:
+1. Neon automatically maintains continuous WAL (Write-Ahead Logging) enabling sub-second Point-in-Time Recovery.
+2. In the Neon Console or via Neon CLI:
+   ```bash
+   neon branches create --from-timestamp "2026-10-24T12:00:00Z" --name recovery-branch
+   ```
+3. Update `DATABASE_URL` in production secrets to point to the newly verified recovery branch.
+

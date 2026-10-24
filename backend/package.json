@@ -8,6 +8,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "test": "vitest run",
+    "db:backup": "node scripts/backup-db.mjs",
+    "db:restore": "node scripts/restore-db.mjs",
+    "db:restore:dry": "node scripts/restore-db.mjs --dry-run",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "tsx prisma/seed.ts"
@@ -53,8 +57,11 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.13.4",
     "@types/nodemailer": "^6.4.17",
+    "@types/supertest": "^7.2.1",
     "prisma": "^6.4.1",
+    "supertest": "^7.3.1",
     "tsx": "^4.19.3",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^5.0.5"
   }
 }

@@ -33,6 +33,15 @@ export default function CommentSection({ postId }: CommentSectionProps) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const loadComments = async () => {
+    setLoading(true);
+    const res = await fetchApi(`/comments/${postId}`);
+    if (res.success && Array.isArray(res.data)) {
+      setComments(res.data);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     loadComments();
 
@@ -61,15 +70,6 @@ export default function CommentSection({ postId }: CommentSectionProps) {
       }
     };
   }, [postId]);
-
-  const loadComments = async () => {
-    setLoading(true);
-    const res = await fetchApi(`/comments/${postId}`);
-    if (res.success && Array.isArray(res.data)) {
-      setComments(res.data);
-    }
-    setLoading(false);
-  };
 
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Coffee, Mail, MapPin, Shield, CheckCircle, Heart } from 'lucide-react';
+import { Coffee, Mail, MapPin, CheckCircle, Heart } from 'lucide-react';
 
 export default function Footer() {
   const pathname = usePathname();
@@ -64,7 +64,7 @@ export default function Footer() {
               {subscribed ? (
                 <div className="flex items-center gap-2 text-sm text-amber-300 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
                   <CheckCircle className="w-5 h-5 text-amber-400" />
-                  <span>You're in! Welcome to the Code &amp; Coffee community.</span>
+                  <span>You&apos;re in! Welcome to the Code &amp; Coffee community.</span>
                 </div>
               ) : (
                 <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-2.5">

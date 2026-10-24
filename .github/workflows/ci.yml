@@ -1,0 +1,76 @@
+name: Code & Coffee Continuous Integration
+
+on:
+  push:
+    branches: [main, master, v1]
+  pull_request:
+    branches: [main, master, v1]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-gate:
+    name: Backend Lint, Test & Compile Gate
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      PORT: 5000
+      JWT_SECRET: ci-test-jwt-secret-do-not-use-in-production
+      CLIENT_URL: http://localhost:3000
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/codeandcoffee_test?schema=public' }}
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma Client Artifacts
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Type-Check & Compile Backend (tsc)
+        working-directory: backend
+        run: npm run build
+
+      - name: Execute Vitest Automated Test Suite
+        working-directory: backend
+        run: npm test
+
+  frontend-gate:
+    name: Frontend Lint & Production Build Gate
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: ESLint Verification
+        working-directory: frontend
+        run: npx eslint --quiet
+
+      - name: Compile Next.js Production Bundle
+        working-directory: frontend
+        run: npm run build
