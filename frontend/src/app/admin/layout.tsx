@@ -30,6 +30,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pendingWaitlist, setPendingWaitlist] = useState(0);
 
   useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.title = 'Admin Console | Code & Coffee';
+    }
+  }, []);
+
+  useEffect(() => {
     if (isAdmin) {
       loadPendingCounts();
 

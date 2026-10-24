@@ -68,6 +68,9 @@ export default function BlogDetailPage() {
     const res = await fetchApi(`/blogs/${slug}`);
     if (res.success && res.data) {
       setBlog(res.data);
+      if (typeof document !== 'undefined' && res.data.title) {
+        document.title = `${res.data.title} | Code & Coffee`;
+      }
     } else {
       setError(res.message || 'Article not found');
     }

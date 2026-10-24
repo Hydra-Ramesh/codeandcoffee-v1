@@ -7,7 +7,10 @@ import Footer from '../components/Footer';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://codeandcoffee.live'),
-  title: 'Code & Coffee — Engineering Journal for Scalable Software',
+  title: {
+    default: 'Code & Coffee — Learn, Practice, Read, Apply',
+    template: '%s | Code & Coffee',
+  },
   description:
     'A high-performance publication for distributed systems, database engineering, cloud architecture, and modern web application craftsmanship.',
   keywords: [
@@ -23,8 +26,18 @@ export const metadata: Metadata = {
     'Cloud Security',
   ],
   authors: [{ name: 'Ramesh Das' }, { name: 'Code & Coffee Engineering Staff' }],
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png', sizes: '32x32' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   openGraph: {
-    title: 'Code & Coffee — Engineering Journal',
+    title: 'Code & Coffee — Learn, Practice, Read, Apply',
     description: 'High-throughput architecture, zero-trust security, and modern web engineering deep-dives.',
     url: 'https://codeandcoffee.live',
     siteName: 'Code & Coffee',
@@ -41,7 +54,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Code & Coffee — Engineering Journal',
+    title: 'Code & Coffee — Learn, Practice, Read, Apply',
     description: 'Where deep code meets high caffeine.',
     images: ['https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80'],
   },
@@ -58,6 +71,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head suppressHydrationWarning>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/icon.png" type="image/png" sizes="32x32" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <script
           id="theme-init"
           suppressHydrationWarning
