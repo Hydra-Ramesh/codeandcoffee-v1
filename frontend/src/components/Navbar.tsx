@@ -16,6 +16,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: 'Explore Blogs', href: '/blogs' },
+    { name: "What's Coming?", href: '/whats-coming', isHighlight: true },
     { name: 'Write for Us', href: '/become-contributor' },
     { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
@@ -41,14 +42,36 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden md:flex items-center gap-1.5">
           {navLinks.map((link) => {
             const isActive = pathname === link.href;
+            const isHighlight = (link as any).isHighlight;
+
+            if (isHighlight) {
+              return (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  className={`group relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                    isActive
+                      ? 'text-amber-300 bg-amber-500/15 border border-amber-500/40 shadow-sm shadow-amber-500/25'
+                      : 'text-amber-400 hover:text-amber-300 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-amber-500/10 hover:from-amber-500/20 hover:to-amber-500/20 border border-amber-500/30 hover:border-amber-400/50'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform duration-300" />
+                  <span>{link.name}</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-xs shadow-amber-500/30">
+                    Roadmap
+                  </span>
+                </Link>
+              );
+            }
+
             return (
               <Link
                 key={link.name}
                 href={link.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
                     : 'text-gray-300 hover:text-white hover:bg-white/5'
@@ -146,16 +169,34 @@ export default function Navbar() {
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden glass-card border-b border-white/10 px-4 pt-3 pb-6 space-y-3">
-          {navLinks.map((link) => (
-            <Link
-              key={link.name}
-              href={link.href}
-              onClick={() => setMobileMenuOpen(false)}
-              className="block px-3 py-2 rounded-lg text-base font-medium text-gray-300 hover:text-white hover:bg-white/5"
-            >
-              {link.name}
-            </Link>
-          ))}
+          {navLinks.map((link) => {
+            const isHighlight = (link as any).isHighlight;
+            const isActive = pathname === link.href;
+            return (
+              <Link
+                key={link.name}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                  isHighlight
+                    ? 'text-amber-300 bg-amber-500/15 border border-amber-500/30'
+                    : isActive
+                    ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
+                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  {isHighlight && <Sparkles className="w-4 h-4 text-amber-400" />}
+                  {link.name}
+                </span>
+                {isHighlight && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950">
+                    Roadmap
+                  </span>
+                )}
+              </Link>
+            );
+          })}
 
           {user ? (
             <div className="pt-4 border-t border-white/10 space-y-2">

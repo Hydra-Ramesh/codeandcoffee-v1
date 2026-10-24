@@ -58,6 +58,12 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2.5">
               <li>
+                <Link href="/whats-coming" className="text-amber-400 font-semibold hover:text-amber-300 transition-colors flex items-center gap-1.5">
+                  <span>What's Coming?</span>
+                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30">Roadmap</span>
+                </Link>
+              </li>
+              <li>
                 <Link href="/about" className="hover:text-amber-400 transition-colors">
                   About Us
                 </Link>
