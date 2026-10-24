@@ -14,6 +14,8 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
   const rawClientOrigins = config.allowedClientOrigins || [config.clientUrl];
   const staticOrigins = new Set([
     ...rawClientOrigins,
+    'https://codeandcoffee.live',
+    'https://www.codeandcoffee.live',
     'https://codeandcoffee-v1.vercel.app',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
@@ -30,6 +32,8 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
         try {
           const parsed = new URL(requestOrigin);
           if (
+            parsed.hostname === 'codeandcoffee.live' ||
+            parsed.hostname.endsWith('.codeandcoffee.live') ||
             parsed.hostname.endsWith('.vercel.app') ||
             parsed.hostname.endsWith('rameshdas.online') ||
             parsed.hostname === 'localhost' ||

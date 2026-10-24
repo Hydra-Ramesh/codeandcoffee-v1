@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://codeandcoffee-v1.vercel.app';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://codeandcoffee.live';
 
   // Base static routes
   const staticRoutes: MetadataRoute.Sitemap = [

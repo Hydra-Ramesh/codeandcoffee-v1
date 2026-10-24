@@ -11,7 +11,7 @@ const defaultApiBaseUrl =
 const rawClientUrl =
   process.env.CLIENT_URL ||
   (process.env.NODE_ENV === 'production'
-    ? 'https://codeandcoffee-v1.vercel.app'
+    ? 'https://codeandcoffee.live'
     : 'http://localhost:3000');
 
 // Primary single URL for OAuth redirect URLs and email links
