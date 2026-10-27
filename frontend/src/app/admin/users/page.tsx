@@ -405,35 +405,35 @@ export default function AdminUserGovernancePage() {
           <div className="py-12 text-center text-gray-400 text-xs">No users matched your search filters.</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full min-w-[1050px] text-left text-xs">
               <thead className="bg-slate-900/80 border-b border-white/10 text-gray-400 font-semibold uppercase">
                 <tr>
-                  <th className="p-4">User</th>
-                  <th className="p-4">Email</th>
-                  <th className="p-4">Role</th>
-                  <th className="p-4">Coding Profiles</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Activity</th>
-                  <th className="p-4 text-right">Security Actions</th>
+                  <th className="p-4 whitespace-nowrap">User</th>
+                  <th className="p-4 whitespace-nowrap">Email</th>
+                  <th className="p-4 whitespace-nowrap">Role</th>
+                  <th className="p-4 whitespace-nowrap">Coding Profiles</th>
+                  <th className="p-4 whitespace-nowrap">Status</th>
+                  <th className="p-4 whitespace-nowrap">Activity</th>
+                  <th className="p-4 whitespace-nowrap text-right">Security Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {paginatedUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                    <td className="p-4 flex items-center gap-2.5">
+                    <td className="p-4 flex items-center gap-2.5 whitespace-nowrap">
                       <img
                         src={
                           optimizeImageUrl(u.avatar, { width: 80, height: 80, crop: 'fill' }) ||
                           `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.name)}`
                         }
                         alt={u.name}
-                        className="w-8 h-8 rounded-full border border-white/15"
+                        className="w-8 h-8 rounded-full border border-white/15 shrink-0"
                       />
-                      <span className="font-bold text-white">{u.name}</span>
+                      <span className="font-bold text-white whitespace-nowrap">{u.name}</span>
                     </td>
-                    <td className="p-4 text-gray-300 font-mono text-[11px]">{u.email}</td>
-                    <td className="p-4">
+                    <td className="p-4 text-gray-300 font-mono text-[11px] whitespace-nowrap">{u.email}</td>
+                    <td className="p-4 whitespace-nowrap">
                       <select
                         value={u.role}
                         onChange={(e) => promptToggleRole(u, e.target.value)}
@@ -451,24 +451,24 @@ export default function AdminUserGovernancePage() {
                       </select>
                     </td>
                     {/* Coding Profiles Button -> Card Modal */}
-                    <td className="p-4">
+                    <td className="p-4 whitespace-nowrap">
                       {(() => {
                         const linkedCount = [u.leetcodeUrl, u.codeforcesUrl, u.codechefUrl, u.githubUrl].filter((x) => x?.trim()).length;
                         return (
                           <button
                             type="button"
                             onClick={() => openProfileModal(u)}
-                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm ${
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm ${
                               linkedCount > 0
                                 ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
                                 : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10'
                             }`}
                             title={`Inspect & manage coding profiles for ${u.name}`}
                           >
-                            <Code2 className={`w-3.5 h-3.5 ${linkedCount > 0 ? 'text-amber-400' : 'text-gray-400'}`} />
-                            <span>View Coding Profiles</span>
+                            <Code2 className={`w-3.5 h-3.5 shrink-0 ${linkedCount > 0 ? 'text-amber-400' : 'text-gray-400'}`} />
+                            <span className="whitespace-nowrap">View Coding Profiles</span>
                             <span
-                              className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                              className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold shrink-0 ${
                                 linkedCount > 0
                                   ? 'bg-amber-500/20 text-amber-300'
                                   : 'bg-white/10 text-gray-400'
@@ -480,9 +480,9 @@ export default function AdminUserGovernancePage() {
                         );
                       })()}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap ${
                           u.isBanned
                             ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                             : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
@@ -491,15 +491,15 @@ export default function AdminUserGovernancePage() {
                         {u.isBanned ? 'Suspended' : 'Active'}
                       </span>
                     </td>
-                    <td className="p-4 text-gray-400 text-xs">
+                    <td className="p-4 text-gray-400 text-xs whitespace-nowrap">
                       {u._count?.likes || 0} likes • {u._count?.comments || 0} comments
                     </td>
-                    <td className="p-4 text-right space-x-2">
+                    <td className="p-4 text-right space-x-2 whitespace-nowrap">
                       {/* Toggle Role Button */}
                       <button
                         onClick={() => promptToggleRole(u)}
                         title={u.role === 'ADMIN' ? 'Demote to Standard User' : 'Elevate to Administrator'}
-                        className="px-3 py-1.5 min-h-[36px] rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-gray-200 hover:text-white transition-all border border-white/10 active:scale-95 cursor-pointer"
+                        className="px-3 py-1.5 min-h-[36px] rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-gray-200 hover:text-white transition-all border border-white/10 active:scale-95 cursor-pointer whitespace-nowrap"
                       >
                         {u.role === 'ADMIN' ? 'Demote User' : 'Promote Admin'}
                       </button>
