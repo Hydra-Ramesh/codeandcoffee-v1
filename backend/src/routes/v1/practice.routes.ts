@@ -34,6 +34,9 @@ router.put('/my-progress/:questionId/note', authenticate, PracticeController.sav
 // List all questions with filters
 router.get('/admin/all', authenticate, requireContributorOrAdmin, PracticeController.adminGetAllQuestions);
 
+// Get real-time user activity and practice metrics
+router.get('/admin/activity', authenticate, requireContributorOrAdmin, PracticeController.adminGetUserActivity);
+
 // Create new question
 router.post('/admin/question', authenticate, requireContributorOrAdmin, PracticeController.adminCreateQuestion);
 

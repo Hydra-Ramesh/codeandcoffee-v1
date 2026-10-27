@@ -635,4 +635,185 @@ export class PracticeController {
       res.status(500).json({ success: false, message: 'Failed to delete question' });
     }
   }
+
+  /**
+   * Admin / Contributor: Get real-time User Activity & Analytics for practice questions
+   */
+  static async adminGetUserActivity(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const [totalCompletions, totalNotes, uniqueStudents, recentActivities, allQuestions] =
+        await Promise.all([
+          prisma.userPracticeProgress.count({ where: { isCompleted: true } }),
+          prisma.userPracticeProgress.count({
+            where: {
+              notes: {
+                not: null,
+              },
+            },
+          }),
+          prisma.userPracticeProgress.groupBy({
+            by: ['userId'],
+          }),
+          prisma.userPracticeProgress.findMany({
+            take: 30,
+            orderBy: { updatedAt: 'desc' },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  avatar: true,
+                  role: true,
+                },
+              },
+              question: {
+                select: {
+                  id: true,
+                  title: true,
+                  sheetType: true,
+                  topic: true,
+                  rating: true,
+                  platform: true,
+                  difficulty: true,
+                },
+              },
+            },
+          }),
+          prisma.practiceQuestion.findMany({
+            where: { isPublished: true },
+            select: {
+              id: true,
+              title: true,
+              sheetType: true,
+              topic: true,
+              difficulty: true,
+              _count: {
+                select: {
+                  progress: {
+                    where: { isCompleted: true },
+                  },
+                },
+              },
+            },
+          }),
+        ]);
+
+      // Sheet Breakdown
+      const sheetCompletions = {
+        CRACK_THE_INTERVIEW: 0,
+        SDE_SHEET: 0,
+        CP_SHEET: 0,
+      };
+
+      const sheetCountsRaw = await prisma.userPracticeProgress.findMany({
+        where: { isCompleted: true },
+        select: {
+          question: {
+            select: { sheetType: true },
+          },
+        },
+      });
+
+      sheetCountsRaw.forEach((item) => {
+        const sheet = item.question?.sheetType;
+        if (sheet && sheetCompletions[sheet] !== undefined) {
+          sheetCompletions[sheet] += 1;
+        }
+      });
+
+      // Top solved questions
+      const topQuestions = allQuestions
+        .map((q) => ({
+          id: q.id,
+          title: q.title,
+          sheetType: q.sheetType,
+          topic: q.topic,
+          difficulty: q.difficulty,
+          solveCount: q._count.progress,
+        }))
+        .sort((a, b) => b.solveCount - a.solveCount)
+        .slice(0, 8);
+
+      // Student Leaderboard
+      const activeUsers = await prisma.user.findMany({
+        where: {
+          practiceProgress: {
+            some: {},
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatar: true,
+          role: true,
+          practiceProgress: {
+            select: {
+              isCompleted: true,
+              notes: true,
+              updatedAt: true,
+              question: {
+                select: { sheetType: true },
+              },
+            },
+          },
+        },
+      });
+
+      const leaderboard = activeUsers
+        .map((u) => {
+          const completed = u.practiceProgress.filter((p) => p.isCompleted);
+          const withNotes = u.practiceProgress.filter((p) => p.notes && p.notes.trim().length > 0);
+          const lastActive = u.practiceProgress.reduce(
+            (acc: Date | null, cur) => (!acc || cur.updatedAt > acc ? cur.updatedAt : acc),
+            null
+          );
+
+          return {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            avatar: u.avatar,
+            role: u.role,
+            totalCompleted: completed.length,
+            totalNotes: withNotes.length,
+            lastActive,
+            crackCount: completed.filter((c) => c.question?.sheetType === 'CRACK_THE_INTERVIEW')
+              .length,
+            sdeCount: completed.filter((c) => c.question?.sheetType === 'SDE_SHEET').length,
+            cpCount: completed.filter((c) => c.question?.sheetType === 'CP_SHEET').length,
+          };
+        })
+        .sort((a, b) => b.totalCompleted - a.totalCompleted || b.totalNotes - a.totalNotes)
+        .slice(0, 25);
+
+      res.json({
+        success: true,
+        data: {
+          metrics: {
+            totalCompletions,
+            totalNotes,
+            uniqueStudentsCount: uniqueStudents.length,
+            sheetCompletions,
+          },
+          recentActivity: recentActivities.map((act) => ({
+            id: act.id,
+            user: act.user,
+            question: act.question,
+            isCompleted: act.isCompleted,
+            hasNote: Boolean(act.notes && act.notes.trim().length > 0),
+            noteSnippet: act.notes ? act.notes.slice(0, 90) : null,
+            completedAt: act.completedAt,
+            updatedAt: act.updatedAt,
+          })),
+          topQuestions,
+          leaderboard,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching admin practice user activity:', error);
+      res.status(500).json({ success: false, message: 'Failed to retrieve practice activity' });
+    }
+  }
 }

@@ -19,10 +19,19 @@ import {
   Sparkles,
   Award,
   Zap,
+  Activity,
+  Users,
+  Trophy,
+  StickyNote,
+  Clock,
+  Flame,
+  ArrowUpRight,
+  TrendingUp,
 } from 'lucide-react';
 
 type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
+type AdminTab = 'CURRICULUM' | 'ACTIVITY';
 
 interface PracticeQuestion {
   id: string;
@@ -46,12 +55,77 @@ interface PracticeQuestion {
   };
 }
 
+interface UserActivityData {
+  metrics: {
+    totalCompletions: number;
+    totalNotes: number;
+    uniqueStudentsCount: number;
+    sheetCompletions: {
+      CRACK_THE_INTERVIEW: number;
+      SDE_SHEET: number;
+      CP_SHEET: number;
+    };
+  };
+  recentActivity: Array<{
+    id: string;
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      avatar?: string | null;
+      role: string;
+    };
+    question: {
+      id: string;
+      title: string;
+      sheetType: SheetType;
+      topic?: string | null;
+      rating?: number | null;
+      platform: string;
+      difficulty: Difficulty;
+    };
+    isCompleted: boolean;
+    hasNote: boolean;
+    noteSnippet?: string | null;
+    completedAt?: string | null;
+    updatedAt: string;
+  }>;
+  topQuestions: Array<{
+    id: string;
+    title: string;
+    sheetType: SheetType;
+    topic?: string | null;
+    difficulty: Difficulty;
+    solveCount: number;
+  }>;
+  leaderboard: Array<{
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string | null;
+    role: string;
+    totalCompleted: number;
+    totalNotes: number;
+    lastActive: string | null;
+    crackCount: number;
+    sdeCount: number;
+    cpCount: number;
+  }>;
+}
+
 export default function AdminPracticePage() {
   const { user, isAdmin } = useAuth();
+  const [activeTab, setActiveTab] = useState<AdminTab>('CURRICULUM');
+
+  // Curriculum State
   const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [filterSheet, setFilterSheet] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Activity State
+  const [activityData, setActivityData] = useState<UserActivityData | null>(null);
+  const [loadingActivity, setLoadingActivity] = useState(false);
 
   // Add / Edit Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -78,10 +152,11 @@ export default function AdminPracticePage() {
 
   useEffect(() => {
     loadAllQuestions();
+    loadActivityData();
   }, []);
 
   const loadAllQuestions = async () => {
-    setLoading(true);
+    setLoadingQuestions(true);
     try {
       const res = await fetchApi('/practice/admin/all');
       if (res.success && res.data) {
@@ -90,7 +165,21 @@ export default function AdminPracticePage() {
     } catch (err) {
       console.error('Failed to load admin practice questions:', err);
     } finally {
-      setLoading(false);
+      setLoadingQuestions(false);
+    }
+  };
+
+  const loadActivityData = async () => {
+    setLoadingActivity(true);
+    try {
+      const res = await fetchApi('/practice/admin/activity');
+      if (res.success && res.data) {
+        setActivityData(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load practice activity:', err);
+    } finally {
+      setLoadingActivity(false);
     }
   };
 
@@ -181,6 +270,7 @@ export default function AdminPracticePage() {
         );
         setIsModalOpen(false);
         loadAllQuestions();
+        loadActivityData();
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setErrorMessage(res.message || 'Operation failed');
@@ -203,6 +293,7 @@ export default function AdminPracticePage() {
         setSuccessMessage('Question deleted successfully');
         setDeleteId(null);
         loadAllQuestions();
+        loadActivityData();
         setTimeout(() => setSuccessMessage(''), 3000);
       }
     } catch (err) {
@@ -210,6 +301,18 @@ export default function AdminPracticePage() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const formatRelativeTime = (dateStr: string | null) => {
+    if (!dateStr) return 'Recently';
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
   // Filtered list
@@ -230,20 +333,67 @@ export default function AdminPracticePage() {
         <div>
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 mb-2">
             <Code2 className="w-3.5 h-3.5" />
-            Curriculum Governance
+            Curriculum &amp; Activity Governance
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Practice Arena Management</h1>
+          <h1 className="text-2xl font-black text-white tracking-tight">Practice Arena Control Center</h1>
           <p className="text-gray-400 text-xs sm:text-sm mt-1">
-            Author and manage questions across Crack the Interview (Readme format), SDE Sheet (LeetCode links), and CP Sheet (Codeforces/CodeChef ratings).
+            Manage practice problem sheets and monitor real-time student activity, solve streaks, and revision notes.
           </p>
         </div>
 
+        <div className="flex items-center gap-2">
+          {activeTab === 'CURRICULUM' && (
+            <button
+              onClick={handleOpenAddModal}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all scale-100 hover:scale-105 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New Question</span>
+            </button>
+          )}
+          {activeTab === 'ACTIVITY' && (
+            <button
+              onClick={loadActivityData}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-card border border-white/10 hover:bg-white/10 text-gray-300 text-xs font-semibold transition-colors"
+            >
+              <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>Refresh Feed</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Mode Tab Switcher */}
+      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
         <button
-          onClick={handleOpenAddModal}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all scale-100 hover:scale-105 active:scale-95"
+          onClick={() => setActiveTab('CURRICULUM')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            activeTab === 'CURRICULUM'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'glass-card text-gray-300 hover:text-white border border-white/10'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          <span>Add New Question</span>
+          <Layers className="w-4 h-4" />
+          <span>Curriculum Management</span>
+          <span className="px-1.5 py-0.2 rounded-md text-[10px] bg-black/25">
+            {questions.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ACTIVITY')}
+          className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            activeTab === 'ACTIVITY'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'glass-card text-gray-300 hover:text-white border border-white/10'
+          }`}
+        >
+          <Activity className="w-4 h-4 text-emerald-400" />
+          <span>User Activity &amp; Analytics</span>
+          <span className="flex h-2 w-2 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
         </button>
       </div>
 
@@ -255,179 +405,467 @@ export default function AdminPracticePage() {
         </div>
       )}
 
-      {/* Filters Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Sheet Filter Buttons */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          <button
-            onClick={() => setFilterSheet('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-              filterSheet === 'ALL'
-                ? 'bg-amber-500 text-slate-950 font-bold'
-                : 'glass-card text-gray-300 hover:text-white border border-white/10'
-            }`}
-          >
-            All Sheets ({questions.length})
-          </button>
-          <button
-            onClick={() => setFilterSheet('CRACK_THE_INTERVIEW')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-              filterSheet === 'CRACK_THE_INTERVIEW'
-                ? 'bg-amber-500 text-slate-950 font-bold'
-                : 'glass-card text-gray-300 hover:text-white border border-white/10'
-            }`}
-          >
-            1. Crack the Interview
-          </button>
-          <button
-            onClick={() => setFilterSheet('SDE_SHEET')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-              filterSheet === 'SDE_SHEET'
-                ? 'bg-amber-500 text-slate-950 font-bold'
-                : 'glass-card text-gray-300 hover:text-white border border-white/10'
-            }`}
-          >
-            2. SDE Sheet
-          </button>
-          <button
-            onClick={() => setFilterSheet('CP_SHEET')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-              filterSheet === 'CP_SHEET'
-                ? 'bg-amber-500 text-slate-950 font-bold'
-                : 'glass-card text-gray-300 hover:text-white border border-white/10'
-            }`}
-          >
-            3. CP Sheet
-          </button>
-        </div>
+      {/* ============================================================ */}
+      {/* TAB 1: CURRICULUM MANAGEMENT */}
+      {/* ============================================================ */}
+      {activeTab === 'CURRICULUM' && (
+        <div className="space-y-4">
+          {/* Filters Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Sheet Filter Buttons */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              <button
+                onClick={() => setFilterSheet('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                  filterSheet === 'ALL'
+                    ? 'bg-amber-500 text-slate-950 font-bold'
+                    : 'glass-card text-gray-300 hover:text-white border border-white/10'
+                }`}
+              >
+                All Sheets ({questions.length})
+              </button>
+              <button
+                onClick={() => setFilterSheet('CRACK_THE_INTERVIEW')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                  filterSheet === 'CRACK_THE_INTERVIEW'
+                    ? 'bg-amber-500 text-slate-950 font-bold'
+                    : 'glass-card text-gray-300 hover:text-white border border-white/10'
+                }`}
+              >
+                1. Crack the Interview
+              </button>
+              <button
+                onClick={() => setFilterSheet('SDE_SHEET')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                  filterSheet === 'SDE_SHEET'
+                    ? 'bg-amber-500 text-slate-950 font-bold'
+                    : 'glass-card text-gray-300 hover:text-white border border-white/10'
+                }`}
+              >
+                2. SDE Sheet
+              </button>
+              <button
+                onClick={() => setFilterSheet('CP_SHEET')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                  filterSheet === 'CP_SHEET'
+                    ? 'bg-amber-500 text-slate-950 font-bold'
+                    : 'glass-card text-gray-300 hover:text-white border border-white/10'
+                }`}
+              >
+                3. CP Sheet
+              </button>
+            </div>
 
-        {/* Search */}
-        <div className="relative sm:w-64">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by title, topic..."
-            className="w-full pl-9 pr-3 py-1.5 rounded-xl text-xs glass-card border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400"
-          />
-        </div>
-      </div>
-
-      {/* Table / List View */}
-      {loading ? (
-        <div className="py-16 text-center">
-          <div className="w-7 h-7 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-gray-400 text-xs font-mono mt-2">Loading practice inventory...</p>
-        </div>
-      ) : filteredQuestions.length === 0 ? (
-        <div className="text-center py-16 glass-card rounded-2xl border border-white/10 space-y-3">
-          <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
-          <h3 className="text-sm font-bold text-white">No questions found</h3>
-          <p className="text-gray-400 text-xs">Click &ldquo;Add New Question&rdquo; to author your first problem.</p>
-        </div>
-      ) : (
-        <div className="glass-card rounded-2xl border border-white/10 overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-gray-300">
-              <thead className="bg-white/[0.03] text-gray-400 font-mono text-[11px] uppercase tracking-wider border-b border-white/10">
-                <tr>
-                  <th className="px-5 py-3.5">Sheet / Category</th>
-                  <th className="px-5 py-3.5">Problem Title</th>
-                  <th className="px-5 py-3.5">Platform</th>
-                  <th className="px-5 py-3.5">Difficulty</th>
-                  <th className="px-5 py-3.5">Author</th>
-                  <th className="px-5 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredQuestions.map((q) => (
-                  <tr key={q.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-5 py-3.5 whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-white">
-                          {q.sheetType === 'CRACK_THE_INTERVIEW' && '🎯 Crack Interview'}
-                          {q.sheetType === 'SDE_SHEET' && '🚀 SDE Sheet'}
-                          {q.sheetType === 'CP_SHEET' && '⚔️ CP Sheet'}
-                        </span>
-                        <span className="text-[11px] text-amber-400 font-mono">
-                          {q.sheetType === 'CP_SHEET'
-                            ? `Rating: ${q.rating || 'N/A'}`
-                            : `Topic: ${q.topic || 'General'}`}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-2 max-w-xs">
-                        <span className="font-bold text-white truncate">{q.title}</span>
-                        {q.content && (
-                          <span
-                            title="Has Readme problem statement"
-                            className="p-1 rounded bg-cyan-500/10 text-cyan-400"
-                          >
-                            <BookOpen className="w-3 h-3" />
-                          </span>
-                        )}
-                        {q.externalUrl && (
-                          <a
-                            href={q.externalUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1 rounded bg-white/5 text-gray-400 hover:text-white"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-3.5 whitespace-nowrap font-mono text-gray-300">
-                      {q.platform}
-                    </td>
-
-                    <td className="px-5 py-3.5 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-                          q.difficulty === 'EASY'
-                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                            : q.difficulty === 'MEDIUM'
-                            ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                            : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
-                        }`}
-                      >
-                        {q.difficulty}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-3.5 whitespace-nowrap text-gray-400 text-[11px]">
-                      {q.author?.name || 'Admin'}
-                    </td>
-
-                    <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleOpenEditModal(q)}
-                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
-                          title="Edit Question"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          onClick={() => setDeleteId(q.id)}
-                          className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
-                          title="Delete Question"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/* Search */}
+            <div className="relative sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by title, topic..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl text-xs glass-card border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400"
+              />
+            </div>
           </div>
+
+          {/* Table / List View */}
+          {loadingQuestions ? (
+            <div className="py-16 text-center">
+              <div className="w-7 h-7 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-gray-400 text-xs font-mono mt-2">Loading practice inventory...</p>
+            </div>
+          ) : filteredQuestions.length === 0 ? (
+            <div className="text-center py-16 glass-card rounded-2xl border border-white/10 space-y-3">
+              <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
+              <h3 className="text-sm font-bold text-white">No questions found</h3>
+              <p className="text-gray-400 text-xs">Click &ldquo;Add New Question&rdquo; to author your first problem.</p>
+            </div>
+          ) : (
+            <div className="glass-card rounded-2xl border border-white/10 overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-gray-300">
+                  <thead className="bg-white/[0.03] text-gray-400 font-mono text-[11px] uppercase tracking-wider border-b border-white/10">
+                    <tr>
+                      <th className="px-5 py-3.5">Sheet / Category</th>
+                      <th className="px-5 py-3.5">Problem Title</th>
+                      <th className="px-5 py-3.5">Platform</th>
+                      <th className="px-5 py-3.5">Difficulty</th>
+                      <th className="px-5 py-3.5">Author</th>
+                      <th className="px-5 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {filteredQuestions.map((q) => (
+                      <tr key={q.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-5 py-3.5 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-white">
+                              {q.sheetType === 'CRACK_THE_INTERVIEW' && '🎯 Crack Interview'}
+                              {q.sheetType === 'SDE_SHEET' && '🚀 SDE Sheet'}
+                              {q.sheetType === 'CP_SHEET' && '⚔️ CP Sheet'}
+                            </span>
+                            <span className="text-[11px] text-amber-400 font-mono">
+                              {q.sheetType === 'CP_SHEET'
+                                ? `Rating: ${q.rating || 'N/A'}`
+                                : `Topic: ${q.topic || 'General'}`}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-2 max-w-xs">
+                            <span className="font-bold text-white truncate">{q.title}</span>
+                            {q.content && (
+                              <span
+                                title="Has Readme problem statement"
+                                className="p-1 rounded bg-cyan-500/10 text-cyan-400"
+                              >
+                                <BookOpen className="w-3 h-3" />
+                              </span>
+                            )}
+                            {q.externalUrl && (
+                              <a
+                                href={q.externalUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 rounded bg-white/5 text-gray-400 hover:text-white"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-3.5 whitespace-nowrap font-mono text-gray-300">
+                          {q.platform}
+                        </td>
+
+                        <td className="px-5 py-3.5 whitespace-nowrap">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                              q.difficulty === 'EASY'
+                                ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                : q.difficulty === 'MEDIUM'
+                                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                            }`}
+                          >
+                            {q.difficulty}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-3.5 whitespace-nowrap text-gray-400 text-[11px]">
+                          {q.author?.name || 'Admin'}
+                        </td>
+
+                        <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleOpenEditModal(q)}
+                              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
+                              title="Edit Question"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => setDeleteId(q.id)}
+                              className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                              title="Delete Question"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB 2: USER PRACTICE ACTIVITY & TELEMETRY */}
+      {/* ============================================================ */}
+      {activeTab === 'ACTIVITY' && (
+        <div className="space-y-6">
+          {loadingActivity || !activityData ? (
+            <div className="py-20 text-center">
+              <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-gray-400 text-xs font-mono mt-3">Aggregating real-time user practice telemetry...</p>
+            </div>
+          ) : (
+            <>
+              {/* Top 4 Telemetry Metrics */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="glass-card p-5 rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent space-y-2">
+                  <div className="flex items-center justify-between text-gray-400 text-xs">
+                    <span>Total Solves</span>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div className="text-3xl font-extrabold text-white font-mono">
+                    {activityData.metrics.totalCompletions}
+                  </div>
+                  <div className="text-[11px] text-emerald-400 flex items-center gap-1 font-mono">
+                    <TrendingUp className="w-3 h-3" /> Verified problem submissions
+                  </div>
+                </div>
+
+                <div className="glass-card p-5 rounded-2xl border border-white/10 bg-gradient-to-br from-cyan-500/10 via-transparent to-transparent space-y-2">
+                  <div className="flex items-center justify-between text-gray-400 text-xs">
+                    <span>Active Solvers</span>
+                    <Users className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div className="text-3xl font-extrabold text-white font-mono">
+                    {activityData.metrics.uniqueStudentsCount}
+                  </div>
+                  <div className="text-[11px] text-cyan-400 flex items-center gap-1 font-mono">
+                    <Users className="w-3 h-3" /> Unique students practicing
+                  </div>
+                </div>
+
+                <div className="glass-card p-5 rounded-2xl border border-white/10 bg-gradient-to-br from-amber-500/10 via-transparent to-transparent space-y-2">
+                  <div className="flex items-center justify-between text-gray-400 text-xs">
+                    <span>Revision Notes</span>
+                    <StickyNote className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div className="text-3xl font-extrabold text-white font-mono">
+                    {activityData.metrics.totalNotes}
+                  </div>
+                  <div className="text-[11px] text-amber-400 flex items-center gap-1 font-mono">
+                    <BookOpen className="w-3 h-3" /> Notes written for review
+                  </div>
+                </div>
+
+                <div className="glass-card p-5 rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/10 via-transparent to-transparent space-y-2">
+                  <div className="flex items-center justify-between text-gray-400 text-xs">
+                    <span>Platform Distribution</span>
+                    <Award className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 text-[11px] font-mono">
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                      Interview: {activityData.metrics.sheetCompletions.CRACK_THE_INTERVIEW}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300">
+                      SDE: {activityData.metrics.sheetCompletions.SDE_SHEET}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                      CP: {activityData.metrics.sheetCompletions.CP_SHEET}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-gray-400">Total sheet engagement</div>
+                </div>
+              </div>
+
+              {/* Main Activity Grid: Live Feed (Left) & Leaderboard + Trending (Right) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left 7 Cols: Live Activity Feed */}
+                <div className="lg:col-span-7 glass-card rounded-2xl border border-white/10 p-5 space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400">
+                        <Activity className="w-4 h-4" />
+                      </div>
+                      <h3 className="text-sm font-bold text-white">Live Student Activity Stream</h3>
+                    </div>
+                    <span className="text-[11px] text-gray-400 font-mono">
+                      Last {activityData.recentActivity.length} events
+                    </span>
+                  </div>
+
+                  {activityData.recentActivity.length === 0 ? (
+                    <div className="py-12 text-center text-gray-400 text-xs">
+                      No student practice activity recorded yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
+                      {activityData.recentActivity.map((act) => (
+                        <div
+                          key={act.id}
+                          className="p-3.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 flex items-start gap-3 transition-colors"
+                        >
+                          <img
+                            src={
+                              act.user.avatar ||
+                              `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+                                act.user.name
+                              )}`
+                            }
+                            alt={act.user.name}
+                            className="w-8 h-8 rounded-full border border-white/20 mt-0.5"
+                          />
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-white truncate">{act.user.name}</span>
+                              <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {formatRelativeTime(act.updatedAt)}
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-gray-300">
+                              {act.isCompleted ? (
+                                <span className="text-emerald-400 font-medium">Solved</span>
+                              ) : (
+                                <span className="text-amber-400 font-medium">Updated note on</span>
+                              )}{' '}
+                              <span className="text-white font-semibold">
+                                {act.question?.title || 'Problem'}
+                              </span>
+                            </p>
+
+                            <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-white/10 text-gray-300">
+                                {act.question?.sheetType === 'CRACK_THE_INTERVIEW'
+                                  ? '🎯 Interview'
+                                  : act.question?.sheetType === 'SDE_SHEET'
+                                  ? '🚀 SDE'
+                                  : '⚔️ CP'}
+                              </span>
+                              {act.question?.topic && (
+                                <span className="text-[10px] text-gray-400 font-mono">
+                                  {act.question.topic}
+                                </span>
+                              )}
+                              {act.hasNote && act.noteSnippet && (
+                                <span className="text-[10px] text-amber-300 italic bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 truncate max-w-xs">
+                                  &ldquo;{act.noteSnippet}...&rdquo;
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right 5 Cols: Student Leaderboard & Trending Problems */}
+                <div className="lg:col-span-5 space-y-6">
+                  {/* Student Leaderboard */}
+                  <div className="glass-card rounded-2xl border border-white/10 p-5 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400">
+                          <Trophy className="w-4 h-4" />
+                        </div>
+                        <h3 className="text-sm font-bold text-white">Top Student Solvers</h3>
+                      </div>
+                      <span className="text-[10px] font-mono text-amber-400">Leaderboard</span>
+                    </div>
+
+                    {activityData.leaderboard.length === 0 ? (
+                      <div className="py-8 text-center text-gray-400 text-xs">
+                        No leaderboard data yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                        {activityData.leaderboard.map((student, idx) => (
+                          <div
+                            key={student.id}
+                            className="p-2.5 rounded-xl bg-white/[0.02] flex items-center justify-between text-xs"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span
+                                className={`w-5 text-center font-bold font-mono ${
+                                  idx === 0
+                                    ? 'text-amber-400'
+                                    : idx === 1
+                                    ? 'text-gray-300'
+                                    : idx === 2
+                                    ? 'text-amber-600'
+                                    : 'text-gray-500'
+                                }`}
+                              >
+                                #{idx + 1}
+                              </span>
+                              <img
+                                src={
+                                  student.avatar ||
+                                  `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+                                    student.name
+                                  )}`
+                                }
+                                alt={student.name}
+                                className="w-7 h-7 rounded-full border border-white/20"
+                              />
+                              <div className="min-w-0">
+                                <div className="font-bold text-white truncate max-w-[130px]">
+                                  {student.name}
+                                </div>
+                                <div className="text-[10px] text-gray-400 font-mono truncate max-w-[130px]">
+                                  {student.email}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                {student.totalCompleted} Solved
+                              </span>
+                              {student.totalNotes > 0 && (
+                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                  {student.totalNotes} notes
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Most Attempted / Top Solved Problems */}
+                  <div className="glass-card rounded-2xl border border-white/10 p-5 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400">
+                          <Flame className="w-4 h-4" />
+                        </div>
+                        <h3 className="text-sm font-bold text-white">Most Practiced Problems</h3>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {activityData.topQuestions.slice(0, 5).map((q, idx) => (
+                        <div
+                          key={q.id}
+                          className="p-2.5 rounded-xl bg-white/[0.02] flex items-center justify-between text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-mono text-gray-400 text-xs">#{idx + 1}</span>
+                            <span className="font-medium text-white truncate max-w-[160px]">
+                              {q.title}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${
+                                q.difficulty === 'EASY'
+                                  ? 'text-emerald-400'
+                                  : q.difficulty === 'MEDIUM'
+                                  ? 'text-amber-400'
+                                  : 'text-rose-400'
+                              }`}
+                            >
+                              {q.difficulty}
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-white/10 text-gray-200 font-mono font-bold text-[11px]">
+                              {q.solveCount} solves
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
