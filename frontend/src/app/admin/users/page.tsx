@@ -31,6 +31,7 @@ import { useDebounce } from '../../../hooks/useDebounce';
 import AdminTableSkeleton from '../../../components/skeletons/AdminTableSkeleton';
 import { useToast } from '../../../context/ToastContext';
 import WarningCardModal, { WarningDetail } from '../../../components/WarningCardModal';
+import Pagination from '../../../components/Pagination';
 
 export default function AdminUserGovernancePage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -40,6 +41,10 @@ export default function AdminUserGovernancePage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+
+  // Pagination State for Users Table
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
 
   useEffect(() => {
     loadUsers();
@@ -183,10 +188,29 @@ export default function AdminUserGovernancePage() {
     });
   };
 
-  const filteredUsers = users.filter((u) =>
-    u.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-    u.email.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch =
+      u.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(debouncedSearch.toLowerCase());
+    const matchesStatus =
+      !statusFilter ||
+      (statusFilter === 'active' && !u.isBanned) ||
+      (statusFilter === 'banned' && u.isBanned);
+    const matchesRole = !roleFilter || u.role === roleFilter;
+
+    return matchesSearch && matchesStatus && matchesRole;
+  });
+
+  // Reset to page 1 on search or filter change
+  useEffect(() => {
+    setUserPage(1);
+  }, [debouncedSearch, statusFilter, roleFilter]);
+
+  const totalUserPages = Math.ceil(filteredUsers.length / userPageSize);
+  const paginatedUsers = React.useMemo(() => {
+    const start = (userPage - 1) * userPageSize;
+    return filteredUsers.slice(start, start + userPageSize);
+  }, [filteredUsers, userPage, userPageSize]);
 
   return (
     <div className="space-y-6">
@@ -252,7 +276,8 @@ export default function AdminUserGovernancePage() {
         ) : filteredUsers.length === 0 ? (
           <div className="py-12 text-center text-gray-400 text-xs">No users matched your search filters.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-900/80 border-b border-white/10 text-gray-400 font-semibold uppercase">
                 <tr>
@@ -266,7 +291,7 @@ export default function AdminUserGovernancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredUsers.map((u) => (
+                {paginatedUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-white/5 transition-colors">
                     <td className="p-4 flex items-center gap-2.5">
                       <img
@@ -412,7 +437,23 @@ export default function AdminUserGovernancePage() {
               </tbody>
             </table>
           </div>
-        )}
+
+          {/* User Governance Pagination */}
+          {filteredUsers.length > 0 && (
+            <Pagination
+              currentPage={userPage}
+              totalPages={totalUserPages}
+              totalItems={filteredUsers.length}
+              pageSize={userPageSize}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageChange={setUserPage}
+              onPageSizeChange={setUserPageSize}
+              itemLabel="registered users"
+              className="border-t border-white/10 rounded-t-none"
+            />
+          )}
+        </>
+      )}
       </div>
 
       {/* Warning Card Modal for Privileged / Destructive Actions */}

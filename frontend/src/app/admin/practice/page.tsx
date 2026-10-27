@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { fetchApi } from '../../../lib/api';
 import AdminPracticeSkeleton from '../../../components/skeletons/AdminPracticeSkeleton';
 import AdminActivitySkeleton from '../../../components/skeletons/AdminActivitySkeleton';
+import Pagination from '../../../components/Pagination';
 import {
   Code2,
   Plus,
@@ -154,6 +155,10 @@ export default function AdminPracticePage() {
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Pagination State for Curriculum Management Table
+  const [curriculumPage, setCurriculumPage] = useState(1);
+  const [curriculumPageSize, setCurriculumPageSize] = useState(15);
 
   // Form Fields
   const [formSheetType, setFormSheetType] = useState<SheetType>('CRACK_THE_INTERVIEW');
@@ -357,6 +362,17 @@ export default function AdminPracticePage() {
     return matchesSheet && matchesSearch;
   });
 
+  // Curriculum Table Pagination
+  useEffect(() => {
+    setCurriculumPage(1);
+  }, [filterSheet, searchQuery]);
+
+  const totalCurriculumPages = Math.ceil(filteredQuestions.length / curriculumPageSize);
+  const paginatedQuestions = React.useMemo(() => {
+    const start = (curriculumPage - 1) * curriculumPageSize;
+    return filteredQuestions.slice(start, start + curriculumPageSize);
+  }, [filteredQuestions, curriculumPage, curriculumPageSize]);
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -540,7 +556,7 @@ export default function AdminPracticePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {filteredQuestions.map((q) => (
+                    {paginatedQuestions.map((q) => (
                       <tr key={q.id} className="hover:bg-white/[0.02] transition-colors">
                         <td className="px-5 py-3.5 whitespace-nowrap">
                           <div className="flex flex-col">
@@ -631,6 +647,21 @@ export default function AdminPracticePage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Curriculum Pagination */}
+              {filteredQuestions.length > 0 && (
+                <Pagination
+                  currentPage={curriculumPage}
+                  totalPages={totalCurriculumPages}
+                  totalItems={filteredQuestions.length}
+                  pageSize={curriculumPageSize}
+                  pageSizeOptions={[10, 15, 25, 50, 100]}
+                  onPageChange={setCurriculumPage}
+                  onPageSizeChange={setCurriculumPageSize}
+                  itemLabel="curriculum questions"
+                  className="border-t border-white/10 rounded-t-none"
+                />
+              )}
             </div>
           )}
         </div>

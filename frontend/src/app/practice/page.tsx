@@ -7,6 +7,7 @@ import { fetchApi } from '../../lib/api';
 import MarkdownViewer from '../../components/MarkdownViewer';
 import PracticeQuestionsSkeleton from '../../components/skeletons/PracticeQuestionsSkeleton';
 import PracticeLeaderboardSkeleton from '../../components/skeletons/PracticeLeaderboardSkeleton';
+import Pagination from '../../components/Pagination';
 import {
   Code2,
   CheckCircle2,
@@ -108,6 +109,12 @@ export default function PracticePage() {
   const [myRankInfo, setMyRankInfo] = useState<LeaderboardUser | null>(null);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
+
+  // Pagination State: Group-based for questions, row-based for leaderboard
+  const [groupPage, setGroupPage] = useState(1);
+  const [groupsPerPage, setGroupsPerPage] = useState(4);
+  const [leaderboardPage, setLeaderboardPage] = useState(1);
+  const [leaderboardPageSize, setLeaderboardPageSize] = useState(20);
 
   // User Progress: completedMap and notesMap
   const [completedMap, setCompletedMap] = useState<Record<string, boolean>>({});
@@ -522,7 +529,7 @@ export default function PracticePage() {
     return { total, completed, percentage };
   }, [questions, completedMap]);
 
-  // Filtered leaderboard solvers
+  // Filtered leaderboard solvers & Leaderboard Pagination
   const filteredLeaderboard = useMemo(() => {
     if (!leaderboardSearch.trim()) return leaderboardData;
     const q = leaderboardSearch.toLowerCase();
@@ -532,6 +539,28 @@ export default function PracticePage() {
         (u.role && u.role.toLowerCase().includes(q))
     );
   }, [leaderboardData, leaderboardSearch]);
+
+  const totalLeaderboardPages = Math.ceil(filteredLeaderboard.length / leaderboardPageSize);
+  const paginatedLeaderboard = useMemo(() => {
+    const start = (leaderboardPage - 1) * leaderboardPageSize;
+    return filteredLeaderboard.slice(start, start + leaderboardPageSize);
+  }, [filteredLeaderboard, leaderboardPage, leaderboardPageSize]);
+
+  useEffect(() => {
+    setLeaderboardPage(1);
+  }, [leaderboardSearch, activeSheet]);
+
+  // Derived Group Entries and Group-based Pagination
+  const groupEntries = useMemo(() => Object.entries(groupedQuestions), [groupedQuestions]);
+  const totalGroupPages = Math.ceil(groupEntries.length / groupsPerPage);
+  const paginatedGroupEntries = useMemo(() => {
+    const start = (groupPage - 1) * groupsPerPage;
+    return groupEntries.slice(start, start + groupsPerPage);
+  }, [groupEntries, groupPage, groupsPerPage]);
+
+  useEffect(() => {
+    setGroupPage(1);
+  }, [activeSheet, searchQuery, selectedDifficulty, selectedStatus, selectedPlatform, sortBy]);
 
   // Total matching questions after filter
   const totalMatchingQuestions = useMemo(() => {
@@ -1488,7 +1517,8 @@ export default function PracticePage() {
               <p className="text-gray-400 text-xs">Try clearing the search query.</p>
             </div>
           ) : (
-            <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+            <>
+              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -1505,7 +1535,7 @@ export default function PracticePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-xs">
-                    {filteredLeaderboard.map((coder) => {
+                    {paginatedLeaderboard.map((coder) => {
                       const isMe = user?.id === coder.id;
                       return (
                         <tr
@@ -1667,6 +1697,22 @@ export default function PracticePage() {
                 </table>
               </div>
             </div>
+
+            {/* Leaderboard Pagination */}
+            {filteredLeaderboard.length > 0 && (
+              <Pagination
+                currentPage={leaderboardPage}
+                totalPages={totalLeaderboardPages}
+                totalItems={filteredLeaderboard.length}
+                pageSize={leaderboardPageSize}
+                pageSizeOptions={[10, 20, 50, 100]}
+                onPageChange={setLeaderboardPage}
+                onPageSizeChange={setLeaderboardPageSize}
+                itemLabel="solvers"
+                className="mt-4"
+              />
+            )}
+            </>
           )}
             </>
           )}
@@ -1810,7 +1856,7 @@ export default function PracticePage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(groupedQuestions).map(([groupTitle, items]) => {
+          {paginatedGroupEntries.map(([groupTitle, items]) => {
             const isExpanded = isGroupExpanded(groupTitle);
             const groupCompleted = items.filter((it) => completedMap[it.id]).length;
 
@@ -2037,6 +2083,21 @@ export default function PracticePage() {
               </div>
             );
           })}
+
+          {/* Group-based Pagination for Questions */}
+          {groupEntries.length > 0 && (
+            <Pagination
+              currentPage={groupPage}
+              totalPages={totalGroupPages}
+              totalItems={groupEntries.length}
+              pageSize={groupsPerPage}
+              pageSizeOptions={[3, 4, 5, 8, 10]}
+              onPageChange={setGroupPage}
+              onPageSizeChange={setGroupsPerPage}
+              itemLabel="topic sections"
+              className="mt-6"
+            />
+          )}
         </div>
       )}
     </>
