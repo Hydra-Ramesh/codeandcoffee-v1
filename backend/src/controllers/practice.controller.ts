@@ -937,6 +937,14 @@ export class PracticeController {
    */
   static async adminGetUserActivity(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      if (req.user?.role !== 'ADMIN') {
+        res.status(403).json({
+          success: false,
+          message: 'Access denied: Only administrators can view user activity and progress data.',
+        });
+        return;
+      }
+
       const [totalCompletions, totalNotes, uniqueStudents, recentActivities, allQuestions] =
         await Promise.all([
           prisma.userPracticeProgress.count({ where: { isCompleted: true } }),

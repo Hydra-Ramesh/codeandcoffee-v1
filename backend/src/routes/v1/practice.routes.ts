@@ -3,6 +3,7 @@ import { PracticeController } from '../../controllers/practice.controller.js';
 import {
   authenticate,
   optionalAuth,
+  requireAdmin,
   requireContributorOrAdmin,
 } from '../../middleware/auth.middleware.js';
 
@@ -40,8 +41,8 @@ router.put('/my-progress/:questionId/note', authenticate, PracticeController.sav
 // List all questions with filters
 router.get('/admin/all', authenticate, requireContributorOrAdmin, PracticeController.adminGetAllQuestions);
 
-// Get real-time user activity and practice metrics
-router.get('/admin/activity', authenticate, requireContributorOrAdmin, PracticeController.adminGetUserActivity);
+// Get real-time user activity and practice metrics (ADMIN ONLY - contributors cannot view user data or activity)
+router.get('/admin/activity', authenticate, requireAdmin, PracticeController.adminGetUserActivity);
 
 // Create new question
 router.post('/admin/question', authenticate, requireContributorOrAdmin, PracticeController.adminCreateQuestion);
