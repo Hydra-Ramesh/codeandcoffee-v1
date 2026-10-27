@@ -917,10 +917,10 @@ export default function AdminPracticePage() {
                                     }`}
                                     className={`w-2.5 h-2.5 rounded-xs flex items-center justify-center text-[6px] ${
                                       d.status === 'FIRE'
-                                        ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-xs'
+                                        ? 'activity-day-fire'
                                         : d.status === 'NORMAL'
-                                        ? 'bg-emerald-500 text-white'
-                                        : 'bg-white/10'
+                                        ? 'activity-day-normal'
+                                        : 'activity-day-empty'
                                     }`}
                                   >
                                     {d.status === 'FIRE' ? '🔥' : ''}

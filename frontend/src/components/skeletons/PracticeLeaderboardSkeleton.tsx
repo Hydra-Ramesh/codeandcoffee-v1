@@ -94,7 +94,7 @@ export default function PracticeLeaderboardSkeleton() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center justify-center gap-1">
                       {Array.from({ length: 14 }).map((_, d) => (
-                        <div key={d} className="w-3 h-3 rounded-xs bg-slate-800/60" />
+                        <div key={d} className="w-3 h-3 rounded-xs activity-day-empty" />
                       ))}
                     </div>
                   </td>

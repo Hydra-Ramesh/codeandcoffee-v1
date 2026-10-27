@@ -514,6 +514,7 @@ export default function PracticePage() {
   const monthLabels = useMemo(() => {
     const labels: { weekIndex: number; name: string }[] = [];
     let lastMonth = -1;
+    let lastWeekIndex = -10;
 
     calendarWeeks.forEach((week, wIdx) => {
       const firstValidDay = week.days.find((d) => d !== null);
@@ -521,11 +522,19 @@ export default function PracticePage() {
         const d = new Date(firstValidDay.date + 'T00:00:00Z');
         const m = d.getUTCMonth();
         if (m !== lastMonth) {
-          lastMonth = m;
-          labels.push({
-            weekIndex: wIdx,
-            name: d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }),
-          });
+          const monthName = d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+          if (wIdx - lastWeekIndex < 3) {
+            // Collision detected! If the previous label was at index 0, replace it with this month
+            if (labels.length > 0 && lastWeekIndex === 0) {
+              labels[labels.length - 1] = { weekIndex: wIdx, name: monthName };
+              lastWeekIndex = wIdx;
+              lastMonth = m;
+            }
+          } else {
+            labels.push({ weekIndex: wIdx, name: monthName });
+            lastWeekIndex = wIdx;
+            lastMonth = m;
+          }
         }
       }
     });
@@ -717,50 +726,50 @@ export default function PracticePage() {
       </div>
 
       {/* 365-Day Problem Solve Activity Matrix */}
-      <div className="glass-card rounded-3xl border border-white/10 p-5 sm:p-6 bg-slate-950/70 shadow-2xl space-y-4">
+      <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-white/10 p-5 sm:p-6 shadow-2xl space-y-4">
         {/* Header with Title and Telemetry Badges */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-white/10">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/20">
+              <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/20">
                 <Calendar className="w-4 h-4" />
               </div>
-              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 365-Day Problem Solve Activity Matrix
               </h2>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-slate-500 dark:text-gray-400">
               LeetCode-style daily contribution matrix showing solved problem volume over the past 365 days.
             </p>
           </div>
 
           {/* Metric Quick Chips */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs font-mono">
-            <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300">
-              <span className="text-amber-400 font-bold">{calendarStats.total365Solves}</span> Solves
+            <div className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-gray-300">
+              <span className="text-amber-500 dark:text-amber-400 font-bold">{calendarStats.total365Solves}</span> Solves
             </div>
-            <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
               <span className="font-bold">{calendarStats.activeDays}</span> Active Days
             </div>
-            <div className="px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400">
+            <div className="px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-600 dark:text-orange-400">
               <span className="font-bold">🔥 {calendarStats.fireDays}</span> Fire Days (≥5 solves)
             </div>
-            <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+            <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
               <span className="font-bold">🏆 {calendarStats.maxStreak}d</span> Longest Streak
             </div>
           </div>
         </div>
 
         {/* Heatmap Grid with Month Headers */}
-        <div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        <div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-white/10 scrollbar-track-transparent">
           <div className="min-w-[840px] space-y-1.5">
             {/* Month Labels Bar */}
-            <div className="text-[10px] text-gray-400 font-mono h-4 relative pl-7">
+            <div className="text-[10px] text-slate-500 dark:text-gray-400 font-mono h-4 relative pl-7">
               {monthLabels.map((ml) => (
                 <div
                   key={ml.name + ml.weekIndex}
-                  style={{ left: `${ml.weekIndex * 15.5}px` }}
-                  className="absolute whitespace-nowrap font-semibold text-gray-400"
+                  style={{ left: `${ml.weekIndex * 16}px` }}
+                  className="absolute whitespace-nowrap font-semibold text-slate-500 dark:text-gray-400"
                 >
                   {ml.name}
                 </div>
@@ -770,7 +779,7 @@ export default function PracticePage() {
             {/* Week Columns & Day Rows */}
             <div className="flex items-start gap-2">
               {/* Day of Week Labels (Mon, Wed, Fri) */}
-              <div className="flex flex-col gap-1 text-[9px] text-gray-500 font-mono pt-0.5 w-5 text-right select-none">
+              <div className="flex flex-col gap-1 text-[9px] text-slate-400 dark:text-gray-500 font-mono pt-0.5 w-5 text-right select-none">
                 <span className="h-[12px] leading-[12px]">Mon</span>
                 <span className="h-[12px] leading-[12px]" />
                 <span className="h-[12px] leading-[12px]">Wed</span>
@@ -808,10 +817,10 @@ export default function PracticePage() {
                           title={tooltip}
                           className={`w-[12px] h-[12px] rounded-[3px] transition-all cursor-pointer flex items-center justify-center text-[7px] ${
                             isFire
-                              ? 'bg-gradient-to-tr from-orange-500 via-amber-500 to-red-500 text-white shadow-sm shadow-orange-500/50 hover:scale-150 z-10'
+                              ? 'activity-day-fire hover:scale-150 z-10'
                               : isNormal
-                              ? 'bg-emerald-500 hover:bg-emerald-400 hover:scale-125 z-10'
-                              : 'bg-white/[0.06] hover:bg-white/20'
+                              ? 'activity-day-normal hover:scale-125 z-10'
+                              : 'activity-day-empty'
                           }`}
                         >
                           {isFire ? '🔥' : ''}
@@ -826,22 +835,22 @@ export default function PracticePage() {
         </div>
 
         {/* Footer Legend and Rule Clarification */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/5 text-xs text-gray-400">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200/80 dark:border-white/5 text-xs text-slate-500 dark:text-gray-400">
           <div className="flex items-center gap-1.5 text-[11px]">
-            <Info className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+            <Info className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
             <span>
-              Fire icon (<strong className="text-orange-400">🔥</strong>) triggers <em>ONLY</em> when 5 or more problems are solved on a single day. Daily streaks (even &gt;5 days) remain normal green (🟢) unless 5+ problems are solved today.
+              Fire icon (<strong className="text-orange-500">🔥</strong>) triggers <em>ONLY</em> when 5 or more problems are solved on a single day. Daily streaks (even &gt;5 days) remain normal green (🟢) unless 5+ problems are solved today.
             </span>
           </div>
 
           {/* Legend Dots */}
-          <div className="flex items-center gap-2 text-[11px] font-mono self-end sm:self-auto">
+          <div className="flex items-center gap-2 text-[11px] font-mono self-end sm:self-auto text-slate-600 dark:text-gray-300">
             <span>0 Solved</span>
-            <div className="w-3 h-3 rounded-[3px] bg-white/[0.08]" />
+            <div className="w-3 h-3 rounded-[3px] activity-day-empty" />
             <span className="ml-1">1-4 Solved</span>
-            <div className="w-3 h-3 rounded-[3px] bg-emerald-500" />
+            <div className="w-3 h-3 rounded-[3px] activity-day-normal" />
             <span className="ml-1">≥5 Solved</span>
-            <div className="w-3 h-3 rounded-[3px] bg-gradient-to-tr from-orange-500 to-red-500 text-white flex items-center justify-center text-[6px]">
+            <div className="w-3 h-3 rounded-[3px] activity-day-fire flex items-center justify-center text-[6px]">
               🔥
             </div>
           </div>
@@ -1536,10 +1545,10 @@ export default function PracticePage() {
                                   }`}
                                   className={`w-3 h-3 rounded-xs flex items-center justify-center text-[7px] ${
                                     d.status === 'FIRE'
-                                      ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-xs'
+                                      ? 'activity-day-fire'
                                       : d.status === 'NORMAL'
-                                      ? 'bg-emerald-500 text-white'
-                                      : 'bg-white/10'
+                                      ? 'activity-day-normal'
+                                      : 'activity-day-empty'
                                   }`}
                                 >
                                   {d.status === 'FIRE' ? '🔥' : ''}

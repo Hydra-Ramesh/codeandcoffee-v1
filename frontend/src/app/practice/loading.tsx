@@ -67,19 +67,19 @@ export default function PracticeLoading() {
       </div>
 
       {/* 365-Day Activity Heatmap Skeleton */}
-      <div className="glass-card rounded-3xl border border-white/10 p-5 sm:p-6 bg-slate-950/70 shadow-2xl space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+      <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-white/10 p-5 sm:p-6 shadow-2xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-white/10">
           <div className="space-y-1.5">
-            <div className="h-5 w-64 bg-slate-800 rounded-md" />
-            <div className="h-3 w-96 bg-slate-800/60 rounded" />
+            <div className="h-5 w-64 bg-slate-300 dark:bg-slate-800 rounded-md" />
+            <div className="h-3 w-96 bg-slate-200 dark:bg-slate-800/60 rounded" />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="h-7 w-28 bg-slate-800/80 rounded-xl" />
-            <div className="h-7 w-28 bg-slate-800/80 rounded-xl" />
-            <div className="h-7 w-28 bg-slate-800/80 rounded-xl" />
+            <div className="h-7 w-28 bg-slate-200 dark:bg-slate-800/80 rounded-xl" />
+            <div className="h-7 w-28 bg-slate-200 dark:bg-slate-800/80 rounded-xl" />
+            <div className="h-7 w-28 bg-slate-200 dark:bg-slate-800/80 rounded-xl" />
           </div>
         </div>
-        <div className="h-28 bg-slate-900/60 rounded-xl" />
+        <div className="h-28 bg-slate-200/70 dark:bg-slate-900/60 rounded-xl" />
       </div>
 
       {/* Tabs Skeleton */}
