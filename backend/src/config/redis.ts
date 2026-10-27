@@ -6,7 +6,7 @@ export interface IRedisClient {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, mode?: string, duration?: number): Promise<string | null>;
   setex(key: string, seconds: number, value: string): Promise<string | null>;
-  del(key: string): Promise<number>;
+  del(...keys: string[]): Promise<number>;
   keys(pattern: string): Promise<string[]>;
   incr(key: string): Promise<number>;
   sadd(key: string, ...members: string[]): Promise<number>;
@@ -51,9 +51,12 @@ class MemoryRedis implements IRedisClient {
     return 'OK';
   }
 
-  async del(key: string): Promise<number> {
-    const deleted = this.store.delete(key) ? 1 : 0;
-    this.sets.delete(key);
+  async del(...keys: string[]): Promise<number> {
+    let deleted = 0;
+    for (const key of keys) {
+      if (this.store.delete(key)) deleted++;
+      this.sets.delete(key);
+    }
     return deleted;
   }
 
@@ -150,6 +153,27 @@ class MemoryRedis implements IRedisClient {
 }
 
 let redisClient: IRedisClient;
+const memoryFallback = new MemoryRedis();
+let hasLoggedQuotaExceeded = false;
+
+function fallbackOnQuota(err: any): boolean {
+  const msg = err?.message || String(err);
+  if (
+    msg.includes('limit exceeded') ||
+    msg.includes('max requests') ||
+    msg.includes('daily limit') ||
+    msg.includes('quota')
+  ) {
+    if (!hasLoggedQuotaExceeded) {
+      console.warn('⚠️ [Redis Failover] Upstash command quota reached. Seamlessly engaging in-memory Redis fallback so all features stay 100% online.');
+      hasLoggedQuotaExceeded = true;
+    }
+    // Permanently switch client to memory for this process session to avoid wasted HTTP network calls
+    redisClient = memoryFallback;
+    return true;
+  }
+  return false;
+}
 
 if (config.upstashRedisRestUrl && config.upstashRedisRestToken) {
   try {
@@ -159,29 +183,118 @@ if (config.upstashRedisRestUrl && config.upstashRedisRestToken) {
     });
 
     redisClient = {
-      get: async (k) => upstash.get<string>(k),
-      set: async (k, v, mode, dur) => {
-        if (mode === 'EX' && dur) {
-          return upstash.set(k, v, { ex: dur });
+      get: async (k) => {
+        try {
+          return await upstash.get<string>(k);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.get(k);
+          throw err;
         }
-        return upstash.set(k, v);
       },
-      setex: async (k, sec, v) => upstash.set(k, v, { ex: sec }),
-      del: async (k) => upstash.del(k),
-      keys: async (p) => upstash.keys(p),
-      incr: async (k) => upstash.incr(k),
-      sadd: async (k, ...m) => (upstash.sadd as any)(k, ...m),
-      srem: async (k, ...m) => (upstash.srem as any)(k, ...m),
-      scard: async (k) => upstash.scard(k),
-      smembers: async (k) => upstash.smembers(k),
-      hincrby: async (k, f, inc) => (upstash.hincrby as any)(k, f, inc),
-      hgetall: async (k) => ((await upstash.hgetall(k)) as Record<string, string>) || {},
-      hdel: async (k, ...f) => (upstash.hdel as any)(k, ...f),
+      set: async (k, v, mode, dur) => {
+        try {
+          if (mode === 'EX' && dur) {
+            return await upstash.set(k, v, { ex: dur });
+          }
+          return await upstash.set(k, v);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.set(k, v, mode, dur);
+          throw err;
+        }
+      },
+      setex: async (k, sec, v) => {
+        try {
+          return await upstash.set(k, v, { ex: sec });
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.setex(k, sec, v);
+          throw err;
+        }
+      },
+      del: async (...keys: string[]) => {
+        try {
+          return await (upstash.del as any)(...keys);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.del(...keys);
+          throw err;
+        }
+      },
+      keys: async (p) => {
+        try {
+          return await upstash.keys(p);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.keys(p);
+          throw err;
+        }
+      },
+      incr: async (k) => {
+        try {
+          return await upstash.incr(k);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.incr(k);
+          throw err;
+        }
+      },
+      sadd: async (k, ...m) => {
+        try {
+          return await (upstash.sadd as any)(k, ...m);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.sadd(k, ...m);
+          throw err;
+        }
+      },
+      srem: async (k, ...m) => {
+        try {
+          return await (upstash.srem as any)(k, ...m);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.srem(k, ...m);
+          throw err;
+        }
+      },
+      scard: async (k) => {
+        try {
+          return await upstash.scard(k);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.scard(k);
+          throw err;
+        }
+      },
+      smembers: async (k) => {
+        try {
+          return await upstash.smembers(k);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.smembers(k);
+          throw err;
+        }
+      },
+      hincrby: async (k, f, inc) => {
+        try {
+          return await (upstash.hincrby as any)(k, f, inc);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.hincrby(k, f, inc);
+          throw err;
+        }
+      },
+      hgetall: async (k) => {
+        try {
+          return ((await upstash.hgetall(k)) as Record<string, string>) || {};
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.hgetall(k);
+          throw err;
+        }
+      },
+      hdel: async (k, ...f) => {
+        try {
+          return await (upstash.hdel as any)(k, ...f);
+        } catch (err) {
+          if (fallbackOnQuota(err)) return memoryFallback.hdel(k, ...f);
+          throw err;
+        }
+      },
     };
     console.log('✅ Connected to Upstash Redis REST API.');
   } catch (err) {
     console.warn('⚠️ Upstash REST client error, falling back to memory cache:', (err as Error).message);
-    redisClient = new MemoryRedis();
+    redisClient = memoryFallback;
   }
 } else if (config.redisUrl && !config.redisUrl.includes('localhost:6379')) {
   try {

@@ -13,13 +13,15 @@ export class ActiveReaderController {
         return;
       }
 
-      // Fast O(1) key marking with 30s auto-expiry in background
-      setImmediate(async () => {
-        try {
-          await redisClient.setex(`blog:reader:${blogId}:${readerId}`, 30, 'active');
-          await redisClient.setex(`site:active:${readerId}`, 30, 'active');
-        } catch {}
-      });
+      // Optional cluster-mode key marking with 30s auto-expiry
+      if (process.env.REDIS_CLUSTER_MODE === 'true') {
+        setImmediate(async () => {
+          try {
+            await redisClient.setex(`blog:reader:${blogId}:${readerId}`, 30, 'active');
+            await redisClient.setex(`site:active:${readerId}`, 30, 'active');
+          } catch {}
+        });
+      }
 
       // Get current instantaneous count from live WebSocket room state
       const count = getActiveBlogReadersCount(blogId);

@@ -52,7 +52,7 @@ export class CacheService {
     try {
       const keys = await redisClient.keys(pattern);
       if (keys && keys.length > 0) {
-        await Promise.all(keys.map((k) => redisClient.del(k)));
+        await redisClient.del(...keys);
       }
     } catch (err) {
       console.warn(`Cache delPattern error for "${pattern}":`, (err as Error).message);

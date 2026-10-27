@@ -17,7 +17,7 @@ async function bootstrap() {
   // Initialize Queues, Mongo, View Batch Buffer & Cold-Start KeepAlive
   setupQueues();
   await connectMongo();
-  ViewBufferService.startFlushInterval(60000);
+  ViewBufferService.startFlushInterval(300000);
   KeepAliveService.start();
 
   // Cloudinary v2 Status
