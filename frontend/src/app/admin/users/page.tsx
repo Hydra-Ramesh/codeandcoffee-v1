@@ -65,6 +65,7 @@ import AdminTableSkeleton from '../../../components/skeletons/AdminTableSkeleton
 import { useToast } from '../../../context/ToastContext';
 import WarningCardModal, { WarningDetail } from '../../../components/WarningCardModal';
 import Pagination from '../../../components/Pagination';
+import { useFocusTrap } from '../../../hooks/useFocusTrap';
 
 export default function AdminUserGovernancePage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -110,6 +111,11 @@ export default function AdminUserGovernancePage() {
       saving: false,
     });
   };
+
+  const profileTrapRef = useFocusTrap<HTMLDivElement>({
+    isOpen: profileModal.isOpen,
+    onClose: () => setProfileModal((m) => ({ ...m, isOpen: false })),
+  });
 
   useEffect(() => {
     loadUsers();
@@ -568,8 +574,16 @@ export default function AdminUserGovernancePage() {
       {/* USER CODING PROFILES INSPECTOR & EDITOR MODAL                */}
       {/* ============================================================ */}
       {profileModal.isOpen && profileModal.user && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-2xl glass-card rounded-3xl border border-white/20 flex flex-col overflow-hidden shadow-2xl bg-slate-950/95 max-h-[92vh]">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="profile-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+        >
+          <div
+            ref={profileTrapRef}
+            className="relative w-full max-w-2xl glass-card rounded-3xl border border-white/20 flex flex-col overflow-hidden shadow-2xl bg-slate-950/95 max-h-[92vh]"
+          >
             {/* Modal Header */}
             <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
               <div className="flex items-center gap-3">
@@ -582,7 +596,7 @@ export default function AdminUserGovernancePage() {
                   className="w-10 h-10 rounded-full border border-amber-500/30 shadow-md shadow-amber-500/10"
                 />
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <h3 id="profile-modal-title" className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                     <span>{profileModal.user.name}</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                       profileModal.user.role === 'ADMIN'

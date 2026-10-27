@@ -29,7 +29,14 @@ export interface FetchApiOptions extends RequestInit {
 export async function fetchApi<T = any>(
   endpoint: string,
   options: FetchApiOptions = {}
-): Promise<{ success: boolean; data?: T; message?: string; errors?: Array<string | Record<string, unknown>>; requestId?: string }> {
+): Promise<{
+  success: boolean;
+  data?: T;
+  message?: string;
+  errors?: Array<string | Record<string, unknown>>;
+  requestId?: string;
+  isAborted?: boolean;
+}> {
   const method = (options.method || 'GET').toUpperCase();
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const isGet = method === 'GET';
@@ -141,7 +148,14 @@ export async function fetchApi<T = any>(
       ...data,
       requestId: serverRequestId,
     };
-  } catch (error: unknown) {
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      return {
+        success: false,
+        message: 'Request was cancelled',
+        isAborted: true,
+      };
+    }
     console.error(`API Fetch Error on ${endpoint}:`, error);
     const message = error instanceof Error ? error.message : 'Unable to communicate with Code & Coffee API server.';
     return {
@@ -149,4 +163,26 @@ export async function fetchApi<T = any>(
       message,
     };
   }
+}
+
+/**
+ * Auto-aborting request controller for search debouncing and rapid navigation
+ */
+export function createAbortableController() {
+  let controller: AbortController | null = null;
+  return {
+    getSignal: () => {
+      if (controller) {
+        controller.abort();
+      }
+      controller = new AbortController();
+      return controller.signal;
+    },
+    abort: () => {
+      if (controller) {
+        controller.abort();
+        controller = null;
+      }
+    },
+  };
 }

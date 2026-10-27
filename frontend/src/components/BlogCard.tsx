@@ -34,7 +34,7 @@ interface BlogCardProps {
   featured?: boolean;
 }
 
-export default function BlogCard({ blog, featured = false }: BlogCardProps) {
+function BlogCardComponent({ blog, featured = false }: BlogCardProps) {
   const { user } = useAuth();
   const activeCount = blog.activeReaders || 0;
   const likes = blog.likesCount || 0;
@@ -178,3 +178,15 @@ export default function BlogCard({ blog, featured = false }: BlogCardProps) {
     </article>
   );
 }
+
+export default React.memo(BlogCardComponent, (prev, next) => {
+  return (
+    prev.blog.id === next.blog.id &&
+    prev.blog.views === next.blog.views &&
+    prev.blog.likesCount === next.blog.likesCount &&
+    prev.blog.dislikesCount === next.blog.dislikesCount &&
+    prev.blog.commentsCount === next.blog.commentsCount &&
+    prev.blog.activeReaders === next.blog.activeReaders &&
+    prev.featured === next.featured
+  );
+});

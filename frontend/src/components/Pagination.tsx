@@ -20,7 +20,7 @@ export interface PaginationProps {
   className?: string;
 }
 
-export default function Pagination({
+function PaginationComponent({
   currentPage,
   totalPages,
   totalItems,
@@ -191,3 +191,5 @@ export default function Pagination({
     </div>
   );
 }
+
+export default React.memo(PaginationComponent);

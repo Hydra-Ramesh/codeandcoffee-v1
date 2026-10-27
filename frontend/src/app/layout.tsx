@@ -64,6 +64,10 @@ export const metadata: Metadata = {
 import React, { Suspense } from 'react';
 import { ThemeProvider } from '../context/ThemeContext';
 
+import { ServiceWorkerRegister } from '../components/ServiceWorkerRegister';
+import { OnboardingModal } from '../components/OnboardingModal';
+import { PerformanceMonitor } from '../components/PerformanceMonitor';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -103,11 +107,20 @@ export default function RootLayout({
           <AuthProvider>
             <ToastProvider>
               <BackendWarmup />
+              <ServiceWorkerRegister />
+              <PerformanceMonitor />
+              <OnboardingModal />
+              <a
+                href="#main-content"
+                className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 z-50 px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl shadow-xl transition-transform"
+              >
+                Skip to main content
+              </a>
               <div className="relative min-h-screen flex flex-col justify-between bg-mesh-radial transition-colors duration-300">
                 <Suspense fallback={<div className="h-20" />}>
                   <Navbar />
                 </Suspense>
-                <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <main id="main-content" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 focus:outline-none">
                   {children}
                 </main>
                 <Footer />
