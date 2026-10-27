@@ -209,6 +209,58 @@ export class UserController {
     }
   }
 
+  // ADMIN ONLY: Update coding profiles for any user (LeetCode, Codeforces, CodeChef, GitHub)
+  static async adminUpdateUserProfiles(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user || req.user.role !== 'ADMIN') {
+        res.status(403).json({ success: false, message: 'Admin privileges required.' });
+        return;
+      }
+
+      const id = String(req.params.id);
+      const { githubUrl, leetcodeUrl, codeforcesUrl, codechefUrl } = req.body;
+
+      const target = await prisma.user.findUnique({ where: { id } });
+      if (!target) {
+        res.status(404).json({ success: false, message: 'User not found.' });
+        return;
+      }
+
+      const updated = await prisma.user.update({
+        where: { id },
+        data: {
+          githubUrl: githubUrl !== undefined ? (githubUrl?.trim() || null) : undefined,
+          leetcodeUrl: leetcodeUrl !== undefined ? (leetcodeUrl?.trim() || null) : undefined,
+          codeforcesUrl: codeforcesUrl !== undefined ? (codeforcesUrl?.trim() || null) : undefined,
+          codechefUrl: codechefUrl !== undefined ? (codechefUrl?.trim() || null) : undefined,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatar: true,
+          githubUrl: true,
+          leetcodeUrl: true,
+          codeforcesUrl: true,
+          codechefUrl: true,
+          updatedAt: true,
+        },
+      });
+
+      // Invalidate cached user session so changes propagate immediately
+      await CacheService.invalidateUserSession(id);
+
+      res.status(200).json({
+        success: true,
+        message: `Coding profiles updated successfully for ${updated.name || updated.email}.`,
+        data: updated,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   // Authenticated User: Get personal profile & stats
   static async getProfile(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {

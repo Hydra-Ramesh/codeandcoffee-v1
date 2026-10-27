@@ -16,6 +16,12 @@ import {
   Code2,
   Trophy,
   Flame,
+  Edit3,
+  Plus,
+  X,
+  Save,
+  Loader2,
+  Filter,
 } from 'lucide-react';
 
 function GithubIcon({ className = 'w-3 h-3' }: { className?: string }) {
@@ -24,6 +30,33 @@ function GithubIcon({ className = 'w-3 h-3' }: { className?: string }) {
       <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
     </svg>
   );
+}
+
+function extractHandle(url: string | null | undefined, type: 'gh' | 'lc' | 'cf' | 'cc'): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('http')) return trimmed;
+  try {
+    const parsed = new URL(trimmed);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (type === 'lc' && parts[0] === 'u') return parts[1] || parts[0];
+    if (type === 'cf' && parts[0] === 'profile') return parts[1] || parts[0];
+    if (type === 'cc' && parts[0] === 'users') return parts[1] || parts[0];
+    return parts[parts.length - 1] || trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
+function normalizeUrl(handleOrUrl: string, type: 'gh' | 'lc' | 'cf' | 'cc'): string {
+  const trimmed = handleOrUrl.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  if (type === 'gh') return `https://github.com/${trimmed}`;
+  if (type === 'lc') return `https://leetcode.com/u/${trimmed}`;
+  if (type === 'cf') return `https://codeforces.com/profile/${trimmed}`;
+  if (type === 'cc') return `https://www.codechef.com/users/${trimmed}`;
+  return trimmed;
 }
 import { fetchApi } from '../../../lib/api';
 import { optimizeImageUrl } from '../../../lib/image';
@@ -40,11 +73,43 @@ export default function AdminUserGovernancePage() {
   const debouncedSearch = useDebounce(search, 250);
   const [statusFilter, setStatusFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [profileFilter, setProfileFilter] = useState<'ALL' | 'LINKED' | 'UNLINKED'>('ALL');
   const [message, setMessage] = useState<string | null>(null);
 
   // Pagination State for Users Table
   const [userPage, setUserPage] = useState(1);
   const [userPageSize, setUserPageSize] = useState(10);
+
+  // Coding Profiles Inspector & Editor Modal State
+  const [profileModal, setProfileModal] = useState<{
+    isOpen: boolean;
+    user: any | null;
+    githubUrl: string;
+    leetcodeUrl: string;
+    codeforcesUrl: string;
+    codechefUrl: string;
+    saving: boolean;
+  }>({
+    isOpen: false,
+    user: null,
+    githubUrl: '',
+    leetcodeUrl: '',
+    codeforcesUrl: '',
+    codechefUrl: '',
+    saving: false,
+  });
+
+  const openProfileModal = (user: any) => {
+    setProfileModal({
+      isOpen: true,
+      user,
+      githubUrl: user.githubUrl || '',
+      leetcodeUrl: user.leetcodeUrl || '',
+      codeforcesUrl: user.codeforcesUrl || '',
+      codechefUrl: user.codechefUrl || '',
+      saving: false,
+    });
+  };
 
   useEffect(() => {
     loadUsers();
@@ -52,7 +117,7 @@ export default function AdminUserGovernancePage() {
 
   const loadUsers = async () => {
     setLoading(true);
-    let query = '?limit=50';
+    let query = '?limit=100';
     if (statusFilter) query += `&status=${statusFilter}`;
     if (roleFilter) query += `&role=${roleFilter}`;
 
@@ -188,23 +253,76 @@ export default function AdminUserGovernancePage() {
     });
   };
 
+  const handleSaveProfiles = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileModal.user) return;
+    setProfileModal((prev) => ({ ...prev, saving: true }));
+    try {
+      const res = await fetchApi(`/users/${profileModal.user.id}/profiles`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          githubUrl: profileModal.githubUrl,
+          leetcodeUrl: profileModal.leetcodeUrl,
+          codeforcesUrl: profileModal.codeforcesUrl,
+          codechefUrl: profileModal.codechefUrl,
+        }),
+      });
+      if (res.success && res.data) {
+        success(res.message || 'Coding profiles updated successfully.');
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === profileModal.user.id
+              ? {
+                  ...u,
+                  githubUrl: profileModal.githubUrl.trim() || null,
+                  leetcodeUrl: profileModal.leetcodeUrl.trim() || null,
+                  codeforcesUrl: profileModal.codeforcesUrl.trim() || null,
+                  codechefUrl: profileModal.codechefUrl.trim() || null,
+                }
+              : u
+          )
+        );
+        setProfileModal((prev) => ({ ...prev, isOpen: false }));
+      } else {
+        toastError(res.message || 'Failed to update profiles.');
+      }
+    } catch (err: any) {
+      toastError(err?.message || 'Error updating profiles.');
+    } finally {
+      setProfileModal((prev) => ({ ...prev, saving: false }));
+    }
+  };
+
   const filteredUsers = users.filter((u) => {
+    const query = debouncedSearch.toLowerCase().trim();
     const matchesSearch =
-      u.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      u.email.toLowerCase().includes(debouncedSearch.toLowerCase());
+      !query ||
+      u.name.toLowerCase().includes(query) ||
+      u.email.toLowerCase().includes(query) ||
+      (u.leetcodeUrl && u.leetcodeUrl.toLowerCase().includes(query)) ||
+      (u.githubUrl && u.githubUrl.toLowerCase().includes(query)) ||
+      (u.codeforcesUrl && u.codeforcesUrl.toLowerCase().includes(query)) ||
+      (u.codechefUrl && u.codechefUrl.toLowerCase().includes(query));
+
     const matchesStatus =
       !statusFilter ||
       (statusFilter === 'active' && !u.isBanned) ||
       (statusFilter === 'banned' && u.isBanned);
     const matchesRole = !roleFilter || u.role === roleFilter;
 
-    return matchesSearch && matchesStatus && matchesRole;
+    const hasProfiles = Boolean(u.leetcodeUrl || u.codeforcesUrl || u.codechefUrl || u.githubUrl);
+    const matchesProfile =
+      profileFilter === 'ALL' ||
+      (profileFilter === 'LINKED' && hasProfiles) ||
+      (profileFilter === 'UNLINKED' && !hasProfiles);
+
+    return matchesSearch && matchesStatus && matchesRole && matchesProfile;
   });
 
   // Reset to page 1 on search or filter change
   useEffect(() => {
     setUserPage(1);
-  }, [debouncedSearch, statusFilter, roleFilter]);
+  }, [debouncedSearch, statusFilter, roleFilter, profileFilter]);
 
   const totalUserPages = Math.ceil(filteredUsers.length / userPageSize);
   const paginatedUsers = React.useMemo(() => {
@@ -222,7 +340,7 @@ export default function AdminUserGovernancePage() {
             User Governance &amp; Security Controls
           </h1>
           <p className="text-xs text-gray-400 mt-1">
-            Maintain platform trust and security: suspend malicious accounts, audit permissions, and promote admins.
+            Maintain platform trust and security: inspect coding profiles, manage roles, and review authentication telemetry.
           </p>
         </div>
 
@@ -242,15 +360,25 @@ export default function AdminUserGovernancePage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, email..."
+            placeholder="Search by name, email, or handle (@leetcode, @github)..."
             className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500"
           />
         </div>
 
         <select
+          value={profileFilter}
+          onChange={(e) => setProfileFilter(e.target.value as any)}
+          className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl glass-input text-xs text-white bg-slate-900 border border-white/10"
+        >
+          <option value="ALL">All Profiles</option>
+          <option value="LINKED">Profiles Linked Only</option>
+          <option value="UNLINKED">No Profiles Linked</option>
+        </select>
+
+        <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl glass-input text-xs text-white bg-slate-900"
+          className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl glass-input text-xs text-white bg-slate-900 border border-white/10"
         >
           <option value="">All Statuses</option>
           <option value="active">Active Only</option>
@@ -260,7 +388,7 @@ export default function AdminUserGovernancePage() {
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl glass-input text-xs text-white bg-slate-900"
+          className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl glass-input text-xs text-white bg-slate-900 border border-white/10"
         >
           <option value="">All Roles</option>
           <option value="ADMIN">Administrators</option>
@@ -324,65 +452,85 @@ export default function AdminUserGovernancePage() {
                     </td>
                     {/* Coding Profiles (GitHub, LeetCode, Codeforces, CodeChef) */}
                     <td className="p-4">
-                      <div className="flex items-center gap-1.5 flex-wrap max-w-xs">
+                      <div className="flex items-center gap-1.5 flex-wrap max-w-sm">
                         {u.githubUrl && (
                           <a
-                            href={u.githubUrl.startsWith('http') ? u.githubUrl : `https://github.com/${u.githubUrl}`}
+                            href={normalizeUrl(u.githubUrl, 'gh')}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title={`GitHub: ${u.githubUrl}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-200 hover:text-white border border-white/10 hover:border-white/30 transition-all cursor-pointer"
+                            title={`GitHub: ${normalizeUrl(u.githubUrl, 'gh')}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-white/10 hover:border-white/30 transition-all cursor-pointer group shadow-sm"
                           >
-                            <GithubIcon className="w-2.5 h-2.5 text-gray-300" />
-                            <span>GH</span>
+                            <GithubIcon className="w-2.5 h-2.5 text-gray-300 group-hover:scale-110 transition-transform" />
+                            <span>GH: @{extractHandle(u.githubUrl, 'gh')}</span>
                             <ExternalLink className="w-2 h-2 text-gray-400" />
                           </a>
                         )}
 
                         {u.leetcodeUrl && (
                           <a
-                            href={u.leetcodeUrl.startsWith('http') ? u.leetcodeUrl : `https://leetcode.com/u/${u.leetcodeUrl}`}
+                            href={normalizeUrl(u.leetcodeUrl, 'lc')}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title={`LeetCode: ${u.leetcodeUrl}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 transition-all cursor-pointer"
+                            title={`LeetCode: ${normalizeUrl(u.leetcodeUrl, 'lc')}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 transition-all cursor-pointer group shadow-sm"
                           >
-                            <Code2 className="w-2.5 h-2.5 text-amber-400" />
-                            <span>LC</span>
+                            <Code2 className="w-2.5 h-2.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                            <span>LC: @{extractHandle(u.leetcodeUrl, 'lc')}</span>
                             <ExternalLink className="w-2 h-2 text-amber-400" />
                           </a>
                         )}
 
                         {u.codeforcesUrl && (
                           <a
-                            href={u.codeforcesUrl.startsWith('http') ? u.codeforcesUrl : `https://codeforces.com/profile/${u.codeforcesUrl}`}
+                            href={normalizeUrl(u.codeforcesUrl, 'cf')}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title={`Codeforces: ${u.codeforcesUrl}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-500/15 text-blue-300 hover:text-blue-200 border border-blue-500/30 hover:border-blue-500/50 transition-all cursor-pointer"
+                            title={`Codeforces: ${normalizeUrl(u.codeforcesUrl, 'cf')}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 hover:text-blue-200 border border-blue-500/30 hover:border-blue-500/50 transition-all cursor-pointer group shadow-sm"
                           >
-                            <Trophy className="w-2.5 h-2.5 text-blue-400" />
-                            <span>CF</span>
+                            <Trophy className="w-2.5 h-2.5 text-blue-400 group-hover:scale-110 transition-transform" />
+                            <span>CF: @{extractHandle(u.codeforcesUrl, 'cf')}</span>
                             <ExternalLink className="w-2 h-2 text-blue-400" />
                           </a>
                         )}
 
                         {u.codechefUrl && (
                           <a
-                            href={u.codechefUrl.startsWith('http') ? u.codechefUrl : `https://www.codechef.com/users/${u.codechefUrl}`}
+                            href={normalizeUrl(u.codechefUrl, 'cc')}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title={`CodeChef: ${u.codechefUrl}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-orange-500/15 text-orange-300 hover:text-orange-200 border border-orange-500/30 hover:border-orange-500/50 transition-all cursor-pointer"
+                            title={`CodeChef: ${normalizeUrl(u.codechefUrl, 'cc')}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 hover:text-orange-200 border border-orange-500/30 hover:border-orange-500/50 transition-all cursor-pointer group shadow-sm"
                           >
-                            <Flame className="w-2.5 h-2.5 text-orange-400" />
-                            <span>CC</span>
+                            <Flame className="w-2.5 h-2.5 text-orange-400 group-hover:scale-110 transition-transform" />
+                            <span>CC: @{extractHandle(u.codechefUrl, 'cc')}</span>
                             <ExternalLink className="w-2 h-2 text-orange-400" />
                           </a>
                         )}
 
+                        {/* Inspect & Edit Button */}
+                        {(u.githubUrl || u.leetcodeUrl || u.codeforcesUrl || u.codechefUrl) && (
+                          <button
+                            type="button"
+                            onClick={() => openProfileModal(u)}
+                            title="Inspect & Edit Coding Profiles"
+                            className="p-1 rounded-md bg-white/5 hover:bg-amber-500/20 text-gray-400 hover:text-amber-300 transition-colors cursor-pointer border border-white/5 hover:border-amber-500/30"
+                          >
+                            <Edit3 className="w-2.5 h-2.5" />
+                          </button>
+                        )}
+
                         {!u.githubUrl && !u.leetcodeUrl && !u.codeforcesUrl && !u.codechefUrl && (
-                          <span className="text-[10px] font-mono text-gray-500 italic">None linked</span>
+                          <button
+                            type="button"
+                            onClick={() => openProfileModal(u)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white/5 hover:bg-amber-500/15 text-gray-400 hover:text-amber-300 border border-dashed border-white/15 hover:border-amber-500/30 transition-all cursor-pointer"
+                            title="No profiles linked. Click to add coding profiles."
+                          >
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>Link Profiles</span>
+                          </button>
                         )}
                       </div>
                     </td>
@@ -469,6 +617,233 @@ export default function AdminUserGovernancePage() {
         details={modalConfig.details}
         confirmLoading={modalLoading}
       />
+
+      {/* ============================================================ */}
+      {/* USER CODING PROFILES INSPECTOR & EDITOR MODAL                */}
+      {/* ============================================================ */}
+      {profileModal.isOpen && profileModal.user && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-2xl glass-card rounded-3xl border border-white/20 flex flex-col overflow-hidden shadow-2xl bg-slate-950/95 max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+              <div className="flex items-center gap-3">
+                <img
+                  src={
+                    optimizeImageUrl(profileModal.user.avatar, { width: 80, height: 80, crop: 'fill' }) ||
+                    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(profileModal.user.name)}`
+                  }
+                  alt={profileModal.user.name}
+                  className="w-10 h-10 rounded-full border border-amber-500/30 shadow-md shadow-amber-500/10"
+                />
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <span>{profileModal.user.name}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                      profileModal.user.role === 'ADMIN'
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                        : profileModal.user.role === 'CONTRIBUTOR'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        : 'bg-white/10 text-gray-300'
+                    }`}>
+                      {profileModal.user.role}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-gray-400 font-mono">{profileModal.user.email}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setProfileModal((prev) => ({ ...prev, isOpen: false }))}
+                className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSaveProfiles} className="p-6 space-y-5 overflow-y-auto">
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-amber-300 font-medium">
+                  <Code2 className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Coding Profiles Governance</span>
+                </div>
+                <span className="text-[11px] font-mono text-gray-400">
+                  {[profileModal.leetcodeUrl, profileModal.codeforcesUrl, profileModal.codechefUrl, profileModal.githubUrl].filter((x) => x?.trim()).length} of 4 profiles linked
+                </span>
+              </div>
+
+              {/* 1. LeetCode Card */}
+              <div className="p-4 rounded-2xl glass-card border border-amber-500/20 bg-amber-500/[0.03] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+                      <Code2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                        LeetCode Profile
+                        <span className="text-[10px] text-amber-400 font-normal">(Required for SDE Sheets)</span>
+                      </label>
+                    </div>
+                  </div>
+                  {profileModal.leetcodeUrl?.trim() && (
+                    <a
+                      href={normalizeUrl(profileModal.leetcodeUrl, 'lc')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
+                    >
+                      <span>Visit Profile</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={profileModal.leetcodeUrl}
+                  onChange={(e) => setProfileModal((prev) => ({ ...prev, leetcodeUrl: e.target.value }))}
+                  placeholder="e.g. Hydra_Ramesh or https://leetcode.com/u/Hydra_Ramesh"
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
+                />
+              </div>
+
+              {/* 2. Codeforces Card */}
+              <div className="p-4 rounded-2xl glass-card border border-blue-500/20 bg-blue-500/[0.03] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                        Codeforces Profile
+                        <span className="text-[10px] text-blue-400 font-normal">(Required for CP Sheets)</span>
+                      </label>
+                    </div>
+                  </div>
+                  {profileModal.codeforcesUrl?.trim() && (
+                    <a
+                      href={normalizeUrl(profileModal.codeforcesUrl, 'cf')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 transition-all cursor-pointer"
+                    >
+                      <span>Visit Profile</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={profileModal.codeforcesUrl}
+                  onChange={(e) => setProfileModal((prev) => ({ ...prev, codeforcesUrl: e.target.value }))}
+                  placeholder="e.g. tourist or https://codeforces.com/profile/tourist"
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
+                />
+              </div>
+
+              {/* 3. CodeChef Card */}
+              <div className="p-4 rounded-2xl glass-card border border-orange-500/20 bg-orange-500/[0.03] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400">
+                      <Flame className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                        CodeChef Profile
+                        <span className="text-[10px] text-orange-400 font-normal">(Required for CP Sheets)</span>
+                      </label>
+                    </div>
+                  </div>
+                  {profileModal.codechefUrl?.trim() && (
+                    <a
+                      href={normalizeUrl(profileModal.codechefUrl, 'cc')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 transition-all cursor-pointer"
+                    >
+                      <span>Visit Profile</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={profileModal.codechefUrl}
+                  onChange={(e) => setProfileModal((prev) => ({ ...prev, codechefUrl: e.target.value }))}
+                  placeholder="e.g. chef_user or https://www.codechef.com/users/chef_user"
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
+                />
+              </div>
+
+              {/* 4. GitHub Card */}
+              <div className="p-4 rounded-2xl glass-card border border-purple-500/20 bg-purple-500/[0.03] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
+                      <GithubIcon className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                        GitHub Profile
+                        <span className="text-[10px] text-purple-400 font-normal">(Developer Portfolio)</span>
+                      </label>
+                    </div>
+                  </div>
+                  {profileModal.githubUrl?.trim() && (
+                    <a
+                      href={normalizeUrl(profileModal.githubUrl, 'gh')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 transition-all cursor-pointer"
+                    >
+                      <span>Visit Profile</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={profileModal.githubUrl}
+                  onChange={(e) => setProfileModal((prev) => ({ ...prev, githubUrl: e.target.value }))}
+                  placeholder="e.g. Hydra-Ramesh or https://github.com/Hydra-Ramesh"
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
+                />
+              </div>
+
+              {/* Footer Actions */}
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setProfileModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-gray-300 hover:text-white hover:bg-white/5 border border-white/10 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={profileModal.saving}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all shadow-md shadow-amber-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {profileModal.saving ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Profiles...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Save Profiles</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
