@@ -27,10 +27,15 @@ import {
   AlertCircle,
   Layers,
   Award,
+  ArrowUpDown,
+  RotateCcw,
+  Filter,
 } from 'lucide-react';
 
 type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
+type StatusFilter = 'ALL' | 'COMPLETED' | 'UNCOMPLETED';
+type SortOption = 'DEFAULT' | 'LEVEL_ASC' | 'LEVEL_DESC' | 'UNSOLVED_FIRST' | 'SOLVED_FIRST' | 'TITLE_ASC';
 
 interface PracticeQuestion {
   id: string;
@@ -55,6 +60,8 @@ export default function PracticePage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('ALL');
+  const [sortBy, setSortBy] = useState<SortOption>('DEFAULT');
 
   // User Progress: completedMap and notesMap
   const [completedMap, setCompletedMap] = useState<Record<string, boolean>>({});
@@ -206,10 +213,17 @@ export default function PracticePage() {
     }, 1200);
   };
 
+  const difficultyWeight: Record<Difficulty, number> = {
+    EASY: 1,
+    MEDIUM: 2,
+    HARD: 3,
+  };
+
   // Group questions by Topic (for Crack the Interview & SDE Sheet) or Rating (for CP Sheet)
   const groupedQuestions = useMemo(() => {
-    let filtered = questions;
+    let filtered = [...questions];
 
+    // 1. Search Query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -220,10 +234,19 @@ export default function PracticePage() {
       );
     }
 
+    // 2. Difficulty Level Filter
     if (selectedDifficulty !== 'ALL') {
       filtered = filtered.filter((item) => item.difficulty === selectedDifficulty);
     }
 
+    // 3. Status Filter (Completed vs Uncompleted)
+    if (selectedStatus === 'COMPLETED') {
+      filtered = filtered.filter((item) => Boolean(completedMap[item.id]));
+    } else if (selectedStatus === 'UNCOMPLETED') {
+      filtered = filtered.filter((item) => !completedMap[item.id]);
+    }
+
+    // 4. Partition into Groups
     const groups: Record<string, PracticeQuestion[]> = {};
 
     filtered.forEach((item) => {
@@ -240,8 +263,42 @@ export default function PracticePage() {
       groups[key].push(item);
     });
 
+    // 5. Apply Sorting Within Each Group
+    Object.keys(groups).forEach((key) => {
+      groups[key].sort((a, b) => {
+        if (sortBy === 'LEVEL_ASC') {
+          const diffA = difficultyWeight[a.difficulty] || 2;
+          const diffB = difficultyWeight[b.difficulty] || 2;
+          if (diffA !== diffB) return diffA - diffB;
+          return a.order - b.order;
+        }
+        if (sortBy === 'LEVEL_DESC') {
+          const diffA = difficultyWeight[a.difficulty] || 2;
+          const diffB = difficultyWeight[b.difficulty] || 2;
+          if (diffA !== diffB) return diffB - diffA;
+          return a.order - b.order;
+        }
+        if (sortBy === 'UNSOLVED_FIRST') {
+          const doneA = Boolean(completedMap[a.id]) ? 1 : 0;
+          const doneB = Boolean(completedMap[b.id]) ? 1 : 0;
+          if (doneA !== doneB) return doneA - doneB;
+          return a.order - b.order;
+        }
+        if (sortBy === 'SOLVED_FIRST') {
+          const doneA = Boolean(completedMap[a.id]) ? 1 : 0;
+          const doneB = Boolean(completedMap[b.id]) ? 1 : 0;
+          if (doneA !== doneB) return doneB - doneA;
+          return a.order - b.order;
+        }
+        if (sortBy === 'TITLE_ASC') {
+          return a.title.localeCompare(b.title);
+        }
+        return a.order - b.order;
+      });
+    });
+
     return groups;
-  }, [questions, searchQuery, selectedDifficulty, activeSheet]);
+  }, [questions, searchQuery, selectedDifficulty, selectedStatus, sortBy, activeSheet, completedMap]);
 
   // Expand / collapse all groups
   const toggleGroup = (key: string) => {
@@ -262,6 +319,24 @@ export default function PracticePage() {
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, completed, percentage };
   }, [questions, completedMap]);
+
+  // Total matching questions after filter
+  const totalMatchingQuestions = useMemo(() => {
+    return Object.values(groupedQuestions).reduce((acc, curr) => acc + curr.length, 0);
+  }, [groupedQuestions]);
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    selectedDifficulty !== 'ALL' ||
+    selectedStatus !== 'ALL' ||
+    sortBy !== 'DEFAULT';
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedDifficulty('ALL');
+    setSelectedStatus('ALL');
+    setSortBy('DEFAULT');
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -310,77 +385,186 @@ export default function PracticePage() {
       </div>
 
       {/* Sheet Tabs */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
-          <button
-            onClick={() => setActiveSheet('CRACK_THE_INTERVIEW')}
-            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all whitespace-nowrap ${
-              activeSheet === 'CRACK_THE_INTERVIEW'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
-                : 'glass-card text-gray-300 hover:text-white hover:bg-white/5 border border-white/10'
-            }`}
-          >
-            <Zap className="w-4 h-4" />
-            <span>1. Crack the Interview</span>
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-black/30">
-              Topic-Wise
-            </span>
-          </button>
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/10 scrollbar-none">
+        <button
+          onClick={() => setActiveSheet('CRACK_THE_INTERVIEW')}
+          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all whitespace-nowrap ${
+            activeSheet === 'CRACK_THE_INTERVIEW'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
+              : 'glass-card text-gray-300 hover:text-white hover:bg-white/5 border border-white/10'
+          }`}
+        >
+          <Zap className="w-4 h-4" />
+          <span>1. Crack the Interview</span>
+          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-black/30">
+            Topic-Wise
+          </span>
+        </button>
 
-          <button
-            onClick={() => setActiveSheet('SDE_SHEET')}
-            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all whitespace-nowrap ${
-              activeSheet === 'SDE_SHEET'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
-                : 'glass-card text-gray-300 hover:text-white hover:bg-white/5 border border-white/10'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>2. SDE Sheet</span>
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-black/30">
-              LeetCode
-            </span>
-          </button>
+        <button
+          onClick={() => setActiveSheet('SDE_SHEET')}
+          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all whitespace-nowrap ${
+            activeSheet === 'SDE_SHEET'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
+              : 'glass-card text-gray-300 hover:text-white hover:bg-white/5 border border-white/10'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>2. SDE Sheet</span>
+          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-black/30">
+            LeetCode
+          </span>
+        </button>
 
-          <button
-            onClick={() => setActiveSheet('CP_SHEET')}
-            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all whitespace-nowrap ${
-              activeSheet === 'CP_SHEET'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
-                : 'glass-card text-gray-300 hover:text-white hover:bg-white/5 border border-white/10'
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            <span>3. CP Sheet</span>
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-black/30">
-              Rating-Wise
-            </span>
-          </button>
+        <button
+          onClick={() => setActiveSheet('CP_SHEET')}
+          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all whitespace-nowrap ${
+            activeSheet === 'CP_SHEET'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
+              : 'glass-card text-gray-300 hover:text-white hover:bg-white/5 border border-white/10'
+          }`}
+        >
+          <Award className="w-4 h-4" />
+          <span>3. CP Sheet</span>
+          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-black/30">
+            Rating-Wise
+          </span>
+        </button>
+      </div>
+
+      {/* Search, Filter & Sort Controls Bar */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 glass-card rounded-2xl border border-white/10 bg-white/[0.02]">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search problems, topics, or ratings..."
+            className="w-full pl-9 pr-8 py-2 rounded-xl text-xs glass-card border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 sm:w-60">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search problem or topic..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl text-xs glass-card border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400"
-            />
+        {/* Filter and Sort Group */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          {/* Level Filter */}
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+            <span className="text-[11px] font-bold text-gray-400 hidden xl:inline">Level:</span>
+            <select
+              value={selectedDifficulty}
+              onChange={(e) => setSelectedDifficulty(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 rounded-xl text-xs glass-card border border-white/10 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
+              title="Filter by Difficulty Level"
+            >
+              <option value="ALL">All Levels</option>
+              <option value="EASY">🟢 Easy</option>
+              <option value="MEDIUM">🟡 Medium</option>
+              <option value="HARD">🔴 Hard</option>
+            </select>
           </div>
 
-          <select
-            value={selectedDifficulty}
-            onChange={(e) => setSelectedDifficulty(e.target.value)}
-            className="px-3 py-2 rounded-xl text-xs glass-card border border-white/10 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
-          >
-            <option value="ALL">All Levels</option>
-            <option value="EASY">Easy</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HARD">Hard</option>
-          </select>
+          {/* Status Filter (Complete / Uncomplete) */}
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+            <span className="text-[11px] font-bold text-gray-400 hidden xl:inline">Status:</span>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value as StatusFilter)}
+              className="w-full sm:w-auto px-3 py-2 rounded-xl text-xs glass-card border border-white/10 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
+              title="Filter by Completion Status"
+            >
+              <option value="ALL">All Status</option>
+              <option value="UNCOMPLETED">⭕ Uncompleted</option>
+              <option value="COMPLETED">✅ Completed</option>
+            </select>
+          </div>
+
+          {/* Sort Option (Level & Complete/Uncomplete) */}
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+            <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-amber-400 hidden sm:flex">
+              <ArrowUpDown className="w-3.5 h-3.5" />
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="w-full sm:w-auto px-3 py-2 rounded-xl text-xs glass-card border border-amber-500/25 text-amber-300 bg-slate-900 focus:outline-none focus:border-amber-400 font-semibold"
+              title="Sort questions by Level or Completion Status"
+            >
+              <option value="DEFAULT">↕️ Curated Order</option>
+              <option value="LEVEL_ASC">🟢 Level: Easy ➔ Hard</option>
+              <option value="LEVEL_DESC">🔴 Level: Hard ➔ Easy</option>
+              <option value="UNSOLVED_FIRST">⭕ Incomplete First</option>
+              <option value="SOLVED_FIRST">✅ Completed First</option>
+              <option value="TITLE_ASC">🔤 Title: A ➔ Z</option>
+            </select>
+          </div>
+
+          {/* Reset Filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={handleResetFilters}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 transition-colors whitespace-nowrap"
+              title="Reset all filters and sorting"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Reset</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filter Stats & Active Chips */}
+      <div className="flex items-center justify-between text-xs text-gray-400 flex-wrap gap-2 px-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-gray-300">
+            Showing <strong className="text-amber-400">{totalMatchingQuestions}</strong> of {questions.length} problems
+          </span>
+
+          {selectedDifficulty !== 'ALL' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              Level: {selectedDifficulty}
+              <button onClick={() => setSelectedDifficulty('ALL')} className="hover:text-white ml-0.5">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          )}
+
+          {selectedStatus !== 'ALL' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              Status: {selectedStatus === 'COMPLETED' ? 'Completed' : 'Uncompleted'}
+              <button onClick={() => setSelectedStatus('ALL')} className="hover:text-white ml-0.5">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          )}
+
+          {sortBy !== 'DEFAULT' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+              Sorted: {
+                sortBy === 'LEVEL_ASC' ? 'Level: Easy ➔ Hard' :
+                sortBy === 'LEVEL_DESC' ? 'Level: Hard ➔ Easy' :
+                sortBy === 'UNSOLVED_FIRST' ? 'Incomplete First' :
+                sortBy === 'SOLVED_FIRST' ? 'Completed First' : 'Title: A-Z'
+              }
+              <button onClick={() => setSortBy('DEFAULT')} className="hover:text-white ml-0.5">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 text-[11px] font-mono">
+          <span className="text-emerald-400">● {sheetStats.completed} Solved</span>
+          <span className="text-gray-600">|</span>
+          <span className="text-gray-400">○ {sheetStats.total - sheetStats.completed} Pending</span>
         </div>
       </div>
 
@@ -542,27 +726,33 @@ export default function PracticePage() {
 
                           {/* Right: Actions (Readme / Link / Notes / Video / Solution) */}
                           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
-                            {/* Readme Button for Crack the Interview */}
-                            {activeSheet === 'CRACK_THE_INTERVIEW' && item.content && (
+                            {/* Readme Button (for questions with Markdown editorial/statement) */}
+                            {item.content && (
                               <button
                                 onClick={() => setActiveReadmeQuestion(item)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition-colors"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition-all hover:scale-[1.02]"
+                                title="Read problem statement and optimal approach breakdown"
                               >
                                 <BookOpen className="w-3.5 h-3.5" />
                                 <span>Read Problem</span>
                               </button>
                             )}
 
-                            {/* External Link for SDE Sheet & CP Sheet */}
+                            {/* External Link (Solve on LeetCode / Platform) */}
                             {item.externalUrl && (
                               <a
                                 href={item.externalUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 transition-colors"
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] ${
+                                  item.platform === 'LeetCode' || item.externalUrl.includes('leetcode')
+                                    ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10'
+                                    : 'bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10'
+                                }`}
+                                title={`Solve on ${item.platform || (item.externalUrl.includes('leetcode') ? 'LeetCode' : 'Platform')}`}
                               >
-                                <span>Solve on {item.platform || 'Platform'}</span>
-                                <ExternalLink className="w-3 h-3 text-gray-400" />
+                                <span>Solve on {item.platform || (item.externalUrl.includes('leetcode') ? 'LeetCode' : 'Platform')}</span>
+                                <ExternalLink className="w-3 h-3 text-amber-400" />
                               </a>
                             )}
 
@@ -649,7 +839,20 @@ export default function PracticePage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap justify-end">
+                {activeReadmeQuestion.externalUrl && (
+                  <a
+                    href={activeReadmeQuestion.externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all hover:scale-105 shadow-sm shadow-amber-500/10"
+                    title={`Solve ${activeReadmeQuestion.title} on ${activeReadmeQuestion.platform || 'LeetCode'}`}
+                  >
+                    <span>Solve on {activeReadmeQuestion.platform || (activeReadmeQuestion.externalUrl.includes('leetcode') ? 'LeetCode' : 'Platform')}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+
                 <button
                   onClick={() => handleToggleComplete(activeReadmeQuestion.id)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${

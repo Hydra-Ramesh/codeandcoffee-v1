@@ -236,6 +236,11 @@ export default function AdminPracticePage() {
       return;
     }
 
+    if (formSheetType === 'CRACK_THE_INTERVIEW' && !formContent.trim() && !formExternalUrl.trim()) {
+      setErrorMessage('Please provide either a Readme problem statement or a LeetCode / external URL (or both).');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -514,14 +519,15 @@ export default function AdminPracticePage() {
                         </td>
 
                         <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-2 max-w-xs">
-                            <span className="font-bold text-white truncate">{q.title}</span>
+                          <div className="flex items-center gap-2 max-w-sm flex-wrap">
+                            <span className="font-bold text-white truncate max-w-[200px]">{q.title}</span>
                             {q.content && (
                               <span
                                 title="Has Readme problem statement"
-                                className="p-1 rounded bg-cyan-500/10 text-cyan-400"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
                               >
-                                <BookOpen className="w-3 h-3" />
+                                <BookOpen className="w-2.5 h-2.5" />
+                                <span>Readme</span>
                               </span>
                             )}
                             {q.externalUrl && (
@@ -529,9 +535,11 @@ export default function AdminPracticePage() {
                                 href={q.externalUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1 rounded bg-white/5 text-gray-400 hover:text-white"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                                title={q.externalUrl}
                               >
-                                <ExternalLink className="w-3 h-3" />
+                                <span>{q.platform || (q.externalUrl.includes('leetcode') ? 'LeetCode' : 'Link')}</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
                               </a>
                             )}
                           </div>
@@ -1045,26 +1053,44 @@ export default function AdminPracticePage() {
                 </div>
               </div>
 
-              {/* External URL for SDE Sheet & CP Sheet */}
+              {/* External URL / LeetCode link */}
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">
-                  External Problem URL (LeetCode, Codeforces, or CodeChef)
+                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
+                  <span>
+                    {formSheetType === 'CRACK_THE_INTERVIEW'
+                      ? 'LeetCode / External Problem URL (Optional)'
+                      : 'External Problem URL (LeetCode, Codeforces, or CodeChef)'}
+                  </span>
+                  {formSheetType === 'CRACK_THE_INTERVIEW' && (
+                    <span className="text-[10px] text-amber-400 font-mono">e.g. Single Number, Is Unique</span>
+                  )}
                 </label>
                 <input
                   type="url"
                   value={formExternalUrl}
                   onChange={(e) => setFormExternalUrl(e.target.value)}
-                  placeholder="https://leetcode.com/problems/... or https://codeforces.com/..."
+                  placeholder={
+                    formSheetType === 'CRACK_THE_INTERVIEW'
+                      ? 'https://leetcode.com/problems/single-number/ or https://leetcode.com/problems/contains-duplicate/'
+                      : 'https://leetcode.com/problems/... or https://codeforces.com/...'
+                  }
                   className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
                 />
+                {formSheetType === 'CRACK_THE_INTERVIEW' && (
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    💡 For Crack the Interview, you can paste a direct LeetCode link. Users can click &ldquo;Solve on LeetCode&rdquo; right from the practice page!
+                  </p>
+                )}
               </div>
 
               {/* Content / Readme for Crack the Interview */}
               {formSheetType === 'CRACK_THE_INTERVIEW' && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
-                    <span>Readme Format Problem Statement (Markdown)</span>
-                    <span className="text-[10px] text-amber-400 font-mono">Supports GFM</span>
+                    <span>Readme Problem Statement (Markdown)</span>
+                    <span className="text-[10px] text-amber-400 font-mono">
+                      {formExternalUrl ? 'Optional with LeetCode link' : 'Supports GFM'}
+                    </span>
                   </label>
                   <textarea
                     value={formContent}

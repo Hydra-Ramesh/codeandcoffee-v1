@@ -172,6 +172,104 @@ dp[i][w] = max(val[i-1] + dp[i-1][w - wt[i-1]], dp[i-1][w])
 - **Time Complexity:** O(N * W)
 - **Space Complexity:** O(W) with 1D array space optimization`,
     },
+    {
+      sheetType: 'CRACK_THE_INTERVIEW',
+      topic: 'Arrays',
+      title: 'Is Unique (Contains Duplicate)',
+      difficulty: 'EASY',
+      platform: 'LeetCode',
+      externalUrl: 'https://leetcode.com/problems/contains-duplicate/',
+      order: 4,
+      content: `# Is Unique (Contains Duplicate)
+
+## Problem Statement
+Implement an algorithm to determine if an array or string has all unique characters / numbers (CTCI 1.1 & LeetCode 217). Return \`true\` if any value appears at least twice in the array, and return \`false\` if every element is distinct.
+
+### Example 1:
+\`\`\`
+Input: nums = [1,2,3,1]
+Output: true
+Explanation: The element 1 occurs at index 0 and 3.
+\`\`\`
+
+### Example 2:
+\`\`\`
+Input: nums = [1,2,3,4]
+Output: false
+Explanation: All elements are distinct.
+\`\`\`
+
+### Example 3:
+\`\`\`
+Input: nums = [1,1,1,3,3,4,3,2,4,2]
+Output: true
+\`\`\`
+
+### Constraints:
+- \`1 <= nums.length <= 10^5\`
+- \`-10^9 <= nums[i] <= 10^9\`
+
+### Optimal Approach 1: Hash Set
+Maintain a set of visited numbers. For each element, if it's already in the set, a duplicate exists.
+- **Time Complexity:** O(N)
+- **Space Complexity:** O(N)
+
+### Optimal Approach 2: Bit Vector (CTCI Variant)
+When working with strings with 26 lowercase characters \`'a' - 'z'\`, use an integer bitmask to achieve O(1) space:
+- Check bit: \`(checker & (1 << val)) > 0\`
+- Set bit: \`checker |= (1 << val)\`
+- **Time Complexity:** O(N)
+- **Space Complexity:** O(1)`,
+    },
+    {
+      sheetType: 'CRACK_THE_INTERVIEW',
+      topic: 'Arrays',
+      title: 'Single Number',
+      difficulty: 'EASY',
+      platform: 'LeetCode',
+      externalUrl: 'https://leetcode.com/problems/single-number/',
+      order: 5,
+      content: `# Single Number
+
+## Problem Statement
+Given a non-empty array of integers \`nums\`, every element appears **twice** except for one. Find that single one.
+
+You must implement a solution with a linear runtime complexity and use only constant extra space.
+
+### Example 1:
+\`\`\`
+Input: nums = [2,2,1]
+Output: 1
+\`\`\`
+
+### Example 2:
+\`\`\`
+Input: nums = [4,1,2,1,2]
+Output: 4
+\`\`\`
+
+### Example 3:
+\`\`\`
+Input: nums = [1]
+Output: 1
+\`\`\`
+
+### Constraints:
+- \`1 <= nums.length <= 3 * 10^4\`
+- \`-3 * 10^4 <= nums[i] <= 3 * 10^4\`
+- Each element in the array appears twice except for one element which appears only once.
+
+### Optimal Approach (Bitwise XOR):
+Using fundamental algebraic properties of Bitwise XOR (\`^\`):
+1. **Self-inverse:** \`a ^ a = 0\`
+2. **Identity element:** \`a ^ 0 = a\`
+3. **Associative & Commutative:** \`a ^ b ^ a = (a ^ a) ^ b = 0 ^ b = b\`
+
+Iterate through \`nums\` and accumulate XOR of all elements. Every duplicate number cancels itself out to 0, leaving only the unique single number!
+
+- **Time Complexity:** O(N)
+- **Space Complexity:** O(1)`,
+    },
   ];
 
   // 2. SDE SHEET (Topic Wise with LeetCode Direct Links)
