@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { fetchApi } from '../../lib/api';
 import MarkdownViewer from '../../components/MarkdownViewer';
@@ -41,6 +42,8 @@ import {
   Shuffle,
   Info,
   AlertTriangle,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 
 type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET' | 'KNOWLEDGE_SHEET' | 'LEADERBOARD';
@@ -93,7 +96,8 @@ interface PracticeQuestion {
 }
 
 export default function PracticePage() {
-  const { user, refreshUser } = useAuth();
+  const router = useRouter();
+  const { user, isLoading, refreshUser } = useAuth();
   const [activeSheet, setActiveSheet] = useState<SheetType>('CRACK_THE_INTERVIEW');
   const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -741,15 +745,18 @@ export default function PracticePage() {
                 <div className="flex items-center gap-2.5">
                   <div
                     className={`p-2.5 rounded-xl ${
-                      myRankInfo?.todayStatus === 'FIRE'
+                      !user && !isLoading
+                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        : myRankInfo?.todayStatus === 'FIRE'
                         ? 'bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/40 animate-pulse'
                         : (myRankInfo?.currentStreak ?? 0) > 0
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : 'bg-white/5 text-gray-400 border border-white/5'
                     }`}
                   >
-                    {/* CRITICAL: ONLY SHOW FLAME ICON IF TODAY SOLVES >= 5! If 1-4 or streak > 5, show Zap/Target/Check, NEVER flame! */}
-                    {myRankInfo?.todayStatus === 'FIRE' ? (
+                    {!user && !isLoading ? (
+                      <Lock className="w-5 h-5 text-amber-400" />
+                    ) : myRankInfo?.todayStatus === 'FIRE' ? (
                       <Flame className="w-5 h-5 text-white" />
                     ) : (myRankInfo?.currentStreak ?? 0) > 0 ? (
                       <Zap className="w-5 h-5 text-emerald-400 fill-emerald-400/20" />
@@ -762,18 +769,26 @@ export default function PracticePage() {
                       Daily Streak
                     </div>
                     <div className="text-xl font-extrabold text-white font-mono flex items-center gap-1.5">
-                      <span>{myRankInfo?.currentStreak ?? 0}</span>
-                      <span className="text-xs text-gray-400 font-sans font-normal">
-                        {(myRankInfo?.currentStreak ?? 0) === 1 ? 'Day' : 'Days'}
-                      </span>
-                      {/* CRITICAL USER REQUIREMENT:
-                          "dont change to fire imoji for more then 5 days steck only change if problem done 5 or more then 5"
-                      */}
-                      {myRankInfo?.todayStatus === 'FIRE' ? (
-                        <span className="text-base" title="🔥 Fire Day! (5+ problems solved today)">🔥</span>
-                      ) : (myRankInfo?.currentStreak ?? 0) > 0 ? (
-                        <span className="text-xs text-emerald-400 font-mono font-bold" title="🟢 Active Streak (1-4 problems solved today)">🟢</span>
-                      ) : null}
+                      {!user && !isLoading ? (
+                        <span className="text-sm font-sans font-bold text-amber-400 flex items-center gap-1">
+                          Sign In to Track
+                        </span>
+                      ) : (
+                        <>
+                          <span>{myRankInfo?.currentStreak ?? 0}</span>
+                          <span className="text-xs text-gray-400 font-sans font-normal">
+                            {(myRankInfo?.currentStreak ?? 0) === 1 ? 'Day' : 'Days'}
+                          </span>
+                          {/* CRITICAL USER REQUIREMENT:
+                              "dont change to fire imoji for more then 5 days steck only change if problem done 5 or more then 5"
+                          */}
+                          {myRankInfo?.todayStatus === 'FIRE' ? (
+                            <span className="text-base" title="🔥 Fire Day! (5+ problems solved today)">🔥</span>
+                          ) : (myRankInfo?.currentStreak ?? 0) > 0 ? (
+                            <span className="text-xs text-emerald-400 font-mono font-bold" title="🟢 Active Streak (1-4 problems solved today)">🟢</span>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -782,7 +797,7 @@ export default function PracticePage() {
                   <div className="text-[10px] text-gray-400 font-mono">Highest Streak</div>
                   <div className="text-xs font-bold text-amber-400 font-mono flex items-center justify-end gap-1">
                     <Trophy className="w-3 h-3" />
-                    {myRankInfo?.highestStreak ?? 0}d
+                    {!user && !isLoading ? '—' : `${myRankInfo?.highestStreak ?? 0}d`}
                   </div>
                 </div>
               </div>
@@ -791,7 +806,9 @@ export default function PracticePage() {
               <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono">
                 <span className="text-gray-400">Today&apos;s Solves:</span>
                 <span>
-                  {myRankInfo?.todayStatus === 'FIRE' ? (
+                  {!user && !isLoading ? (
+                    <span className="text-gray-400 italic">Sign in required</span>
+                  ) : myRankInfo?.todayStatus === 'FIRE' ? (
                     <span className="text-orange-400 font-bold flex items-center gap-1">
                       🔥 {myRankInfo.todaySolves} Solved (Fire Active)
                     </span>
@@ -811,15 +828,27 @@ export default function PracticePage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20">
-                    <Award className="w-5 h-5 text-slate-950" />
+                    {!user && !isLoading ? (
+                      <Lock className="w-5 h-5 text-slate-950" />
+                    ) : (
+                      <Award className="w-5 h-5 text-slate-950" />
+                    )}
                   </div>
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
                       Earned Points
                     </div>
                     <div className="text-xl font-extrabold text-amber-400 font-mono flex items-baseline gap-1">
-                      <span>{myRankInfo?.points ?? (Object.values(completedMap).filter(Boolean).length * 10)}</span>
-                      <span className="text-xs text-gray-400 font-sans font-normal">pts</span>
+                      {!user && !isLoading ? (
+                        <span className="text-sm font-sans font-bold text-amber-400 flex items-center gap-1">
+                          Locked
+                        </span>
+                      ) : (
+                        <>
+                          <span>{myRankInfo?.points ?? (Object.values(completedMap).filter(Boolean).length * 10)}</span>
+                          <span className="text-xs text-gray-400 font-sans font-normal">pts</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -828,7 +857,7 @@ export default function PracticePage() {
                   <div className="text-[10px] text-gray-400 font-mono">Global Rank</div>
                   <div className="text-sm font-bold text-white font-mono flex items-center justify-end gap-1">
                     <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                    {myRankInfo ? `#${myRankInfo.rank}` : 'Unranked'}
+                    {!user && !isLoading ? '—' : myRankInfo ? `#${myRankInfo.rank}` : 'Unranked'}
                   </div>
                 </div>
               </div>
@@ -837,10 +866,14 @@ export default function PracticePage() {
                 <div className="flex items-center justify-between text-[11px] font-bold text-gray-300">
                   <span>{activeSheet === 'LEADERBOARD' ? 'Global Solvers' : 'Sheet Progress'}</span>
                   <span className="text-amber-400 font-mono">
-                    {activeSheet === 'LEADERBOARD' ? `${leaderboardData.length} Users` : `${sheetStats.percentage}% (${sheetStats.completed}/${sheetStats.total})`}
+                    {!user && !isLoading
+                      ? 'Sign in to sync'
+                      : activeSheet === 'LEADERBOARD'
+                      ? `${leaderboardData.length} Users`
+                      : `${sheetStats.percentage}% (${sheetStats.completed}/${sheetStats.total})`}
                   </span>
                 </div>
-                {activeSheet !== 'LEADERBOARD' ? (
+                {activeSheet !== 'LEADERBOARD' && user ? (
                   <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
                     <div
                       className="bg-gradient-to-r from-amber-400 to-amber-500 h-1.5 rounded-full transition-all duration-500"
@@ -850,7 +883,7 @@ export default function PracticePage() {
                 ) : null}
                 <div className="text-[10px] text-gray-400 font-mono flex items-center justify-between">
                   <span className="text-amber-400/90 font-semibold">10 pts / problem</span>
-                  <span>{sheetStats.completed} completed in sheet</span>
+                  <span>{!user && !isLoading ? 'Requires sign-in' : `${sheetStats.completed} completed in sheet`}</span>
                 </div>
               </div>
             </div>
@@ -858,8 +891,20 @@ export default function PracticePage() {
         </div>
       </div>
 
-      {/* 365-Day Problem Solve Activity Matrix */}
-      <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-white/10 p-5 sm:p-6 shadow-2xl space-y-4">
+      {/* ============================================================ */}
+      {/* PRACTICE ARENA MAIN SECTION (BLURRED & LOCKED IF GUEST)      */}
+      {/* ============================================================ */}
+      <div className="relative">
+        <div
+          className={`space-y-8 transition-all duration-300 ${
+            !user && !isLoading
+              ? 'filter blur-[7px] sm:blur-[9px] pointer-events-none select-none opacity-40 dark:opacity-20 max-h-[850px] overflow-hidden'
+              : ''
+          }`}
+          aria-hidden={!user && !isLoading}
+        >
+          {/* 365-Day Problem Solve Activity Matrix */}
+          <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-white/10 p-5 sm:p-6 shadow-2xl space-y-4">
         {/* Header with Title and Telemetry Badges */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-white/10">
           <div className="flex items-center gap-2">
@@ -2102,6 +2147,78 @@ export default function PracticePage() {
       )}
     </>
   )}
+        </div>
+
+        {/* Lock Warning Overlay for Unauthenticated Users */}
+        {!user && !isLoading && (
+          <div className="absolute inset-0 z-30 flex items-start justify-center pt-8 sm:pt-16 px-4 pointer-events-auto">
+            <div className="sticky top-28 w-full max-w-xl mx-auto glass-card rounded-3xl border border-amber-500/30 bg-slate-950/90 dark:bg-black/95 p-6 sm:p-8 shadow-2xl shadow-amber-500/10 backdrop-blur-xl text-center space-y-6">
+              {/* Glowing animated Lock Icon */}
+              <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-amber-600/20 border border-amber-500/40 flex items-center justify-center shadow-xl shadow-amber-500/20">
+                <div className="absolute inset-0 rounded-2xl bg-amber-500/15 animate-ping opacity-75 pointer-events-none" />
+                <Lock className="w-8 h-8 sm:w-10 sm:h-10 text-amber-400 relative z-10" />
+              </div>
+
+              {/* Title & Badge */}
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Authenticated Access Only</span>
+                </div>
+                <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                  Unlock the <span className="gradient-text-amber">Practice Arena</span>
+                </h3>
+                <p className="text-gray-300 text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
+                  Practice problem sheets, automated LeetCode streak tracking, video tutorials, and
+                  the Global Leaderboard are available exclusively to authenticated members.
+                </p>
+              </div>
+
+              {/* Perks List */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left text-xs text-gray-300">
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Curated Tier-1 SDE Sheets</span>
+                </div>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>365-Day Streak Matrix</span>
+                </div>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>10 Points / Problem Solve</span>
+                </div>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Global Leaderboard Rank</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => router.push('/auth/login?redirect=/practice')}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                >
+                  <Unlock className="w-4 h-4" />
+                  <span>Unlock Now — Sign In</span>
+                </button>
+                <Link
+                  href="/auth/register?redirect=/practice"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 border border-white/10 transition-all cursor-pointer"
+                >
+                  <span>Create Free Account</span>
+                </Link>
+              </div>
+
+              <div className="text-[11px] text-gray-400">
+                Sign in with Google, GitHub, or Email to instantly sync your solves.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ============================================================ */}
       {/* README MODAL FOR CRACK THE INTERVIEW */}
