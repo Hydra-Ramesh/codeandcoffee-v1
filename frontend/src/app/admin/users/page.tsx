@@ -450,89 +450,35 @@ export default function AdminUserGovernancePage() {
                         <option value="ADMIN" className="bg-slate-900 text-purple-300">ADMIN</option>
                       </select>
                     </td>
-                    {/* Coding Profiles (GitHub, LeetCode, Codeforces, CodeChef) */}
+                    {/* Coding Profiles Button -> Card Modal */}
                     <td className="p-4">
-                      <div className="flex items-center gap-1.5 flex-wrap max-w-sm">
-                        {u.githubUrl && (
-                          <a
-                            href={normalizeUrl(u.githubUrl, 'gh')}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`GitHub: ${normalizeUrl(u.githubUrl, 'gh')}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-white/10 hover:border-white/30 transition-all cursor-pointer group shadow-sm"
-                          >
-                            <GithubIcon className="w-2.5 h-2.5 text-gray-300 group-hover:scale-110 transition-transform" />
-                            <span>GH: @{extractHandle(u.githubUrl, 'gh')}</span>
-                            <ExternalLink className="w-2 h-2 text-gray-400" />
-                          </a>
-                        )}
-
-                        {u.leetcodeUrl && (
-                          <a
-                            href={normalizeUrl(u.leetcodeUrl, 'lc')}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`LeetCode: ${normalizeUrl(u.leetcodeUrl, 'lc')}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 transition-all cursor-pointer group shadow-sm"
-                          >
-                            <Code2 className="w-2.5 h-2.5 text-amber-400 group-hover:scale-110 transition-transform" />
-                            <span>LC: @{extractHandle(u.leetcodeUrl, 'lc')}</span>
-                            <ExternalLink className="w-2 h-2 text-amber-400" />
-                          </a>
-                        )}
-
-                        {u.codeforcesUrl && (
-                          <a
-                            href={normalizeUrl(u.codeforcesUrl, 'cf')}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`Codeforces: ${normalizeUrl(u.codeforcesUrl, 'cf')}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 hover:text-blue-200 border border-blue-500/30 hover:border-blue-500/50 transition-all cursor-pointer group shadow-sm"
-                          >
-                            <Trophy className="w-2.5 h-2.5 text-blue-400 group-hover:scale-110 transition-transform" />
-                            <span>CF: @{extractHandle(u.codeforcesUrl, 'cf')}</span>
-                            <ExternalLink className="w-2 h-2 text-blue-400" />
-                          </a>
-                        )}
-
-                        {u.codechefUrl && (
-                          <a
-                            href={normalizeUrl(u.codechefUrl, 'cc')}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`CodeChef: ${normalizeUrl(u.codechefUrl, 'cc')}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 hover:text-orange-200 border border-orange-500/30 hover:border-orange-500/50 transition-all cursor-pointer group shadow-sm"
-                          >
-                            <Flame className="w-2.5 h-2.5 text-orange-400 group-hover:scale-110 transition-transform" />
-                            <span>CC: @{extractHandle(u.codechefUrl, 'cc')}</span>
-                            <ExternalLink className="w-2 h-2 text-orange-400" />
-                          </a>
-                        )}
-
-                        {/* Inspect & Edit Button */}
-                        {(u.githubUrl || u.leetcodeUrl || u.codeforcesUrl || u.codechefUrl) && (
+                      {(() => {
+                        const linkedCount = [u.leetcodeUrl, u.codeforcesUrl, u.codechefUrl, u.githubUrl].filter((x) => x?.trim()).length;
+                        return (
                           <button
                             type="button"
                             onClick={() => openProfileModal(u)}
-                            title="Inspect & Edit Coding Profiles"
-                            className="p-1 rounded-md bg-white/5 hover:bg-amber-500/20 text-gray-400 hover:text-amber-300 transition-colors cursor-pointer border border-white/5 hover:border-amber-500/30"
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm ${
+                              linkedCount > 0
+                                ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
+                                : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10'
+                            }`}
+                            title={`Inspect & manage coding profiles for ${u.name}`}
                           >
-                            <Edit3 className="w-2.5 h-2.5" />
+                            <Code2 className={`w-3.5 h-3.5 ${linkedCount > 0 ? 'text-amber-400' : 'text-gray-400'}`} />
+                            <span>View Coding Profiles</span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                                linkedCount > 0
+                                  ? 'bg-amber-500/20 text-amber-300'
+                                  : 'bg-white/10 text-gray-400'
+                              }`}
+                            >
+                              {linkedCount}/4
+                            </span>
                           </button>
-                        )}
-
-                        {!u.githubUrl && !u.leetcodeUrl && !u.codeforcesUrl && !u.codechefUrl && (
-                          <button
-                            type="button"
-                            onClick={() => openProfileModal(u)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white/5 hover:bg-amber-500/15 text-gray-400 hover:text-amber-300 border border-dashed border-white/15 hover:border-amber-500/30 transition-all cursor-pointer"
-                            title="No profiles linked. Click to add coding profiles."
-                          >
-                            <Plus className="w-2.5 h-2.5" />
-                            <span>Link Profiles</span>
-                          </button>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </td>
                     <td className="p-4">
                       <span
@@ -673,144 +619,147 @@ export default function AdminUserGovernancePage() {
                 </span>
               </div>
 
-              {/* 1. LeetCode Card */}
-              <div className="p-4 rounded-2xl glass-card border border-amber-500/20 bg-amber-500/[0.03] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
-                      <Code2 className="w-4 h-4" />
+              {/* 4 Platform Cards Grid (2x2 on desktop) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. LeetCode Card */}
+                <div className="p-4 rounded-2xl glass-card border border-amber-500/20 bg-amber-500/[0.03] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+                        <Code2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                          LeetCode Profile
+                        </label>
+                        <span className="text-[10px] text-amber-400 font-normal">SDE Practice Sheets</span>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                        LeetCode Profile
-                        <span className="text-[10px] text-amber-400 font-normal">(Required for SDE Sheets)</span>
-                      </label>
-                    </div>
+                    {profileModal.leetcodeUrl?.trim() && (
+                      <a
+                        href={normalizeUrl(profileModal.leetcodeUrl, 'lc')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
+                      >
+                        <span>Visit</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
-                  {profileModal.leetcodeUrl?.trim() && (
-                    <a
-                      href={normalizeUrl(profileModal.leetcodeUrl, 'lc')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
-                    >
-                      <span>Visit Profile</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
+                  <input
+                    type="text"
+                    value={profileModal.leetcodeUrl}
+                    onChange={(e) => setProfileModal((prev) => ({ ...prev, leetcodeUrl: e.target.value }))}
+                    placeholder="e.g. Hydra_Ramesh or https://leetcode.com/u/Hydra_Ramesh"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={profileModal.leetcodeUrl}
-                  onChange={(e) => setProfileModal((prev) => ({ ...prev, leetcodeUrl: e.target.value }))}
-                  placeholder="e.g. Hydra_Ramesh or https://leetcode.com/u/Hydra_Ramesh"
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
-                />
-              </div>
 
-              {/* 2. Codeforces Card */}
-              <div className="p-4 rounded-2xl glass-card border border-blue-500/20 bg-blue-500/[0.03] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
-                      <Trophy className="w-4 h-4" />
+                {/* 2. Codeforces Card */}
+                <div className="p-4 rounded-2xl glass-card border border-blue-500/20 bg-blue-500/[0.03] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
+                        <Trophy className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                          Codeforces Profile
+                        </label>
+                        <span className="text-[10px] text-blue-400 font-normal">CP &amp; Contests</span>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                        Codeforces Profile
-                        <span className="text-[10px] text-blue-400 font-normal">(Required for CP Sheets)</span>
-                      </label>
-                    </div>
+                    {profileModal.codeforcesUrl?.trim() && (
+                      <a
+                        href={normalizeUrl(profileModal.codeforcesUrl, 'cf')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 transition-all cursor-pointer"
+                      >
+                        <span>Visit</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
-                  {profileModal.codeforcesUrl?.trim() && (
-                    <a
-                      href={normalizeUrl(profileModal.codeforcesUrl, 'cf')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 transition-all cursor-pointer"
-                    >
-                      <span>Visit Profile</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
+                  <input
+                    type="text"
+                    value={profileModal.codeforcesUrl}
+                    onChange={(e) => setProfileModal((prev) => ({ ...prev, codeforcesUrl: e.target.value }))}
+                    placeholder="e.g. tourist or https://codeforces.com/profile/tourist"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={profileModal.codeforcesUrl}
-                  onChange={(e) => setProfileModal((prev) => ({ ...prev, codeforcesUrl: e.target.value }))}
-                  placeholder="e.g. tourist or https://codeforces.com/profile/tourist"
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
-                />
-              </div>
 
-              {/* 3. CodeChef Card */}
-              <div className="p-4 rounded-2xl glass-card border border-orange-500/20 bg-orange-500/[0.03] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400">
-                      <Flame className="w-4 h-4" />
+                {/* 3. CodeChef Card */}
+                <div className="p-4 rounded-2xl glass-card border border-orange-500/20 bg-orange-500/[0.03] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400">
+                        <Flame className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                          CodeChef Profile
+                        </label>
+                        <span className="text-[10px] text-orange-400 font-normal">CP &amp; Star Rating</span>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                        CodeChef Profile
-                        <span className="text-[10px] text-orange-400 font-normal">(Required for CP Sheets)</span>
-                      </label>
-                    </div>
+                    {profileModal.codechefUrl?.trim() && (
+                      <a
+                        href={normalizeUrl(profileModal.codechefUrl, 'cc')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 transition-all cursor-pointer"
+                      >
+                        <span>Visit</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
-                  {profileModal.codechefUrl?.trim() && (
-                    <a
-                      href={normalizeUrl(profileModal.codechefUrl, 'cc')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 transition-all cursor-pointer"
-                    >
-                      <span>Visit Profile</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
+                  <input
+                    type="text"
+                    value={profileModal.codechefUrl}
+                    onChange={(e) => setProfileModal((prev) => ({ ...prev, codechefUrl: e.target.value }))}
+                    placeholder="e.g. chef_user or https://www.codechef.com/users/chef_user"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={profileModal.codechefUrl}
-                  onChange={(e) => setProfileModal((prev) => ({ ...prev, codechefUrl: e.target.value }))}
-                  placeholder="e.g. chef_user or https://www.codechef.com/users/chef_user"
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
-                />
-              </div>
 
-              {/* 4. GitHub Card */}
-              <div className="p-4 rounded-2xl glass-card border border-purple-500/20 bg-purple-500/[0.03] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
-                      <GithubIcon className="w-4 h-4 text-purple-400" />
+                {/* 4. GitHub Card */}
+                <div className="p-4 rounded-2xl glass-card border border-purple-500/20 bg-purple-500/[0.03] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
+                        <GithubIcon className="w-4 h-4 text-purple-400" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                          GitHub Profile
+                        </label>
+                        <span className="text-[10px] text-purple-400 font-normal">Developer Portfolio</span>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                        GitHub Profile
-                        <span className="text-[10px] text-purple-400 font-normal">(Developer Portfolio)</span>
-                      </label>
-                    </div>
+                    {profileModal.githubUrl?.trim() && (
+                      <a
+                        href={normalizeUrl(profileModal.githubUrl, 'gh')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 transition-all cursor-pointer"
+                      >
+                        <span>Visit</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
-                  {profileModal.githubUrl?.trim() && (
-                    <a
-                      href={normalizeUrl(profileModal.githubUrl, 'gh')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 transition-all cursor-pointer"
-                    >
-                      <span>Visit Profile</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
+                  <input
+                    type="text"
+                    value={profileModal.githubUrl}
+                    onChange={(e) => setProfileModal((prev) => ({ ...prev, githubUrl: e.target.value }))}
+                    placeholder="e.g. Hydra-Ramesh or https://github.com/Hydra-Ramesh"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={profileModal.githubUrl}
-                  onChange={(e) => setProfileModal((prev) => ({ ...prev, githubUrl: e.target.value }))}
-                  placeholder="e.g. Hydra-Ramesh or https://github.com/Hydra-Ramesh"
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder-gray-500 font-mono"
-                />
               </div>
 
               {/* Footer Actions */}
