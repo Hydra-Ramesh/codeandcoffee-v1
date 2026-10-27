@@ -18,8 +18,6 @@ export default function Navbar() {
     { name: 'Explore Blogs', href: '/blogs' },
     { name: 'Practice', href: '/practice', isPractice: true },
     { name: "What's Coming?", href: '/whats-coming', isHighlight: true },
-    { name: 'Write for Us', href: '/become-contributor' },
-    { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
   ];
 
@@ -32,14 +30,9 @@ export default function Navbar() {
             <Coffee className="w-6 h-6 text-amber-400 group-hover:rotate-6 transition-transform duration-300" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full pulse-beacon" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5">
-              Code <span className="gradient-text-amber">&amp; Coffee</span>
-            </span>
-            <span className="text-[11px] font-mono tracking-wider text-gray-400">
-              ENGINEERING JOURNAL
-            </span>
-          </div>
+          <span className="text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5">
+            Code <span className="gradient-text-amber">&amp; Coffee</span>
+          </span>
         </Link>
 
         {/* Desktop Navigation */}
