@@ -227,6 +227,12 @@ export class PracticeController {
       }
 
       res.setHeader('X-Cache', fromCache ? 'HIT' : 'MISS');
+      if (!req.user?.id) {
+        // Public anonymous sheet list can be cached by browser & Cloudflare CDN for 5 minutes
+        res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+      } else {
+        res.setHeader('Cache-Control', 'private, no-cache');
+      }
       res.json({
         success: true,
         fromCache,

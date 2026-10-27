@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import v1Routes from './routes/v1/index.js';
@@ -21,6 +22,17 @@ export function createApp() {
 
   // Trust first reverse proxy hop (Render, Cloudflare, AWS, Nginx)
   app.set('trust proxy', 1);
+
+  // High-performance gzip/deflate response compression (reduces egress bandwidth by up to 80%)
+  app.use(
+    compression({
+      threshold: 1024, // Only compress responses larger than 1KB
+      filter: (req, res) => {
+        if (req.headers['x-no-compression']) return false;
+        return compression.filter(req, res);
+      },
+    })
+  );
 
   // Distributed correlation ID assignment
   app.use(requestIdMiddleware);
