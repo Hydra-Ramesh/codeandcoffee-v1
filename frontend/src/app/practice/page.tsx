@@ -833,18 +833,13 @@ export default function PracticePage() {
       <div className="glass-card rounded-3xl border border-slate-200/80 dark:border-white/10 p-5 sm:p-6 shadow-2xl space-y-4">
         {/* Header with Title and Telemetry Badges */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-white/10">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/20">
-                <Calendar className="w-4 h-4" />
-              </div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                365-Day Problem Solve Activity Matrix
-              </h2>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/20">
+              <Calendar className="w-4 h-4" />
             </div>
-            <p className="text-xs text-slate-500 dark:text-gray-400">
-              LeetCode-style daily contribution matrix showing solved problem volume over the past 365 days.
-            </p>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              365-Day Problem Solve Activity Matrix
+            </h2>
           </div>
 
           {/* Metric Quick Chips */}
