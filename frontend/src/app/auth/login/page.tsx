@@ -6,12 +6,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../context/AuthContext';
 import { Coffee, Mail, Lock, LogIn, CheckCircle2, AlertCircle } from 'lucide-react';
 
+import { getSafeRedirectUrl } from '../../../lib/security';
+
 function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
 
-  const redirectParam = searchParams.get('redirect');
+  const rawRedirect = searchParams.get('redirect');
+  const safeRedirect = getSafeRedirectUrl(rawRedirect, '/blogs');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,11 +38,7 @@ function LoginFormContent() {
 
     const res = await login(email, password);
     if (res.success) {
-      if (redirectParam) {
-        router.push(redirectParam);
-      } else {
-        router.push('/blogs');
-      }
+      router.push(safeRedirect);
     } else {
       setError(res.message || 'Invalid email or password.');
     }
@@ -48,8 +47,8 @@ function LoginFormContent() {
 
   const handleOAuth = (provider: 'google' | 'github') => {
     setLoading(true);
-    if (redirectParam && typeof window !== 'undefined') {
-      sessionStorage.setItem('auth_redirect', redirectParam);
+    if (rawRedirect && typeof window !== 'undefined') {
+      sessionStorage.setItem('auth_redirect', safeRedirect);
     }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     window.location.href = `${apiUrl}/auth/${provider}`;
@@ -67,7 +66,7 @@ function LoginFormContent() {
           <p className="text-xs text-gray-400">Sign in to your Code &amp; Coffee developer account</p>
         </div>
 
-        {redirectParam && (
+        {rawRedirect && (
           <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
             <Lock className="w-4 h-4 text-amber-400 shrink-0" />
             <span>Please sign in to read the full publication.</span>
@@ -196,7 +195,7 @@ function LoginFormContent() {
         <div className="text-center text-xs text-gray-400">
           Don&apos;t have an account?{' '}
           <Link
-            href={redirectParam ? `/auth/register?redirect=${encodeURIComponent(redirectParam)}` : '/auth/register'}
+            href={rawRedirect ? `/auth/register?redirect=${encodeURIComponent(safeRedirect)}` : '/auth/register'}
             className="text-amber-400 font-semibold hover:underline"
           >
             Register now &rarr;

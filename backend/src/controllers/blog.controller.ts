@@ -6,7 +6,7 @@ import { redisClient } from '../config/redis.js';
 import { queueNewBlogBroadcast } from '../config/queues.js';
 import { CacheService } from '../services/cache.service.js';
 import { ViewBufferService } from '../services/viewBuffer.service.js';
-import { broadcastBlogPublished, broadcastReactionUpdate } from '../config/socket.js';
+import { broadcastBlogPublished, broadcastReactionUpdate, getActiveBlogReadersCount } from '../config/socket.js';
 
 function generateSlug(title: string): string {
   const base = title
@@ -108,24 +108,23 @@ export class BlogController {
         prisma.post.count({ where }),
       ]);
 
-      // Enrich with live active reader count and buffered view count
-      const enrichedBlogs = await Promise.all(
-        blogs.map(async (blog) => {
-          const [activeReaders, bufferedViews] = await Promise.all([
-            redisClient.scard(`blog:readers:${blog.id}`).catch(() => 0),
-            ViewBufferService.getBufferedViews(blog.id),
-          ]);
+      // Efficiently enrich with batch buffered views and O(1) active readers (eliminates N+1 Redis queries)
+      const blogIds = blogs.map((b) => b.id);
+      const batchViewsMap = await ViewBufferService.getBatchBufferedViews(blogIds);
 
-          return {
-            ...blog,
-            views: (blog.views || 0) + bufferedViews,
-            activeReaders: Math.max(activeReaders, 0),
-            likesCount: blog._count.likes,
-            dislikesCount: blog._count.dislikes,
-            commentsCount: blog._count.comments,
-          };
-        })
-      );
+      const enrichedBlogs = blogs.map((blog) => {
+        const bufferedViews = batchViewsMap.get(blog.id) || 0;
+        const activeReaders = getActiveBlogReadersCount(blog.id);
+
+        return {
+          ...blog,
+          views: (blog.views || 0) + bufferedViews,
+          activeReaders: Math.max(activeReaders, 1),
+          likesCount: blog._count.likes,
+          dislikesCount: blog._count.dislikes,
+          commentsCount: blog._count.comments,
+        };
+      });
 
       const responsePayload = {
         blogs: enrichedBlogs,

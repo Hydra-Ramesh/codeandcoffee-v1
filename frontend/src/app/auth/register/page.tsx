@@ -5,13 +5,15 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../context/AuthContext';
 import { Coffee, User, Mail, Lock, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { getSafeRedirectUrl } from '../../../lib/security';
 
 function RegisterFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register, loginWithOAuth } = useAuth();
 
-  const redirectParam = searchParams.get('redirect');
+  const rawRedirect = searchParams.get('redirect');
+  const safeRedirect = getSafeRedirectUrl(rawRedirect, '/blogs');
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -38,11 +40,7 @@ function RegisterFormContent() {
     setLoading(true);
     const res = await register(name, email, password);
     if (res.success) {
-      if (redirectParam) {
-        router.push(redirectParam);
-      } else {
-        router.push('/blogs');
-      }
+      router.push(safeRedirect);
     } else {
       setError(res.message || 'Registration failed.');
     }
@@ -51,8 +49,8 @@ function RegisterFormContent() {
 
   const handleOAuth = (provider: 'google' | 'github') => {
     setLoading(true);
-    if (redirectParam && typeof window !== 'undefined') {
-      sessionStorage.setItem('auth_redirect', redirectParam);
+    if (rawRedirect && typeof window !== 'undefined') {
+      sessionStorage.setItem('auth_redirect', safeRedirect);
     }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     window.location.href = `${apiUrl}/auth/${provider}`;
@@ -69,7 +67,7 @@ function RegisterFormContent() {
           <p className="text-xs text-gray-400">Create your account to read full deep-dives, react, and comment</p>
         </div>
 
-        {redirectParam && (
+        {rawRedirect && (
           <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
             <Lock className="w-4 h-4 text-amber-400 shrink-0" />
             <span>Create a free developer account to read the full publication.</span>
@@ -254,7 +252,7 @@ function RegisterFormContent() {
         <div className="text-center text-xs text-gray-400">
           Already have an account?{' '}
           <Link
-            href={redirectParam ? `/auth/login?redirect=${encodeURIComponent(redirectParam)}` : '/auth/login'}
+            href={rawRedirect ? `/auth/login?redirect=${encodeURIComponent(safeRedirect)}` : '/auth/login'}
             className="text-amber-400 font-semibold hover:underline"
           >
             Sign In &rarr;

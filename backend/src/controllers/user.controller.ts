@@ -124,6 +124,15 @@ export class UserController {
         return;
       }
 
+      // Safeguard primary system administrator against being banned
+      if (target.email.toLowerCase() === config.initialAdmin.email.toLowerCase()) {
+        res.status(403).json({
+          success: false,
+          message: 'The primary system administrator account cannot be suspended.',
+        });
+        return;
+      }
+
       const updated = await prisma.user.update({
         where: { id },
         data: { isBanned: !target.isBanned },
@@ -164,6 +173,21 @@ export class UserController {
         return;
       }
 
+      const target = await prisma.user.findUnique({ where: { id } });
+      if (!target) {
+        res.status(404).json({ success: false, message: 'User not found.' });
+        return;
+      }
+
+      // Safeguard primary system administrator against demotion
+      if (target.email.toLowerCase() === config.initialAdmin.email.toLowerCase() && role !== 'ADMIN') {
+        res.status(403).json({
+          success: false,
+          message: 'The primary system administrator role cannot be demoted.',
+        });
+        return;
+      }
+
       const updated = await prisma.user.update({
         where: { id },
         data: { role },
@@ -194,6 +218,21 @@ export class UserController {
       const id = String(req.params.id);
       if (id === req.user.id) {
         res.status(400).json({ success: false, message: 'You cannot delete your own administrator account.' });
+        return;
+      }
+
+      const target = await prisma.user.findUnique({ where: { id } });
+      if (!target) {
+        res.status(404).json({ success: false, message: 'User not found.' });
+        return;
+      }
+
+      // Safeguard primary system administrator against deletion by any secondary administrator
+      if (target.email.toLowerCase() === config.initialAdmin.email.toLowerCase()) {
+        res.status(403).json({
+          success: false,
+          message: 'The primary system administrator account cannot be deleted.',
+        });
         return;
       }
 

@@ -5,7 +5,18 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+const MAX_CACHE_ENTRIES = 100;
 const clientMemoryCache = new Map<string, CacheEntry<unknown>>();
+
+function setInClientMemoryCache(key: string, entry: CacheEntry<unknown>) {
+  if (clientMemoryCache.has(key)) {
+    clientMemoryCache.delete(key);
+  } else if (clientMemoryCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = clientMemoryCache.keys().next().value;
+    if (oldestKey) clientMemoryCache.delete(oldestKey);
+  }
+  clientMemoryCache.set(key, entry);
+}
 
 export function clearApiCache(endpointPrefix?: string) {
   if (!endpointPrefix) {
@@ -46,6 +57,9 @@ export async function fetchApi<T = any>(
   if (isGet && !options.skipCache) {
     const cached = clientMemoryCache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
+      // Refresh LRU position
+      clientMemoryCache.delete(cacheKey);
+      clientMemoryCache.set(cacheKey, cached);
       return cached.data as { success: boolean; data?: T; message?: string; errors?: Array<string | Record<string, unknown>> };
     }
   }
@@ -133,7 +147,7 @@ export async function fetchApi<T = any>(
     // Cache successful GET requests for 15 seconds
     if (isGet && !options.skipCache && data.success) {
       const ttl = options.cacheTtlMs || 15000;
-      clientMemoryCache.set(cacheKey, {
+      setInClientMemoryCache(cacheKey, {
         data,
         expiresAt: Date.now() + ttl,
       });

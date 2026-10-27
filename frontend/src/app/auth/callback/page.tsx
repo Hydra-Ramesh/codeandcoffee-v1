@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Coffee, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
+import { getSafeRedirectUrl } from '../../../lib/security';
 
 function OAuthCallbackContent() {
   const router = useRouter();
@@ -35,14 +36,15 @@ function OAuthCallbackContent() {
       .then((success) => {
         if (success) {
           setStatus('success');
-          const redirectParam =
+          const rawRedirect =
             searchParams.get('redirect') ||
             (typeof window !== 'undefined' ? sessionStorage.getItem('auth_redirect') : null);
           if (typeof window !== 'undefined') {
             sessionStorage.removeItem('auth_redirect');
           }
+          const safeRedirect = getSafeRedirectUrl(rawRedirect, '/blogs');
           setTimeout(() => {
-            router.push(redirectParam || '/blogs');
+            router.push(safeRedirect);
           }, 800);
         } else {
           setStatus('error');

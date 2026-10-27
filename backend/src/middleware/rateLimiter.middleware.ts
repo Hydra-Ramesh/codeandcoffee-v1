@@ -64,3 +64,17 @@ export const contributorLimiter = rateLimit({
     message: 'Application submission limit exceeded. Please wait an hour before submitting again.',
   },
 });
+
+// Strict rate limiter for Public Contact & Inquiry submissions (prevents SMTP spam)
+export const inquiryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Up to 5 inquiries per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  message: {
+    success: false,
+    message: 'Too many contact messages submitted from this IP. Please wait 15 minutes.',
+  },
+});
+

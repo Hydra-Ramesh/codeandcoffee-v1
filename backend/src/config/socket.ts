@@ -34,7 +34,8 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
           if (
             parsed.hostname === 'codeandcoffee.live' ||
             parsed.hostname.endsWith('.codeandcoffee.live') ||
-            parsed.hostname.endsWith('.vercel.app') ||
+            parsed.hostname === 'codeandcoffee-v1.vercel.app' ||
+            /^codeandcoffee(-[a-z0-9-]+)?\.vercel\.app$/.test(parsed.hostname) ||
             parsed.hostname.endsWith('rameshdas.online') ||
             parsed.hostname === 'localhost' ||
             parsed.hostname === '127.0.0.1'

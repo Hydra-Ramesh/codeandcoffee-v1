@@ -47,6 +47,28 @@ export class ViewBufferService {
   }
 
   /**
+   * Batch retrieval of buffered views for multiple posts in a single lookup
+   */
+  static async getBatchBufferedViews(blogIds: string[]): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    let remoteMap: Record<string, string> = {};
+
+    if (process.env.REDIS_CLUSTER_MODE === 'true' && blogIds.length > 0) {
+      try {
+        remoteMap = await redisClient.hgetall(BUFFER_KEY);
+      } catch {}
+    }
+
+    for (const id of blogIds) {
+      const local = localPendingViews.get(id) || 0;
+      const remote = remoteMap[id] ? parseInt(remoteMap[id], 10) || 0 : 0;
+      map.set(id, Math.max(local, remote));
+    }
+
+    return map;
+  }
+
+  /**
    * Consolidated batch write: flush all accumulated views to PostgreSQL
    * Reduces PostgreSQL write load by up to 99% and eliminates idle Redis polling
    */

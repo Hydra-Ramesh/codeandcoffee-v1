@@ -19,13 +19,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://codeandcoffee-v1.onrender.com/api/v1';
-    const res = await fetch(`${apiUrl}/blogs?limit=100`, {
-      next: { revalidate: 3600 },
-    });
-    const data = await res.json();
+    const allBlogs: any[] = [];
+    let page = 1;
+    let totalPages = 1;
 
-    if (data.success && Array.isArray(data.data?.blogs)) {
-      const blogRoutes: MetadataRoute.Sitemap = data.data.blogs.map((b: any) => ({
+    do {
+      const res = await fetch(`${apiUrl}/blogs?page=${page}&limit=50`, {
+        next: { revalidate: 3600 },
+      });
+      if (!res.ok) break;
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data?.blogs)) {
+        allBlogs.push(...data.data.blogs);
+        totalPages = data.data.pagination?.totalPages || 1;
+        page++;
+      } else {
+        break;
+      }
+    } while (page <= totalPages && page <= 10);
+
+    if (allBlogs.length > 0) {
+      const blogRoutes: MetadataRoute.Sitemap = allBlogs.map((b: any) => ({
         url: `${baseUrl}/blogs/${b.slug}`,
         lastModified: new Date(b.updatedAt || b.createdAt),
         changeFrequency: 'weekly',

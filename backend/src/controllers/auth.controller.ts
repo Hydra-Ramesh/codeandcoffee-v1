@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction, CookieOptions } from 'express';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { AuthService } from '../services/auth.service.js';
 import { SessionService } from '../services/session.service.js';
@@ -250,6 +251,16 @@ export class AuthController {
   // --- Real Google OAuth2 Redirection & Callback ---
   static initiateGoogleOAuth(req: Request, res: Response) {
     const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+    const state = crypto.randomBytes(32).toString('hex');
+
+    res.cookie('oauth_state', state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000,
+      path: '/',
+    });
+
     const params = new URLSearchParams({
       client_id: config.oauth.google.clientId,
       redirect_uri: config.oauth.google.callbackUrl,
@@ -257,17 +268,26 @@ export class AuthController {
       scope: 'openid email profile',
       access_type: 'offline',
       prompt: 'consent',
+      state,
     });
     res.redirect(`${rootUrl}?${params.toString()}`);
   }
 
   static async handleGoogleCallback(req: Request, res: Response, next: NextFunction) {
     try {
-      const { code, error } = req.query;
+      const { code, state, error } = req.query;
+      const storedState = req.cookies?.oauth_state;
+      res.clearCookie('oauth_state', { path: '/' });
 
       if (error || !code) {
         console.warn('Google OAuth returned error or was cancelled:', error);
         res.redirect(`${config.clientUrl}/auth/login?error=${encodeURIComponent('Google login was cancelled or failed.')}`);
+        return;
+      }
+
+      if (!state || !storedState || state !== storedState) {
+        console.warn('⚠️ Google OAuth state mismatch or missing state token (potential CSRF).');
+        res.redirect(`${config.clientUrl}/auth/login?error=${encodeURIComponent('Security verification failed: Invalid OAuth state token.')}`);
         return;
       }
 
@@ -318,6 +338,12 @@ export class AuthController {
       if (result.accessToken) {
         res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
       }
+      if (result.refreshToken) {
+        res.cookie('refreshToken', result.refreshToken, {
+          ...AUTH_COOKIE_OPTIONS,
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+      }
 
       const sessionResult = await SessionService.recordLoginSession(result.user, req);
       if (sessionResult?.session?.id) {
@@ -327,11 +353,9 @@ export class AuthController {
         });
       }
 
-      // Redirect to frontend callback page with tokens
+      // Redirect with only accessToken in URL for client store; refreshToken remains strictly in HttpOnly cookie
       res.redirect(
-        `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}&refreshToken=${encodeURIComponent(
-          result.refreshToken
-        )}`
+        `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}`
       );
     } catch (err) {
       console.error('Google OAuth callback error:', err);
@@ -342,21 +366,40 @@ export class AuthController {
   // --- Real GitHub OAuth Redirection & Callback ---
   static initiateGithubOAuth(req: Request, res: Response) {
     const rootUrl = 'https://github.com/login/oauth/authorize';
+    const state = crypto.randomBytes(32).toString('hex');
+
+    res.cookie('oauth_state', state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000,
+      path: '/',
+    });
+
     const params = new URLSearchParams({
       client_id: config.oauth.github.clientId,
       redirect_uri: config.oauth.github.callbackUrl,
       scope: 'read:user user:email',
+      state,
     });
     res.redirect(`${rootUrl}?${params.toString()}`);
   }
 
   static async handleGithubCallback(req: Request, res: Response, next: NextFunction) {
     try {
-      const { code, error } = req.query;
+      const { code, state, error } = req.query;
+      const storedState = req.cookies?.oauth_state;
+      res.clearCookie('oauth_state', { path: '/' });
 
       if (error || !code) {
         console.warn('GitHub OAuth returned error or was cancelled:', error);
         res.redirect(`${config.clientUrl}/auth/login?error=${encodeURIComponent('GitHub login was cancelled or failed.')}`);
+        return;
+      }
+
+      if (!state || !storedState || state !== storedState) {
+        console.warn('⚠️ GitHub OAuth state mismatch or missing state token (potential CSRF).');
+        res.redirect(`${config.clientUrl}/auth/login?error=${encodeURIComponent('Security verification failed: Invalid OAuth state token.')}`);
         return;
       }
 
@@ -427,6 +470,12 @@ export class AuthController {
       if (result.accessToken) {
         res.cookie('token', result.accessToken, AUTH_COOKIE_OPTIONS);
       }
+      if (result.refreshToken) {
+        res.cookie('refreshToken', result.refreshToken, {
+          ...AUTH_COOKIE_OPTIONS,
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+      }
 
       const sessionResult = await SessionService.recordLoginSession(result.user, req);
       if (sessionResult?.session?.id) {
@@ -436,10 +485,9 @@ export class AuthController {
         });
       }
 
+      // Redirect with only accessToken in URL for client store; refreshToken remains strictly in HttpOnly cookie
       res.redirect(
-        `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}&refreshToken=${encodeURIComponent(
-          result.refreshToken
-        )}`
+        `${config.clientUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}`
       );
     } catch (err) {
       console.error('GitHub OAuth callback error:', err);

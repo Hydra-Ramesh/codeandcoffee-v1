@@ -2,11 +2,12 @@ import { Router } from 'express';
 import { InquiryController } from '../../controllers/inquiry.controller.js';
 import { authenticate, requireAdmin } from '../../middleware/auth.middleware.js';
 import { honeypotCheck } from '../../middleware/honeypot.middleware.js';
+import { inquiryLimiter } from '../../middleware/rateLimiter.middleware.js';
 
 const router = Router();
 
-// Public: Submit a contact inquiry
-router.post('/', honeypotCheck, InquiryController.submitInquiry);
+// Public: Submit a contact inquiry (rate limited to 5/15min)
+router.post('/', inquiryLimiter, honeypotCheck, InquiryController.submitInquiry);
 
 // Admin-only: List all inquiries
 router.get('/', authenticate, requireAdmin, InquiryController.getInquiries);
