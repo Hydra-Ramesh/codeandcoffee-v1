@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { fetchApi } from '../../../lib/api';
+import AdminPracticeSkeleton from '../../../components/skeletons/AdminPracticeSkeleton';
+import AdminActivitySkeleton from '../../../components/skeletons/AdminActivitySkeleton';
 import {
   Code2,
   Plus,
@@ -516,10 +518,7 @@ export default function AdminPracticePage() {
 
           {/* Table / List View */}
           {loadingQuestions ? (
-            <div className="py-16 text-center">
-              <div className="w-7 h-7 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-gray-400 text-xs font-mono mt-2">Loading practice inventory...</p>
-            </div>
+            <AdminPracticeSkeleton />
           ) : filteredQuestions.length === 0 ? (
             <div className="text-center py-16 glass-card rounded-2xl border border-white/10 space-y-3">
               <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
@@ -643,10 +642,7 @@ export default function AdminPracticePage() {
       {activeTab === 'ACTIVITY' && isAdmin && (
         <div className="space-y-6">
           {loadingActivity || !activityData ? (
-            <div className="py-20 text-center">
-              <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-gray-400 text-xs font-mono mt-3">Aggregating real-time user practice telemetry...</p>
-            </div>
+            <AdminActivitySkeleton />
           ) : (
             <>
               {/* Top 4 Telemetry Metrics */}

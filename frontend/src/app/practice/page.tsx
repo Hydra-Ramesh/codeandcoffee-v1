@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
 import { fetchApi } from '../../lib/api';
 import MarkdownViewer from '../../components/MarkdownViewer';
+import PracticeQuestionsSkeleton from '../../components/skeletons/PracticeQuestionsSkeleton';
+import PracticeLeaderboardSkeleton from '../../components/skeletons/PracticeLeaderboardSkeleton';
 import {
   Code2,
   CheckCircle2,
@@ -1150,8 +1152,13 @@ export default function PracticePage() {
             </div>
           </div>
 
-          {/* Top 3 Podium */}
-          {!loadingLeaderboard && leaderboardData.length > 0 && (
+          {/* Top 3 Podium & Leaderboard Table */}
+          {loadingLeaderboard ? (
+            <PracticeLeaderboardSkeleton />
+          ) : (
+            <>
+              {/* Top 3 Podium */}
+              {leaderboardData.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 items-end">
               {/* Rank 2 - Silver (Left) */}
               {leaderboardData[1] && (
@@ -1366,12 +1373,7 @@ export default function PracticePage() {
           </div>
 
           {/* Full Solvers Table */}
-          {loadingLeaderboard ? (
-            <div className="py-16 text-center space-y-3">
-              <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-gray-400 text-xs font-mono">Ranking all practice arena coders...</p>
-            </div>
-          ) : filteredLeaderboard.length === 0 ? (
+          {filteredLeaderboard.length === 0 ? (
             <div className="text-center py-16 glass-card rounded-2xl border border-white/10 space-y-2">
               <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
               <h3 className="text-base font-bold text-white">No solvers match search</h3>
@@ -1558,6 +1560,8 @@ export default function PracticePage() {
               </div>
             </div>
           )}
+            </>
+          )}
         </div>
       ) : (
         <>
@@ -1649,11 +1653,8 @@ export default function PracticePage() {
           )}
 
           {loading ? (
-        <div className="space-y-4 py-12 text-center">
-          <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-gray-400 text-xs font-mono">Loading curated problem collection...</p>
-        </div>
-      ) : Object.keys(groupedQuestions).length === 0 ? (
+            <PracticeQuestionsSkeleton />
+          ) : Object.keys(groupedQuestions).length === 0 ? (
         <div className="text-center py-16 glass-card rounded-2xl border border-white/10 space-y-4 max-w-xl mx-auto">
           <div className="p-3.5 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-block">
             <BookOpen className="w-8 h-8" />
