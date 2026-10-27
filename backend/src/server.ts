@@ -7,16 +7,18 @@ import { isCloudinaryConfigured } from './config/cloudinary.js';
 import { AuthService } from './services/auth.service.js';
 import { initSocketServer } from './config/socket.js';
 import { ViewBufferService } from './services/viewBuffer.service.js';
+import { KeepAliveService } from './services/keepAlive.service.js';
 
 async function bootstrap() {
   console.log('----------------------------------------------------');
   console.log('☕ Starting Code & Coffee Fullstack Blog Platform...');
   console.log('----------------------------------------------------');
 
-  // Initialize Queues, Mongo & View Batch Buffer
+  // Initialize Queues, Mongo, View Batch Buffer & Cold-Start KeepAlive
   setupQueues();
   await connectMongo();
   ViewBufferService.startFlushInterval(60000);
+  KeepAliveService.start();
 
   // Cloudinary v2 Status
   if (isCloudinaryConfigured()) {
@@ -63,6 +65,7 @@ async function bootstrap() {
 
   const shutdown = async () => {
     console.log('\n🛑 Gracefully shutting down Code & Coffee API server...');
+    KeepAliveService.stop();
     server.close(async () => {
       await prisma.$disconnect();
       console.log('👋 Clean exit completed.');
