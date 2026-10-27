@@ -33,6 +33,10 @@ model User {
   isBanned      Boolean   @default(false)
   oauthProvider String?   @default("local") // "local" | "google" | "github"
   oauthId       String?
+  githubUrl     String?
+  leetcodeUrl   String?
+  codeforcesUrl String?
+  codechefUrl   String?
   deletionRequestedAt DateTime?
   deletionScheduledAt DateTime?
   createdAt           DateTime  @default(now())

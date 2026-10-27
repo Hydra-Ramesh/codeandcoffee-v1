@@ -12,7 +12,19 @@ import {
   Trash2,
   UserX,
   UserCheck,
+  ExternalLink,
+  Code2,
+  Trophy,
+  Flame,
 } from 'lucide-react';
+
+function GithubIcon({ className = 'w-3 h-3' }: { className?: string }) {
+  return (
+    <svg className={`${className} fill-current`} viewBox="0 0 24 24">
+      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+    </svg>
+  );
+}
 import { fetchApi } from '../../../lib/api';
 import { optimizeImageUrl } from '../../../lib/image';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -247,6 +259,7 @@ export default function AdminUserGovernancePage() {
                   <th className="p-4">User</th>
                   <th className="p-4">Email</th>
                   <th className="p-4">Role</th>
+                  <th className="p-4">Coding Profiles</th>
                   <th className="p-4">Status</th>
                   <th className="p-4">Activity</th>
                   <th className="p-4 text-right">Security Actions</th>
@@ -283,6 +296,70 @@ export default function AdminUserGovernancePage() {
                         <option value="CONTRIBUTOR" className="bg-slate-900 text-amber-300">CONTRIBUTOR</option>
                         <option value="ADMIN" className="bg-slate-900 text-purple-300">ADMIN</option>
                       </select>
+                    </td>
+                    {/* Coding Profiles (GitHub, LeetCode, Codeforces, CodeChef) */}
+                    <td className="p-4">
+                      <div className="flex items-center gap-1.5 flex-wrap max-w-xs">
+                        {u.githubUrl && (
+                          <a
+                            href={u.githubUrl.startsWith('http') ? u.githubUrl : `https://github.com/${u.githubUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`GitHub: ${u.githubUrl}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-200 hover:text-white border border-white/10 hover:border-white/30 transition-all cursor-pointer"
+                          >
+                            <GithubIcon className="w-2.5 h-2.5 text-gray-300" />
+                            <span>GH</span>
+                            <ExternalLink className="w-2 h-2 text-gray-400" />
+                          </a>
+                        )}
+
+                        {u.leetcodeUrl && (
+                          <a
+                            href={u.leetcodeUrl.startsWith('http') ? u.leetcodeUrl : `https://leetcode.com/u/${u.leetcodeUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`LeetCode: ${u.leetcodeUrl}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 transition-all cursor-pointer"
+                          >
+                            <Code2 className="w-2.5 h-2.5 text-amber-400" />
+                            <span>LC</span>
+                            <ExternalLink className="w-2 h-2 text-amber-400" />
+                          </a>
+                        )}
+
+                        {u.codeforcesUrl && (
+                          <a
+                            href={u.codeforcesUrl.startsWith('http') ? u.codeforcesUrl : `https://codeforces.com/profile/${u.codeforcesUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Codeforces: ${u.codeforcesUrl}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-500/15 text-blue-300 hover:text-blue-200 border border-blue-500/30 hover:border-blue-500/50 transition-all cursor-pointer"
+                          >
+                            <Trophy className="w-2.5 h-2.5 text-blue-400" />
+                            <span>CF</span>
+                            <ExternalLink className="w-2 h-2 text-blue-400" />
+                          </a>
+                        )}
+
+                        {u.codechefUrl && (
+                          <a
+                            href={u.codechefUrl.startsWith('http') ? u.codechefUrl : `https://www.codechef.com/users/${u.codechefUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`CodeChef: ${u.codechefUrl}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-orange-500/15 text-orange-300 hover:text-orange-200 border border-orange-500/30 hover:border-orange-500/50 transition-all cursor-pointer"
+                          >
+                            <Flame className="w-2.5 h-2.5 text-orange-400" />
+                            <span>CC</span>
+                            <ExternalLink className="w-2 h-2 text-orange-400" />
+                          </a>
+                        )}
+
+                        {!u.githubUrl && !u.leetcodeUrl && !u.codeforcesUrl && !u.codechefUrl && (
+                          <span className="text-[10px] font-mono text-gray-500 italic">None linked</span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
                       <span

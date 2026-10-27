@@ -39,6 +39,7 @@ import {
   TrendingUp,
   Shuffle,
   Info,
+  AlertTriangle,
 } from 'lucide-react';
 
 type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET' | 'KNOWLEDGE_SHEET' | 'LEADERBOARD';
@@ -91,7 +92,7 @@ interface PracticeQuestion {
 }
 
 export default function PracticePage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [activeSheet, setActiveSheet] = useState<SheetType>('CRACK_THE_INTERVIEW');
   const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,6 +133,21 @@ export default function PracticePage() {
     type: 'video',
     questionTitle: '',
   });
+
+  // Profile Prerequisite Modal State (for SDE & CP sheets)
+  const [profilePromptModal, setProfilePromptModal] = useState<{
+    open: boolean;
+    sheet: 'SDE_SHEET' | 'CP_SHEET';
+    targetAction?: () => void;
+  }>({
+    open: false,
+    sheet: 'SDE_SHEET',
+  });
+  const [modalLeetcode, setModalLeetcode] = useState('');
+  const [modalCodeforces, setModalCodeforces] = useState('');
+  const [modalCodechef, setModalCodechef] = useState('');
+  const [savingProfiles, setSavingProfiles] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   // Helper to format relative time for leaderboard
   function formatRelativeTime(dateString: string | null | undefined): string {
@@ -234,31 +250,119 @@ export default function PracticePage() {
     }
   };
 
-  // Toggle question completion
-  const handleToggleComplete = async (questionId: string) => {
-    const nextVal = !completedMap[questionId];
-
-    // Optimistic UI update
-    setCompletedMap((prev) => {
-      const updated = { ...prev, [questionId]: nextVal };
-      try {
-        localStorage.setItem('practice_completed_map', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-
-    // If authenticated, sync with backend
-    if (user) {
-      try {
-        await fetchApi(`/practice/my-progress/${questionId}/toggle`, {
-          method: 'POST',
-        });
-        // Refresh leaderboard and streak telemetry immediately
-        loadLeaderboard();
-      } catch (err) {
-        console.error('Failed to sync progress with server:', err);
-      }
+  // Check profile prerequisites for SDE Sheet (LeetCode) or CP Sheet (Codeforces + CodeChef)
+  const executeWithProfileCheck = (
+    sheetType: SheetType,
+    action: () => void
+  ) => {
+    if (!user) {
+      action();
+      return;
     }
+
+    if (sheetType === 'SDE_SHEET' && !user.leetcodeUrl) {
+      setModalLeetcode('');
+      setProfileError(null);
+      setProfilePromptModal({
+        open: true,
+        sheet: 'SDE_SHEET',
+        targetAction: action,
+      });
+      return;
+    }
+
+    if (sheetType === 'CP_SHEET' && (!user.codeforcesUrl || !user.codechefUrl)) {
+      setModalCodeforces(user.codeforcesUrl || '');
+      setModalCodechef(user.codechefUrl || '');
+      setProfileError(null);
+      setProfilePromptModal({
+        open: true,
+        sheet: 'CP_SHEET',
+        targetAction: action,
+      });
+      return;
+    }
+
+    action();
+  };
+
+  const handleSaveProfilePrerequisites = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError(null);
+
+    const isSde = profilePromptModal.sheet === 'SDE_SHEET';
+
+    if (isSde && !modalLeetcode.trim()) {
+      setProfileError('Please enter your LeetCode profile handle or URL.');
+      return;
+    }
+
+    if (!isSde && (!modalCodeforces.trim() || !modalCodechef.trim())) {
+      setProfileError('Both Codeforces and CodeChef profile handles or URLs are required.');
+      return;
+    }
+
+    setSavingProfiles(true);
+    try {
+      const payload: any = {};
+      if (isSde) {
+        payload.leetcodeUrl = modalLeetcode.trim();
+      } else {
+        payload.codeforcesUrl = modalCodeforces.trim();
+        payload.codechefUrl = modalCodechef.trim();
+      }
+
+      const res = await fetchApi('/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+
+      if (res.success) {
+        await refreshUser();
+        const action = profilePromptModal.targetAction;
+        setProfilePromptModal({ open: false, sheet: 'SDE_SHEET' });
+        if (action) {
+          action();
+        }
+      } else {
+        setProfileError(res.message || 'Failed to save profile. Please try again.');
+      }
+    } catch (err: any) {
+      setProfileError(err?.message || 'Network error while saving profile.');
+    } finally {
+      setSavingProfiles(false);
+    }
+  };
+
+  // Toggle question completion
+  const handleToggleComplete = async (questionId: string, sheetType?: SheetType) => {
+    const targetSheet = sheetType || questions.find((q) => q.id === questionId)?.sheetType || activeSheet;
+
+    executeWithProfileCheck(targetSheet, async () => {
+      const nextVal = !completedMap[questionId];
+
+      // Optimistic UI update
+      setCompletedMap((prev) => {
+        const updated = { ...prev, [questionId]: nextVal };
+        try {
+          localStorage.setItem('practice_completed_map', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      // If authenticated, sync with backend
+      if (user) {
+        try {
+          await fetchApi(`/practice/my-progress/${questionId}/toggle`, {
+            method: 'POST',
+          });
+          // Refresh leaderboard and streak telemetry immediately
+          loadLeaderboard();
+        } catch (err) {
+          console.error('Failed to sync progress with server:', err);
+        }
+      }
+    });
   };
 
   // Open note editor
@@ -1631,15 +1735,27 @@ export default function PracticePage() {
                         href={randomPickedQuestion.externalUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors flex items-center gap-1"
+                        onClick={(e) => {
+                          const targetSheet = randomPickedQuestion.sheetType || activeSheet;
+                          if (
+                            (targetSheet === 'SDE_SHEET' && user && !user.leetcodeUrl) ||
+                            (targetSheet === 'CP_SHEET' && user && (!user.codeforcesUrl || !user.codechefUrl))
+                          ) {
+                            e.preventDefault();
+                            executeWithProfileCheck(targetSheet, () => {
+                              window.open(randomPickedQuestion.externalUrl!, '_blank');
+                            });
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors flex items-center gap-1 cursor-pointer"
                       >
                         <span>Solve on {randomPickedQuestion.platform}</span>
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
                     <button
-                      onClick={() => handleToggleComplete(randomPickedQuestion.id)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors flex items-center gap-1 ${
+                      onClick={() => handleToggleComplete(randomPickedQuestion.id, randomPickedQuestion.sheetType)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors flex items-center gap-1 cursor-pointer ${
                         completedMap[randomPickedQuestion.id]
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                           : 'bg-white/10 text-white border-white/15 hover:bg-white/20'
@@ -1766,8 +1882,8 @@ export default function PracticePage() {
                           <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
                             {/* Checkmark Button */}
                             <button
-                              onClick={() => handleToggleComplete(item.id)}
-                              className={`p-1 rounded-lg transition-transform hover:scale-110 focus:outline-none ${
+                              onClick={() => handleToggleComplete(item.id, item.sheetType)}
+                              className={`p-1 rounded-lg transition-transform hover:scale-110 focus:outline-none cursor-pointer ${
                                 isDone ? 'text-green-400' : 'text-gray-500 hover:text-gray-300'
                               }`}
                               title={isDone ? 'Mark as Incomplete' : 'Mark as Done'}
@@ -1848,7 +1964,19 @@ export default function PracticePage() {
                                 href={item.externalUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] ${
+                                onClick={(e) => {
+                                  const targetSheet = item.sheetType || activeSheet;
+                                  if (
+                                    (targetSheet === 'SDE_SHEET' && user && !user.leetcodeUrl) ||
+                                    (targetSheet === 'CP_SHEET' && user && (!user.codeforcesUrl || !user.codechefUrl))
+                                  ) {
+                                    e.preventDefault();
+                                    executeWithProfileCheck(targetSheet, () => {
+                                      window.open(item.externalUrl!, '_blank');
+                                    });
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] cursor-pointer ${
                                   item.platform === 'LeetCode' || item.externalUrl.includes('leetcode')
                                     ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10'
                                     : 'bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10'
@@ -1951,7 +2079,19 @@ export default function PracticePage() {
                     href={activeReadmeQuestion.externalUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all hover:scale-105 shadow-sm shadow-amber-500/10"
+                    onClick={(e) => {
+                      const targetSheet = activeReadmeQuestion.sheetType || activeSheet;
+                      if (
+                        (targetSheet === 'SDE_SHEET' && user && !user.leetcodeUrl) ||
+                        (targetSheet === 'CP_SHEET' && user && (!user.codeforcesUrl || !user.codechefUrl))
+                      ) {
+                        e.preventDefault();
+                        executeWithProfileCheck(targetSheet, () => {
+                          window.open(activeReadmeQuestion.externalUrl!, '_blank');
+                        });
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all hover:scale-105 shadow-sm shadow-amber-500/10 cursor-pointer"
                     title={`Solve ${activeReadmeQuestion.title} on ${activeReadmeQuestion.platform || 'LeetCode'}`}
                   >
                     <span>Solve on {activeReadmeQuestion.platform || (activeReadmeQuestion.externalUrl.includes('leetcode') ? 'LeetCode' : 'Platform')}</span>
@@ -1960,8 +2100,8 @@ export default function PracticePage() {
                 )}
 
                 <button
-                  onClick={() => handleToggleComplete(activeReadmeQuestion.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                  onClick={() => handleToggleComplete(activeReadmeQuestion.id, activeReadmeQuestion.sheetType)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                     completedMap[activeReadmeQuestion.id]
                       ? 'bg-green-500 text-slate-950 border-green-400 shadow-md shadow-green-500/20'
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/15'
@@ -2122,6 +2262,148 @@ export default function PracticePage() {
                 View Roadmap
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* PROFILE PREREQUISITE WARNING MODAL (SDE & CP Sheets) */}
+      {/* ============================================================ */}
+      {profilePromptModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg glass-card rounded-3xl border-2 border-amber-500/40 p-6 sm:p-8 space-y-5 shadow-2xl bg-slate-950/95 text-left">
+            <button
+              onClick={() => setProfilePromptModal({ open: false, sheet: 'SDE_SHEET' })}
+              className="absolute top-5 right-5 p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Warning Header */}
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                <AlertTriangle className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    One-Time Verification
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-bold text-white">
+                  {profilePromptModal.sheet === 'SDE_SHEET'
+                    ? 'LeetCode Profile Link Required'
+                    : 'Competitive Programming Profiles Required'}
+                </h3>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-300 leading-relaxed">
+              {profilePromptModal.sheet === 'SDE_SHEET'
+                ? 'To solve problems on the SDE Sheet and verify algorithmic submissions, please enter your LeetCode profile handle or URL. We only ask this once, and it will be visible on your profile and leaderboards.'
+                : 'To solve problems on the Competitive Programming Sheet, please link both your Codeforces and CodeChef handles or URLs. This is required once to verify submissions and rank CP solvers.'}
+            </p>
+
+            {profileError && (
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{profileError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfilePrerequisites} className="space-y-4">
+              {profilePromptModal.sheet === 'SDE_SHEET' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-amber-300 mb-1.5 flex items-center gap-1.5">
+                    <Code2 className="w-4 h-4 text-amber-400" />
+                    LeetCode Profile URL or Handle
+                  </label>
+                  <input
+                    type="text"
+                    value={modalLeetcode}
+                    onChange={(e) => setModalLeetcode(e.target.value)}
+                    placeholder="e.g. alex_coder or https://leetcode.com/u/alex_coder"
+                    required
+                    autoFocus
+                    className="w-full px-4 py-2.5 text-xs rounded-xl glass-input text-white placeholder-gray-500 font-mono border border-amber-500/30 focus:border-amber-400"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Enter either your username or full URL (e.g. <code>https://leetcode.com/u/your_handle</code>)
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-blue-300 mb-1.5 flex items-center gap-1.5">
+                      <Trophy className="w-4 h-4 text-blue-400" />
+                      Codeforces Profile URL or Handle
+                    </label>
+                    <input
+                      type="text"
+                      value={modalCodeforces}
+                      onChange={(e) => setModalCodeforces(e.target.value)}
+                      placeholder="e.g. tourist or https://codeforces.com/profile/tourist"
+                      required
+                      autoFocus
+                      className="w-full px-4 py-2.5 text-xs rounded-xl glass-input text-white placeholder-gray-500 font-mono border border-blue-500/30 focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-orange-300 mb-1.5 flex items-center gap-1.5">
+                      <Flame className="w-4 h-4 text-orange-400" />
+                      CodeChef Profile URL or Handle
+                    </label>
+                    <input
+                      type="text"
+                      value={modalCodechef}
+                      onChange={(e) => setModalCodechef(e.target.value)}
+                      placeholder="e.g. chef_pro or https://www.codechef.com/users/chef_pro"
+                      required
+                      className="w-full px-4 py-2.5 text-xs rounded-xl glass-input text-white placeholder-gray-500 font-mono border border-orange-500/30 focus:border-orange-400"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2">
+                <Link
+                  href="/user/profile"
+                  target="_blank"
+                  className="text-xs text-gray-400 hover:text-amber-300 transition-colors flex items-center gap-1"
+                >
+                  <span>Edit all links in Profile</span>
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProfilePromptModal({ open: false, sheet: 'SDE_SHEET' })}
+                    className="px-4 py-2 rounded-xl glass-card text-gray-300 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingProfiles}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                  >
+                    {savingProfiles ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Save &amp; Start Solving</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

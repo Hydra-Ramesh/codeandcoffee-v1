@@ -17,6 +17,10 @@ const updateProfileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
   bio: z.string().max(500, 'Bio is too long').optional(),
   avatar: z.string().optional().or(z.string().length(0)),
+  githubUrl: z.string().optional().nullable().or(z.string().length(0)),
+  leetcodeUrl: z.string().optional().nullable().or(z.string().length(0)),
+  codeforcesUrl: z.string().optional().nullable().or(z.string().length(0)),
+  codechefUrl: z.string().optional().nullable().or(z.string().length(0)),
 });
 
 export class UserController {
@@ -68,6 +72,10 @@ export class UserController {
             isBanned: true,
             avatar: true,
             bio: true,
+            githubUrl: true,
+            leetcodeUrl: true,
+            codeforcesUrl: true,
+            codechefUrl: true,
             oauthProvider: true,
             createdAt: true,
             _count: {
@@ -229,6 +237,10 @@ export class UserController {
           role: true,
           avatar: true,
           bio: true,
+          githubUrl: true,
+          leetcodeUrl: true,
+          codeforcesUrl: true,
+          codechefUrl: true,
           oauthProvider: true,
           deletionRequestedAt: true,
           deletionScheduledAt: true,
@@ -297,6 +309,10 @@ export class UserController {
       if (data.name !== undefined) updatePayload.name = sanitizeText(data.name);
       if (data.bio !== undefined) updatePayload.bio = sanitizeText(data.bio);
       if (data.avatar !== undefined) updatePayload.avatar = data.avatar;
+      if (data.githubUrl !== undefined) updatePayload.githubUrl = data.githubUrl ? sanitizeText(data.githubUrl.trim()) : null;
+      if (data.leetcodeUrl !== undefined) updatePayload.leetcodeUrl = data.leetcodeUrl ? sanitizeText(data.leetcodeUrl.trim()) : null;
+      if (data.codeforcesUrl !== undefined) updatePayload.codeforcesUrl = data.codeforcesUrl ? sanitizeText(data.codeforcesUrl.trim()) : null;
+      if (data.codechefUrl !== undefined) updatePayload.codechefUrl = data.codechefUrl ? sanitizeText(data.codechefUrl.trim()) : null;
 
       const updated = await prisma.user.update({
         where: { id: req.user.id },
@@ -308,6 +324,10 @@ export class UserController {
           avatar: true,
           bio: true,
           role: true,
+          githubUrl: true,
+          leetcodeUrl: true,
+          codeforcesUrl: true,
+          codechefUrl: true,
         },
       });
 

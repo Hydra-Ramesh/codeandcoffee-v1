@@ -33,7 +33,20 @@ import {
   Check,
   X,
   ExternalLink,
+  Code2,
+  Trophy,
+  Flame,
+  Globe,
+  Link2,
 } from 'lucide-react';
+
+function GithubIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={`${className} fill-current`} viewBox="0 0 24 24">
+      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+    </svg>
+  );
+}
 
 interface DeviceSession {
   id: string;
@@ -61,6 +74,12 @@ export default function UserProfilePage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Coding Profile Links State
+  const [githubUrl, setGithubUrl] = useState('');
+  const [leetcodeUrl, setLeetcodeUrl] = useState('');
+  const [codeforcesUrl, setCodeforcesUrl] = useState('');
+  const [codechefUrl, setCodechefUrl] = useState('');
 
   // Direct Reset Password State
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
@@ -90,6 +109,10 @@ export default function UserProfilePage() {
       setName(res.data.name || '');
       setBio(res.data.bio || '');
       setAvatar(res.data.avatar || '');
+      setGithubUrl(res.data.githubUrl || '');
+      setLeetcodeUrl(res.data.leetcodeUrl || '');
+      setCodeforcesUrl(res.data.codeforcesUrl || '');
+      setCodechefUrl(res.data.codechefUrl || '');
     }
     setLoading(false);
   };
@@ -141,7 +164,15 @@ export default function UserProfilePage() {
     setUpdating(true);
     const res = await fetchApi('/users/profile', {
       method: 'PUT',
-      body: JSON.stringify({ name, bio, avatar }),
+      body: JSON.stringify({
+        name,
+        bio,
+        avatar,
+        githubUrl,
+        leetcodeUrl,
+        codeforcesUrl,
+        codechefUrl,
+      }),
     });
 
     if (res.success) {
@@ -483,6 +514,77 @@ export default function UserProfilePage() {
                   className="w-full px-3.5 py-2 text-xs rounded-xl glass-input text-white resize-none"
                 />
               </div>
+
+              {/* Developer & Competitive Programming Profiles Inputs */}
+              <div className="space-y-3 pt-3 border-t border-white/10">
+                <div className="flex items-center gap-1.5">
+                  <Code2 className="w-4 h-4 text-amber-400" />
+                  <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                    Coding &amp; Platform Handles
+                  </h4>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  Required for verified submissions and solving questions on SDE &amp; CP practice sheets.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-300 mb-1 flex items-center gap-1">
+                      <GithubIcon className="w-3.5 h-3.5 text-gray-400" />
+                      GitHub Profile URL / Username
+                    </label>
+                    <input
+                      type="text"
+                      value={githubUrl}
+                      onChange={(e) => setGithubUrl(e.target.value)}
+                      placeholder="e.g. https://github.com/username or username"
+                      className="w-full px-3.5 py-2 text-xs rounded-xl glass-input text-white placeholder-gray-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-amber-300 mb-1 flex items-center gap-1">
+                      <Code2 className="w-3.5 h-3.5 text-amber-400" />
+                      LeetCode Profile URL / Username (SDE Sheet)
+                    </label>
+                    <input
+                      type="text"
+                      value={leetcodeUrl}
+                      onChange={(e) => setLeetcodeUrl(e.target.value)}
+                      placeholder="e.g. https://leetcode.com/u/username or username"
+                      className="w-full px-3.5 py-2 text-xs rounded-xl glass-input text-white placeholder-gray-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-blue-300 mb-1 flex items-center gap-1">
+                      <Trophy className="w-3.5 h-3.5 text-blue-400" />
+                      Codeforces Handle / URL (CP Sheet)
+                    </label>
+                    <input
+                      type="text"
+                      value={codeforcesUrl}
+                      onChange={(e) => setCodeforcesUrl(e.target.value)}
+                      placeholder="e.g. tourist or https://codeforces.com/profile/tourist"
+                      className="w-full px-3.5 py-2 text-xs rounded-xl glass-input text-white placeholder-gray-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-orange-300 mb-1 flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5 text-orange-400" />
+                      CodeChef Handle / URL (CP Sheet)
+                    </label>
+                    <input
+                      type="text"
+                      value={codechefUrl}
+                      onChange={(e) => setCodechefUrl(e.target.value)}
+                      placeholder="e.g. chef_pro or https://www.codechef.com/users/chef_pro"
+                      className="w-full px-3.5 py-2 text-xs rounded-xl glass-input text-white placeholder-gray-500 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -497,6 +599,163 @@ export default function UserProfilePage() {
             </div>
           </form>
         )}
+      </div>
+
+      {/* CODING & DEVELOPER PROFILES SHOWCASE CARD */}
+      <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+              <Code2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                Coding &amp; Developer Profiles
+              </h2>
+              <p className="text-xs text-gray-400">
+                Verified competitive programming &amp; GitHub accounts for sheet progress and leaderboards
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsEditing(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-gray-200 transition-colors self-start sm:self-auto cursor-pointer"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+            <span>Edit Links</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* GitHub */}
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-gray-200">
+                <GithubIcon className="w-4 h-4 text-white" />
+                <span>GitHub</span>
+              </div>
+              {githubUrl ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Linked
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-gray-400">
+                  Not linked
+                </span>
+              )}
+            </div>
+            {githubUrl ? (
+              <a
+                href={githubUrl.startsWith('http') ? githubUrl : `https://github.com/${githubUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-amber-400 hover:text-amber-300 font-mono truncate flex items-center gap-1 group"
+              >
+                <span className="truncate">{githubUrl.replace(/^https?:\/\/(www\.)?github\.com\/?/, '@')}</span>
+                <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </a>
+            ) : (
+              <p className="text-xs text-gray-500 italic">Add your GitHub profile URL to showcase open-source projects.</p>
+            )}
+          </div>
+
+          {/* LeetCode */}
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
+                <Code2 className="w-4 h-4 text-amber-400" />
+                <span>LeetCode</span>
+              </div>
+              {leetcodeUrl ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Linked
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  Required for SDE Sheet
+                </span>
+              )}
+            </div>
+            {leetcodeUrl ? (
+              <a
+                href={leetcodeUrl.startsWith('http') ? leetcodeUrl : `https://leetcode.com/u/${leetcodeUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-amber-400 hover:text-amber-300 font-mono truncate flex items-center gap-1 group"
+              >
+                <span className="truncate">{leetcodeUrl.replace(/^https?:\/\/(www\.)?leetcode\.com\/(u\/)?/, '@')}</span>
+                <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </a>
+            ) : (
+              <p className="text-xs text-gray-500 italic">Required to solve and track questions on the SDE Sheet.</p>
+            )}
+          </div>
+
+          {/* Codeforces */}
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-blue-300">
+                <Trophy className="w-4 h-4 text-blue-400" />
+                <span>Codeforces</span>
+              </div>
+              {codeforcesUrl ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Linked
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                  Required for CP Sheet
+                </span>
+              )}
+            </div>
+            {codeforcesUrl ? (
+              <a
+                href={codeforcesUrl.startsWith('http') ? codeforcesUrl : `https://codeforces.com/profile/${codeforcesUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-400 hover:text-blue-300 font-mono truncate flex items-center gap-1 group"
+              >
+                <span className="truncate">{codeforcesUrl.replace(/^https?:\/\/(www\.)?codeforces\.com\/profile\/?/, '@')}</span>
+                <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </a>
+            ) : (
+              <p className="text-xs text-gray-500 italic">Required to practice on the Competitive Programming Sheet.</p>
+            )}
+          </div>
+
+          {/* CodeChef */}
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-orange-300">
+                <Flame className="w-4 h-4 text-orange-400" />
+                <span>CodeChef</span>
+              </div>
+              {codechefUrl ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Linked
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
+                  Required for CP Sheet
+                </span>
+              )}
+            </div>
+            {codechefUrl ? (
+              <a
+                href={codechefUrl.startsWith('http') ? codechefUrl : `https://www.codechef.com/users/${codechefUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-orange-400 hover:text-orange-300 font-mono truncate flex items-center gap-1 group"
+              >
+                <span className="truncate">{codechefUrl.replace(/^https?:\/\/(www\.)?codechef\.com\/users\/?/, '@')}</span>
+                <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </a>
+            ) : (
+              <p className="text-xs text-gray-500 italic">Required to practice on the Competitive Programming Sheet.</p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* SECURITY & PASSWORD RESET SECTION */}
