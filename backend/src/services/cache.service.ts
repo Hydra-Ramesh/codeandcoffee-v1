@@ -129,5 +129,21 @@ export class CacheService {
     }
     await Promise.all(promises);
   }
+
+  /**
+   * Invalidate practice sheet cache
+   */
+  static async invalidatePracticeCaches(sheetType?: string): Promise<void> {
+    try {
+      if (sheetType) {
+        await this.del(`practice:sheet:${sheetType}`);
+      } else {
+        await this.delPattern('practice:sheet:*');
+      }
+      await this.delPattern('practice:admin:*');
+    } catch (err) {
+      console.warn('Error during practice cache invalidation:', (err as Error).message);
+    }
+  }
 }
 

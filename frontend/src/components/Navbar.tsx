@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { Coffee, ShieldAlert, User, LogOut, Menu, X, Sparkles, PenTool } from 'lucide-react';
+import { Coffee, ShieldAlert, User, LogOut, Menu, X, Sparkles, PenTool, Code2 } from 'lucide-react';
 import { optimizeImageUrl } from '../lib/image';
 
 import ThemeToggle from './ThemeToggle';
@@ -16,6 +16,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: 'Explore Blogs', href: '/blogs' },
+    { name: 'Practice', href: '/practice', isPractice: true },
     { name: "What's Coming?", href: '/whats-coming', isHighlight: true },
     { name: 'Write for Us', href: '/become-contributor' },
     { name: 'About', href: '/about' },
@@ -46,6 +47,27 @@ export default function Navbar() {
           {navLinks.map((link) => {
             const isActive = pathname === link.href;
             const isHighlight = (link as any).isHighlight;
+            const isPractice = (link as any).isPractice;
+
+            if (isPractice) {
+              return (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  className={`group relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                    isActive
+                      ? 'text-cyan-300 bg-cyan-500/15 border border-cyan-500/40 shadow-sm shadow-cyan-500/25'
+                      : 'text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/15 border border-cyan-500/30 hover:border-cyan-400/50'
+                  }`}
+                >
+                  <Code2 className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-6 transition-transform duration-300" />
+                  <span>{link.name}</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-xs shadow-cyan-500/30">
+                    Sheets
+                  </span>
+                </Link>
+              );
+            }
 
             if (isHighlight) {
               return (
@@ -171,6 +193,7 @@ export default function Navbar() {
         <div className="md:hidden glass-card border-b border-white/10 px-4 pt-3 pb-6 space-y-3">
           {navLinks.map((link) => {
             const isHighlight = (link as any).isHighlight;
+            const isPractice = (link as any).isPractice;
             const isActive = pathname === link.href;
             return (
               <Link
@@ -180,6 +203,8 @@ export default function Navbar() {
                 className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   isHighlight
                     ? 'text-amber-300 bg-amber-500/15 border border-amber-500/30'
+                    : isPractice
+                    ? 'text-cyan-300 bg-cyan-500/15 border border-cyan-500/30'
                     : isActive
                     ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
                     : 'text-gray-300 hover:text-white hover:bg-white/5'
@@ -187,11 +212,17 @@ export default function Navbar() {
               >
                 <span className="flex items-center gap-2">
                   {isHighlight && <Sparkles className="w-4 h-4 text-amber-400" />}
+                  {isPractice && <Code2 className="w-4 h-4 text-cyan-400" />}
                   {link.name}
                 </span>
                 {isHighlight && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950">
                     Roadmap
+                  </span>
+                )}
+                {isPractice && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950">
+                    Sheets
                   </span>
                 )}
               </Link>
