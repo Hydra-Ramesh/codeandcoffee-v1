@@ -13,6 +13,17 @@ export function optimizeImageUrl(
 ): string {
   if (!url) return '';
 
+  // Automatically rewrite local upload URLs to production backend on HTTPS to prevent Mixed Content warnings
+  if (url.startsWith('http://localhost:5000') || url.startsWith('http://127.0.0.1:5000')) {
+    const isHttps =
+      typeof window !== 'undefined'
+        ? window.location.protocol === 'https:'
+        : process.env.NODE_ENV === 'production';
+    if (isHttps) {
+      url = url.replace(/^http:\/\/(localhost|127\.0\.0\.1):5000/, 'https://codeandcoffee-v1.onrender.com');
+    }
+  }
+
   const { width, height, crop = 'limit' } = options;
 
   // Cloudinary Optimization
