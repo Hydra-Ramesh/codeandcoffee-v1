@@ -74,7 +74,19 @@ async function bootstrap() {
   process.on('SIGINT', shutdown);
 }
 
+// Global Process Crash Guards
+// In Node.js 16+, unhandled rejections terminate the process with exit code 1.
+// These guards catch rogue background promises and keep the server online.
+process.on('unhandledRejection', (reason: any) => {
+  console.error('🚨 [Server Guard] Unhandled Promise Rejection intercepted:', reason?.message || reason);
+});
+
+process.on('uncaughtException', (err: Error) => {
+  console.error('🚨 [Server Guard] Uncaught Exception intercepted:', err?.message || err, err?.stack);
+});
+
 bootstrap().catch((err) => {
   console.error('Fatal bootstrapping error:', err);
   process.exit(1);
 });
+
