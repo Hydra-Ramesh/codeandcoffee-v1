@@ -208,6 +208,7 @@ enum PracticeSheetType {
   CRACK_THE_INTERVIEW
   SDE_SHEET
   CP_SHEET
+  KNOWLEDGE_SHEET
 }
 
 enum ProblemDifficulty {

@@ -29,7 +29,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 
-type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET';
+type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET' | 'KNOWLEDGE_SHEET';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type AdminTab = 'CURRICULUM' | 'ACTIVITY';
 
@@ -70,6 +70,7 @@ interface UserActivityData {
       CRACK_THE_INTERVIEW: number;
       SDE_SHEET: number;
       CP_SHEET: number;
+      KNOWLEDGE_SHEET: number;
     };
   };
   recentActivity: Array<{
@@ -240,7 +241,7 @@ export default function AdminPracticePage() {
       return;
     }
 
-    if (formSheetType !== 'CP_SHEET' && !formTopic.trim()) {
+    if ((formSheetType === 'CRACK_THE_INTERVIEW' || formSheetType === 'SDE_SHEET') && !formTopic.trim()) {
       setErrorMessage('Topic is required for Crack the Interview & SDE Sheet.');
       return;
     }
@@ -259,7 +260,7 @@ export default function AdminPracticePage() {
     try {
       const payload = {
         sheetType: formSheetType,
-        topic: formSheetType === 'CP_SHEET' ? null : formTopic.trim(),
+        topic: formSheetType === 'CP_SHEET' ? null : (formTopic.trim() || 'General Practice'),
         rating: formSheetType === 'CP_SHEET' ? parseInt(formRating, 10) : null,
         platform: formPlatform,
         title: formTitle.trim(),
@@ -473,6 +474,16 @@ export default function AdminPracticePage() {
               >
                 3. CP Sheet
               </button>
+              <button
+                onClick={() => setFilterSheet('KNOWLEDGE_SHEET')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                  filterSheet === 'KNOWLEDGE_SHEET'
+                    ? 'bg-amber-500 text-slate-950 font-bold'
+                    : 'glass-card text-gray-300 hover:text-white border border-white/10'
+                }`}
+              >
+                4. Knowledge Sheet
+              </button>
             </div>
 
             {/* Search */}
@@ -523,6 +534,7 @@ export default function AdminPracticePage() {
                               {q.sheetType === 'CRACK_THE_INTERVIEW' && '🎯 Crack Interview'}
                               {q.sheetType === 'SDE_SHEET' && '🚀 SDE Sheet'}
                               {q.sheetType === 'CP_SHEET' && '⚔️ CP Sheet'}
+                              {q.sheetType === 'KNOWLEDGE_SHEET' && '🧠 Knowledge Sheet'}
                             </span>
                             <span className="text-[11px] text-amber-400 font-mono">
                               {q.sheetType === 'CP_SHEET'
@@ -668,7 +680,7 @@ export default function AdminPracticePage() {
                     <span>Platform Distribution</span>
                     <Award className="w-4 h-4 text-purple-400" />
                   </div>
-                  <div className="flex items-center gap-2 pt-1 text-[11px] font-mono">
+                  <div className="flex items-center gap-2 pt-1 text-[11px] font-mono flex-wrap">
                     <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
                       Interview: {activityData.metrics.sheetCompletions.CRACK_THE_INTERVIEW}
                     </span>
@@ -677,6 +689,9 @@ export default function AdminPracticePage() {
                     </span>
                     <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
                       CP: {activityData.metrics.sheetCompletions.CP_SHEET}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                      Knowledge: {activityData.metrics.sheetCompletions.KNOWLEDGE_SHEET || 0}
                     </span>
                   </div>
                   <div className="text-[11px] text-gray-400">Total sheet engagement</div>
@@ -995,7 +1010,7 @@ export default function AdminPracticePage() {
                 <label className="block text-xs font-semibold text-gray-300 mb-1.5">
                   Target Sheet Type
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -1040,10 +1055,25 @@ export default function AdminPracticePage() {
                   >
                     3. CP Sheet
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormSheetType('KNOWLEDGE_SHEET');
+                      setFormPlatform('LeetCode');
+                    }}
+                    className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
+                      formSheetType === 'KNOWLEDGE_SHEET'
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
+                        : 'glass-card text-gray-300 border-white/10 hover:bg-white/5'
+                    }`}
+                  >
+                    4. Knowledge Sheet
+                  </button>
                 </div>
               </div>
 
-              {/* Dynamic Topic (for Interview/SDE) OR Rating (for CP) */}
+              {/* Dynamic Topic (for Interview/SDE/Knowledge) OR Rating (for CP) */}
               {formSheetType === 'CP_SHEET' ? (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1069,6 +1099,8 @@ export default function AdminPracticePage() {
                       <option value="Codeforces">Codeforces</option>
                       <option value="CodeChef">CodeChef</option>
                       <option value="AtCoder">AtCoder</option>
+                      <option value="LeetCode">LeetCode</option>
+                      <option value="Self-Created (Code & Coffee)">Self-Created (Code & Coffee)</option>
                     </select>
                   </div>
                 </div>
@@ -1076,13 +1108,17 @@ export default function AdminPracticePage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-300 mb-1">
-                      Topic Name
+                      Topic Name {formSheetType === 'KNOWLEDGE_SHEET' && '(Optional)'}
                     </label>
                     <input
                       type="text"
                       value={formTopic}
                       onChange={(e) => setFormTopic(e.target.value)}
-                      placeholder="e.g. Arrays, Dynamic Programming, Trees"
+                      placeholder={
+                        formSheetType === 'KNOWLEDGE_SHEET'
+                          ? 'e.g. Arrays, System Design, Random Practice'
+                          : 'e.g. Arrays, Dynamic Programming, Trees'
+                      }
                       className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
                     />
                   </div>
@@ -1095,8 +1131,12 @@ export default function AdminPracticePage() {
                       className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
                     >
                       <option value="LeetCode">LeetCode</option>
+                      <option value="Self-Created (Code & Coffee)">Self-Created (Code & Coffee)</option>
                       <option value="Internal">Internal (Readme)</option>
+                      <option value="Codeforces">Codeforces</option>
+                      <option value="CodeChef">CodeChef</option>
                       <option value="GeeksforGeeks">GeeksforGeeks</option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
                 </div>

@@ -111,9 +111,9 @@ export function computeStreakAndDailyStats(
     }
   }
 
-  // Generate last 14 days summary for activity heatmap
+  // Generate 365 days summary for full-year activity calendar matrix
   const recentDays: DailySolveSummary[] = [];
-  for (let i = 13; i >= 0; i--) {
+  for (let i = 364; i >= 0; i--) {
     const day = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
     const dayKey = day.toISOString().split('T')[0];
     const count = dateCounts[dayKey] || 0;
@@ -145,7 +145,7 @@ export class PracticeController {
   static async getSheetQuestions(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const sheetType = req.params.sheetType as string;
-      const validTypes: PracticeSheetType[] = ['CRACK_THE_INTERVIEW', 'SDE_SHEET', 'CP_SHEET'];
+      const validTypes: PracticeSheetType[] = ['CRACK_THE_INTERVIEW', 'SDE_SHEET', 'CP_SHEET', 'KNOWLEDGE_SHEET'];
 
       if (!validTypes.includes(sheetType as PracticeSheetType)) {
         res.status(400).json({
@@ -453,6 +453,7 @@ export class PracticeController {
           CRACK_THE_INTERVIEW: 0,
           SDE_SHEET: 0,
           CP_SHEET: 0,
+          KNOWLEDGE_SHEET: 0,
         },
       };
 
@@ -463,8 +464,8 @@ export class PracticeController {
         if (entry.isCompleted) {
           stats.totalCompleted += 1;
           const sheet = entry.question?.sheetType;
-          if (sheet && stats.bySheet[sheet] !== undefined) {
-            stats.bySheet[sheet] += 1;
+          if (sheet && (stats.bySheet as any)[sheet] !== undefined) {
+            (stats.bySheet as any)[sheet] += 1;
           }
           completedIds.push(entry.questionId);
         }
@@ -553,6 +554,7 @@ export class PracticeController {
             crackCount: u.practiceProgress.filter((c) => c.question?.sheetType === 'CRACK_THE_INTERVIEW').length,
             sdeCount: u.practiceProgress.filter((c) => c.question?.sheetType === 'SDE_SHEET').length,
             cpCount: u.practiceProgress.filter((c) => c.question?.sheetType === 'CP_SHEET').length,
+            knowledgeCount: u.practiceProgress.filter((c) => c.question?.sheetType === 'KNOWLEDGE_SHEET').length,
           };
         });
 
@@ -579,20 +581,20 @@ export class PracticeController {
         if (found) {
           myRankInfo = found;
         } else {
-          // If user hasn't solved any questions yet
+          // If user hasn't solved any questions yet, generate valid 365-day stats
+          const emptyStats = computeStreakAndDailyStats([]);
           myRankInfo = {
             id: req.user.id,
             name: req.user.name,
+            avatar: (req.user as any).avatar || null,
+            role: req.user.role,
             rank: leaderboard.length + 1,
-            totalCompleted: 0,
-            points: 0,
-            currentStreak: 0,
-            highestStreak: 0,
-            fireDaysCount: 0,
-            normalDaysCount: 0,
-            todaySolves: 0,
-            todayStatus: 'NONE',
-            recentDays: [],
+            ...emptyStats,
+            lastActive: null,
+            crackCount: 0,
+            sdeCount: 0,
+            cpCount: 0,
+            knowledgeCount: 0,
           };
         }
       }
@@ -732,7 +734,7 @@ export class PracticeController {
         isPublished,
       } = req.body;
 
-      const validSheets: PracticeSheetType[] = ['CRACK_THE_INTERVIEW', 'SDE_SHEET', 'CP_SHEET'];
+      const validSheets: PracticeSheetType[] = ['CRACK_THE_INTERVIEW', 'SDE_SHEET', 'CP_SHEET', 'KNOWLEDGE_SHEET'];
       if (!validSheets.includes(sheetType)) {
         res.status(400).json({ success: false, message: `Invalid sheetType: ${sheetType}` });
         return;
@@ -759,6 +761,8 @@ export class PracticeController {
           res.status(400).json({ success: false, message: 'Rating (e.g. 800, 1000, 1200) is required for CP Sheet' });
           return;
         }
+      } else if (sheetType === 'KNOWLEDGE_SHEET') {
+        // Knowledge sheet problems can have custom topic or fallback to 'General Practice'
       }
 
       const parsedRating = rating ? parseInt(rating, 10) : null;
@@ -770,7 +774,7 @@ export class PracticeController {
       const question = await prisma.practiceQuestion.create({
         data: {
           sheetType: sheetType as PracticeSheetType,
-          topic: topic ? topic.trim() : null,
+          topic: topic ? topic.trim() : (sheetType === 'KNOWLEDGE_SHEET' ? 'General Practice' : null),
           rating: parsedRating,
           platform: platform || (sheetType === 'CP_SHEET' ? 'Codeforces' : 'LeetCode'),
           title: title.trim(),
@@ -992,10 +996,11 @@ export class PracticeController {
         ]);
 
       // Sheet Breakdown
-      const sheetCompletions = {
+      const sheetCompletions: Record<string, number> = {
         CRACK_THE_INTERVIEW: 0,
         SDE_SHEET: 0,
         CP_SHEET: 0,
+        KNOWLEDGE_SHEET: 0,
       };
 
       const sheetCountsRaw = await prisma.userPracticeProgress.findMany({
@@ -1085,6 +1090,7 @@ export class PracticeController {
               .length,
             sdeCount: completed.filter((c) => c.question?.sheetType === 'SDE_SHEET').length,
             cpCount: completed.filter((c) => c.question?.sheetType === 'CP_SHEET').length,
+            knowledgeCount: completed.filter((c) => c.question?.sheetType === 'KNOWLEDGE_SHEET').length,
           };
         })
         .sort((a, b) => b.totalCompleted - a.totalCompleted || b.highestStreak - a.highestStreak)

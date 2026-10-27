@@ -35,9 +35,11 @@ import {
   Calendar,
   Clock,
   TrendingUp,
+  Shuffle,
+  Info,
 } from 'lucide-react';
 
-type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET' | 'LEADERBOARD';
+type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET' | 'KNOWLEDGE_SHEET' | 'LEADERBOARD';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type StatusFilter = 'ALL' | 'COMPLETED' | 'UNCOMPLETED';
 type SortOption = 'DEFAULT' | 'LEVEL_ASC' | 'LEVEL_DESC' | 'UNSOLVED_FIRST' | 'SOLVED_FIRST' | 'TITLE_ASC';
@@ -67,6 +69,7 @@ export interface LeaderboardUser {
   crackCount: number;
   sdeCount: number;
   cpCount: number;
+  knowledgeCount?: number;
 }
 
 interface PracticeQuestion {
@@ -93,7 +96,9 @@ export default function PracticePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('ALL');
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<SortOption>('DEFAULT');
+  const [randomPickedQuestion, setRandomPickedQuestion] = useState<PracticeQuestion | null>(null);
 
   // Leaderboard & Streak State
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
@@ -302,7 +307,7 @@ export default function PracticePage() {
     HARD: 3,
   };
 
-  // Group questions by Topic (for Crack the Interview & SDE Sheet) or Rating (for CP Sheet)
+  // Group questions by Topic (for Crack Interview, SDE, Knowledge Sheet) or Rating (for CP Sheet)
   const groupedQuestions = useMemo(() => {
     let filtered = [...questions];
 
@@ -313,7 +318,8 @@ export default function PracticePage() {
         (item) =>
           item.title.toLowerCase().includes(q) ||
           (item.topic && item.topic.toLowerCase().includes(q)) ||
-          (item.rating && item.rating.toString().includes(q))
+          (item.rating && item.rating.toString().includes(q)) ||
+          (item.platform && item.platform.toLowerCase().includes(q))
       );
     }
 
@@ -329,13 +335,20 @@ export default function PracticePage() {
       filtered = filtered.filter((item) => !completedMap[item.id]);
     }
 
-    // 4. Partition into Groups
+    // 4. Platform Filter
+    if (selectedPlatform !== 'ALL') {
+      filtered = filtered.filter((item) => item.platform === selectedPlatform);
+    }
+
+    // 5. Partition into Groups
     const groups: Record<string, PracticeQuestion[]> = {};
 
     filtered.forEach((item) => {
       let key = '';
       if (activeSheet === 'CP_SHEET') {
         key = item.rating ? `Rating: ${item.rating}` : 'Unrated Challenges';
+      } else if (activeSheet === 'KNOWLEDGE_SHEET') {
+        key = item.topic || 'General Practice';
       } else {
         key = item.topic || 'General Algorithms';
       }
@@ -346,7 +359,7 @@ export default function PracticePage() {
       groups[key].push(item);
     });
 
-    // 5. Apply Sorting Within Each Group
+    // 6. Apply Sorting Within Each Group
     Object.keys(groups).forEach((key) => {
       groups[key].sort((a, b) => {
         if (sortBy === 'LEVEL_ASC') {
@@ -381,7 +394,7 @@ export default function PracticePage() {
     });
 
     return groups;
-  }, [questions, searchQuery, selectedDifficulty, selectedStatus, sortBy, activeSheet, completedMap]);
+  }, [questions, searchQuery, selectedDifficulty, selectedStatus, selectedPlatform, sortBy, activeSheet, completedMap]);
 
   // Expand / collapse all groups
   const toggleGroup = (key: string) => {
@@ -423,13 +436,135 @@ export default function PracticePage() {
     searchQuery.trim() !== '' ||
     selectedDifficulty !== 'ALL' ||
     selectedStatus !== 'ALL' ||
+    selectedPlatform !== 'ALL' ||
     sortBy !== 'DEFAULT';
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedDifficulty('ALL');
     setSelectedStatus('ALL');
+    setSelectedPlatform('ALL');
     setSortBy('DEFAULT');
+  };
+
+  // 365-Day Activity Calendar Matrix Helpers
+  const calendarDays = useMemo(() => {
+    if (myRankInfo?.recentDays && myRankInfo.recentDays.length >= 365) {
+      return myRankInfo.recentDays;
+    }
+    const now = new Date();
+    const days: DailySolveSummary[] = [];
+    for (let i = 364; i >= 0; i--) {
+      const day = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dayKey = day.toISOString().split('T')[0];
+      days.push({ date: dayKey, count: 0, status: 'NONE' });
+    }
+    return days;
+  }, [myRankInfo]);
+
+  // Aggregate stats for 365 days
+  const calendarStats = useMemo(() => {
+    const total365Solves = calendarDays.reduce((acc, d) => acc + d.count, 0);
+    const activeDays = calendarDays.filter((d) => d.count > 0).length;
+    const fireDays = calendarDays.filter((d) => d.count >= 5).length;
+    return {
+      total365Solves,
+      activeDays,
+      fireDays,
+      maxStreak: myRankInfo?.highestStreak ?? 0,
+      currentStreak: myRankInfo?.currentStreak ?? 0,
+    };
+  }, [calendarDays, myRankInfo]);
+
+  // Group into ~53 weeks with 7 days each (Mon to Sun)
+  const calendarWeeks = useMemo(() => {
+    if (calendarDays.length === 0) return [];
+    const weeks: { days: (DailySolveSummary | null)[] }[] = [];
+    let currentWeek: (DailySolveSummary | null)[] = [];
+
+    // The first day's day of week
+    const firstDate = new Date(calendarDays[0].date + 'T00:00:00Z');
+    const startDayOfWeek = (firstDate.getUTCDay() + 6) % 7; // Monday = 0, Sunday = 6
+
+    for (let i = 0; i < startDayOfWeek; i++) {
+      currentWeek.push(null);
+    }
+
+    for (const day of calendarDays) {
+      currentWeek.push(day);
+      if (currentWeek.length === 7) {
+        weeks.push({ days: currentWeek });
+        currentWeek = [];
+      }
+    }
+
+    if (currentWeek.length > 0) {
+      while (currentWeek.length < 7) {
+        currentWeek.push(null);
+      }
+      weeks.push({ days: currentWeek });
+    }
+
+    return weeks;
+  }, [calendarDays]);
+
+  // Month labels mapped by week column index
+  const monthLabels = useMemo(() => {
+    const labels: { weekIndex: number; name: string }[] = [];
+    let lastMonth = -1;
+
+    calendarWeeks.forEach((week, wIdx) => {
+      const firstValidDay = week.days.find((d) => d !== null);
+      if (firstValidDay) {
+        const d = new Date(firstValidDay.date + 'T00:00:00Z');
+        const m = d.getUTCMonth();
+        if (m !== lastMonth) {
+          lastMonth = m;
+          labels.push({
+            weekIndex: wIdx,
+            name: d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }),
+          });
+        }
+      }
+    });
+
+    return labels;
+  }, [calendarWeeks]);
+
+  // Pick Random Problem handler for Knowledge Sheet
+  const handlePickRandomProblem = () => {
+    if (questions.length === 0) return;
+
+    // Prioritize uncompleted questions
+    const uncompleted = questions.filter((q) => !completedMap[q.id]);
+    const pool = uncompleted.length > 0 ? uncompleted : questions;
+
+    const randomIndex = Math.floor(Math.random() * pool.length);
+    const chosen = pool[randomIndex];
+
+    setRandomPickedQuestion(chosen);
+
+    // Ensure the group accordion for this problem is opened
+    const groupKey =
+      activeSheet === 'CP_SHEET'
+        ? chosen.rating
+          ? `Rating: ${chosen.rating}`
+          : 'Unrated Challenges'
+        : chosen.topic ||
+          (activeSheet === 'KNOWLEDGE_SHEET' ? 'General Practice' : 'General Algorithms');
+
+    setExpandedSections((prev) => ({
+      ...prev,
+      [groupKey]: true,
+    }));
+
+    // Smooth scroll into view and highlight
+    setTimeout(() => {
+      const el = document.getElementById(`question-card-${chosen.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 150);
   };
 
   return (
@@ -469,7 +604,14 @@ export default function PracticePage() {
                         : 'bg-white/5 text-gray-400 border border-white/5'
                     }`}
                   >
-                    <Flame className="w-5 h-5" />
+                    {/* CRITICAL: ONLY SHOW FLAME ICON IF TODAY SOLVES >= 5! If 1-4 or streak > 5, show Zap/Target/Check, NEVER flame! */}
+                    {myRankInfo?.todayStatus === 'FIRE' ? (
+                      <Flame className="w-5 h-5 text-white" />
+                    ) : (myRankInfo?.currentStreak ?? 0) > 0 ? (
+                      <Zap className="w-5 h-5 text-emerald-400 fill-emerald-400/20" />
+                    ) : (
+                      <Zap className="w-5 h-5 text-gray-500" />
+                    )}
                   </div>
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
@@ -480,10 +622,13 @@ export default function PracticePage() {
                       <span className="text-xs text-gray-400 font-sans font-normal">
                         {(myRankInfo?.currentStreak ?? 0) === 1 ? 'Day' : 'Days'}
                       </span>
+                      {/* CRITICAL USER REQUIREMENT:
+                          "dont change to fire imoji for more then 5 days steck only change if problem done 5 or more then 5"
+                      */}
                       {myRankInfo?.todayStatus === 'FIRE' ? (
-                        <span className="text-base" title="Fire Day Active! (≥5 problems solved today)">🔥</span>
+                        <span className="text-base" title="🔥 Fire Day! (5+ problems solved today)">🔥</span>
                       ) : (myRankInfo?.currentStreak ?? 0) > 0 ? (
-                        <span className="text-xs text-emerald-400 font-mono font-bold" title="Normal Streak Day (1-4 problems solved)">🟢</span>
+                        <span className="text-xs text-emerald-400 font-mono font-bold" title="🟢 Active Streak (1-4 problems solved today)">🟢</span>
                       ) : null}
                     </div>
                   </div>
@@ -498,75 +643,57 @@ export default function PracticePage() {
                 </div>
               </div>
 
-              {/* 14-Day Calendar Heat Strip */}
-              <div className="pt-1.5 border-t border-white/5 space-y-1">
-                <div className="flex items-center justify-between text-[10px] text-gray-400">
-                  <span>14-Day Activity</span>
-                  <span className="font-mono text-gray-300">
-                    {myRankInfo?.todayStatus === 'FIRE'
-                      ? '🔥 Fire Day Active!'
-                      : myRankInfo?.todayStatus === 'NORMAL'
-                      ? '🟢 Today Active'
-                      : '○ 0 Solved Today'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-1">
-                  {(myRankInfo?.recentDays || []).slice(-14).map((d, i) => (
-                    <div
-                      key={d.date || i}
-                      title={`${d.date}: ${d.count} solved ${
-                        d.status === 'FIRE'
-                          ? '(🔥 Fire Day: ≥5 solves)'
-                          : d.status === 'NORMAL'
-                          ? '(🟢 Normal Day: 1-4 solves)'
-                          : '(0 solves)'
-                      }`}
-                      className={`w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[8px] transition-all ${
-                        d.status === 'FIRE'
-                          ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-sm shadow-orange-500/50 scale-110'
-                          : d.status === 'NORMAL'
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-white/10 hover:bg-white/20'
-                      }`}
-                    >
-                      {d.status === 'FIRE' ? '🔥' : ''}
-                    </div>
-                  ))}
-                </div>
+              {/* Status summary */}
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono">
+                <span className="text-gray-400">Today&apos;s Solves:</span>
+                <span>
+                  {myRankInfo?.todayStatus === 'FIRE' ? (
+                    <span className="text-orange-400 font-bold flex items-center gap-1">
+                      🔥 {myRankInfo.todaySolves} Solved (Fire Day Active!)
+                    </span>
+                  ) : (myRankInfo?.todaySolves ?? 0) > 0 ? (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      🟢 {myRankInfo?.todaySolves} Solved (Normal Streak)
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">0 Solved (Solve 1 to extend)</span>
+                  )}
+                </span>
               </div>
             </div>
 
             {/* Total Points & Sheet Progress Card */}
-            <div className="glass-card p-4 rounded-2xl border border-white/10 bg-black/60 space-y-2 min-w-[240px]">
+            <div className="glass-card p-4 rounded-2xl border border-white/10 bg-black/60 space-y-2.5 min-w-[240px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20">
-                    <Zap className="w-5 h-5 fill-slate-950" />
+                    <Award className="w-5 h-5 text-slate-950" />
                   </div>
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
                       Earned Points
                     </div>
-                    <div className="text-xl font-extrabold text-amber-400 font-mono">
-                      {myRankInfo?.points ?? (Object.values(completedMap).filter(Boolean).length * 10)}
-                      <span className="text-xs text-gray-400 font-sans font-normal ml-1">pts</span>
+                    <div className="text-xl font-extrabold text-amber-400 font-mono flex items-baseline gap-1">
+                      <span>{myRankInfo?.points ?? (Object.values(completedMap).filter(Boolean).length * 10)}</span>
+                      <span className="text-xs text-gray-400 font-sans font-normal">pts</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="text-right">
                   <div className="text-[10px] text-gray-400 font-mono">Global Rank</div>
-                  <div className="text-xs font-bold text-white font-mono">
+                  <div className="text-sm font-bold text-white font-mono flex items-center justify-end gap-1">
+                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
                     {myRankInfo ? `#${myRankInfo.rank}` : 'Unranked'}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-1 pt-1 border-t border-white/5">
+              <div className="space-y-1.5 pt-1.5 border-t border-white/5">
                 <div className="flex items-center justify-between text-[11px] font-bold text-gray-300">
                   <span>{activeSheet === 'LEADERBOARD' ? 'Global Solvers' : 'Sheet Progress'}</span>
                   <span className="text-amber-400 font-mono">
-                    {activeSheet === 'LEADERBOARD' ? `${leaderboardData.length} Users` : `${sheetStats.percentage}%`}
+                    {activeSheet === 'LEADERBOARD' ? `${leaderboardData.length} Users` : `${sheetStats.percentage}% (${sheetStats.completed}/${sheetStats.total})`}
                   </span>
                 </div>
                 {activeSheet !== 'LEADERBOARD' ? (
@@ -578,10 +705,142 @@ export default function PracticePage() {
                   </div>
                 ) : null}
                 <div className="text-[10px] text-gray-400 font-mono flex items-center justify-between">
-                  <span>10 pts / problem</span>
+                  <span className="text-amber-400/90 font-semibold">10 pts / problem</span>
                   <span>{sheetStats.completed} completed in sheet</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 365-Day Problem Solve Activity Matrix */}
+      <div className="glass-card rounded-3xl border border-white/10 p-5 sm:p-6 bg-slate-950/70 shadow-2xl space-y-4">
+        {/* Header with Title and Telemetry Badges */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                365-Day Problem Solve Activity Matrix
+              </h2>
+            </div>
+            <p className="text-xs text-gray-400">
+              LeetCode-style daily contribution matrix showing solved problem volume over the past 365 days.
+            </p>
+          </div>
+
+          {/* Metric Quick Chips */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs font-mono">
+            <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300">
+              <span className="text-amber-400 font-bold">{calendarStats.total365Solves}</span> Solves
+            </div>
+            <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <span className="font-bold">{calendarStats.activeDays}</span> Active Days
+            </div>
+            <div className="px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400">
+              <span className="font-bold">🔥 {calendarStats.fireDays}</span> Fire Days (≥5 solves)
+            </div>
+            <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+              <span className="font-bold">🏆 {calendarStats.maxStreak}d</span> Longest Streak
+            </div>
+          </div>
+        </div>
+
+        {/* Heatmap Grid with Month Headers */}
+        <div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+          <div className="min-w-[840px] space-y-1.5">
+            {/* Month Labels Bar */}
+            <div className="text-[10px] text-gray-400 font-mono h-4 relative pl-7">
+              {monthLabels.map((ml) => (
+                <div
+                  key={ml.name + ml.weekIndex}
+                  style={{ left: `${ml.weekIndex * 15.5}px` }}
+                  className="absolute whitespace-nowrap font-semibold text-gray-400"
+                >
+                  {ml.name}
+                </div>
+              ))}
+            </div>
+
+            {/* Week Columns & Day Rows */}
+            <div className="flex items-start gap-2">
+              {/* Day of Week Labels (Mon, Wed, Fri) */}
+              <div className="flex flex-col gap-1 text-[9px] text-gray-500 font-mono pt-0.5 w-5 text-right select-none">
+                <span className="h-[12px] leading-[12px]">Mon</span>
+                <span className="h-[12px] leading-[12px]" />
+                <span className="h-[12px] leading-[12px]">Wed</span>
+                <span className="h-[12px] leading-[12px]" />
+                <span className="h-[12px] leading-[12px]">Fri</span>
+                <span className="h-[12px] leading-[12px]" />
+                <span className="h-[12px] leading-[12px]" />
+              </div>
+
+              {/* 53 Columns x 7 Rows */}
+              <div className="flex gap-1">
+                {calendarWeeks.map((week, wIdx) => (
+                  <div key={wIdx} className="flex flex-col gap-1">
+                    {week.days.map((day, dIdx) => {
+                      if (!day) {
+                        return <div key={`empty-${dIdx}`} className="w-[12px] h-[12px]" />;
+                      }
+
+                      const isFire = day.status === 'FIRE';
+                      const isNormal = day.status === 'NORMAL';
+
+                      const tooltip = `${day.date}: ${day.count} ${
+                        day.count === 1 ? 'problem' : 'problems'
+                      } solved ${
+                        isFire
+                          ? '(🔥 Fire Day: ≥5 solves)'
+                          : isNormal
+                          ? '(🟢 Normal Streak Day: 1-4 solves)'
+                          : '(0 solves)'
+                      }`;
+
+                      return (
+                        <div
+                          key={day.date}
+                          title={tooltip}
+                          className={`w-[12px] h-[12px] rounded-[3px] transition-all cursor-pointer flex items-center justify-center text-[7px] ${
+                            isFire
+                              ? 'bg-gradient-to-tr from-orange-500 via-amber-500 to-red-500 text-white shadow-sm shadow-orange-500/50 hover:scale-150 z-10'
+                              : isNormal
+                              ? 'bg-emerald-500 hover:bg-emerald-400 hover:scale-125 z-10'
+                              : 'bg-white/[0.06] hover:bg-white/20'
+                          }`}
+                        >
+                          {isFire ? '🔥' : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Legend and Rule Clarification */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/5 text-xs text-gray-400">
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <Info className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+            <span>
+              Fire icon (<strong className="text-orange-400">🔥</strong>) triggers <em>ONLY</em> when 5 or more problems are solved on a single day. Daily streaks (even &gt;5 days) remain normal green (🟢) unless 5+ problems are solved today.
+            </span>
+          </div>
+
+          {/* Legend Dots */}
+          <div className="flex items-center gap-2 text-[11px] font-mono self-end sm:self-auto">
+            <span>0 Solved</span>
+            <div className="w-3 h-3 rounded-[3px] bg-white/[0.08]" />
+            <span className="ml-1">1-4 Solved</span>
+            <div className="w-3 h-3 rounded-[3px] bg-emerald-500" />
+            <span className="ml-1">≥5 Solved</span>
+            <div className="w-3 h-3 rounded-[3px] bg-gradient-to-tr from-orange-500 to-red-500 text-white flex items-center justify-center text-[6px]">
+              🔥
             </div>
           </div>
         </div>
@@ -635,6 +894,21 @@ export default function PracticePage() {
         </button>
 
         <button
+          onClick={() => setActiveSheet('KNOWLEDGE_SHEET')}
+          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all whitespace-nowrap ${
+            activeSheet === 'KNOWLEDGE_SHEET'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
+              : 'glass-card text-gray-300 hover:text-white hover:bg-white/5 border border-white/10'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>4. Knowledge Sheet</span>
+          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-black/30">
+            Random Practice &amp; Pool
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveSheet('LEADERBOARD')}
           className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all whitespace-nowrap ${
             activeSheet === 'LEADERBOARD'
@@ -643,7 +917,7 @@ export default function PracticePage() {
           }`}
         >
           <Trophy className="w-4 h-4" />
-          <span>4. Global Leaderboard</span>
+          <span>5. Global Leaderboard</span>
           <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-black/30">
             Top Solvers &amp; Streaks
           </span>
@@ -707,6 +981,24 @@ export default function PracticePage() {
             </select>
           </div>
 
+          {/* Platform Filter */}
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+            <span className="text-[11px] font-bold text-gray-400 hidden xl:inline">Platform:</span>
+            <select
+              value={selectedPlatform}
+              onChange={(e) => setSelectedPlatform(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 rounded-xl text-xs glass-card border border-white/10 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
+              title="Filter by Platform"
+            >
+              <option value="ALL">All Platforms</option>
+              <option value="LeetCode">LeetCode</option>
+              <option value="Self-Created (Code & Coffee)">Self-Created</option>
+              <option value="Internal">Internal (Readme)</option>
+              <option value="Codeforces">Codeforces</option>
+              <option value="CodeChef">CodeChef</option>
+            </select>
+          </div>
+
           {/* Sort Option (Level & Complete/Uncomplete) */}
           <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
             <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-amber-400 hidden sm:flex">
@@ -759,8 +1051,17 @@ export default function PracticePage() {
 
           {selectedStatus !== 'ALL' && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              Status: {selectedStatus === 'COMPLETED' ? 'Completed' : 'Uncompleted'}
+              Status: {selectedStatus}
               <button onClick={() => setSelectedStatus('ALL')} className="hover:text-white ml-0.5">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          )}
+
+          {selectedPlatform !== 'ALL' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+              Platform: {selectedPlatform}
+              <button onClick={() => setSelectedPlatform('ALL')} className="hover:text-white ml-0.5">
                 <X className="w-2.5 h-2.5" />
               </button>
             </span>
@@ -1158,6 +1459,14 @@ export default function PracticePage() {
                             <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-white/5 text-gray-200 border border-white/10">
                               {coder.totalCompleted} solved
                             </span>
+                            {(coder.crackCount > 0 || coder.sdeCount > 0 || coder.cpCount > 0 || (coder.knowledgeCount ?? 0) > 0) && (
+                              <div className="flex items-center justify-center gap-1 text-[9px] text-gray-400 mt-1">
+                                {coder.crackCount > 0 && <span>Int: {coder.crackCount}</span>}
+                                {coder.sdeCount > 0 && <span>• SDE: {coder.sdeCount}</span>}
+                                {coder.cpCount > 0 && <span>• CP: {coder.cpCount}</span>}
+                                {(coder.knowledgeCount ?? 0) > 0 && <span>• Know: {coder.knowledgeCount}</span>}
+                              </div>
+                            )}
                           </td>
 
                           {/* Total Score */}
@@ -1252,6 +1561,93 @@ export default function PracticePage() {
         </div>
       ) : (
         <>
+          {/* Knowledge Sheet Random Practice Arena Banner */}
+          {activeSheet === 'KNOWLEDGE_SHEET' && (
+            <div className="glass-card rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 via-purple-500/5 to-cyan-500/10 p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-amber-400" />
+                    <h2 className="text-base sm:text-lg font-bold text-white">
+                      Knowledge Sheet &amp; Random Problem Arena
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-300">
+                    Comprehensive master collection of LeetCode problems and Self-Created engineering challenges for spontaneous and targeted practice.
+                  </p>
+                </div>
+
+                {/* Pick Random Problem Button */}
+                <button
+                  onClick={handlePickRandomProblem}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/30 hover:scale-105 active:scale-95 transition-all whitespace-nowrap cursor-pointer"
+                >
+                  <Shuffle className="w-4 h-4" />
+                  <span>🎲 Pick Random Problem</span>
+                </button>
+              </div>
+
+              {/* Highlight Banner if a Random Problem was selected */}
+              {randomPickedQuestion && (
+                <div className="p-4 rounded-xl bg-amber-500/15 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+                  <div className="flex items-center gap-2 text-xs min-w-0">
+                    <Sparkles className="w-4 h-4 text-amber-300 flex-shrink-0 animate-spin" />
+                    <div className="truncate">
+                      <span className="text-gray-300">Random Pick: </span>
+                      <strong className="text-white font-bold">{randomPickedQuestion.title}</strong>
+                      <span className="ml-2 font-mono text-[10px] px-1.5 py-0.5 rounded bg-black/40 text-amber-300">
+                        {randomPickedQuestion.difficulty}
+                      </span>
+                      <span className="ml-1 font-mono text-[10px] px-1.5 py-0.5 rounded bg-black/40 text-cyan-300">
+                        {randomPickedQuestion.platform}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+                    {randomPickedQuestion.content && (
+                      <button
+                        onClick={() => setActiveReadmeQuestion(randomPickedQuestion)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30 transition-colors"
+                      >
+                        📖 Read Problem
+                      </button>
+                    )}
+                    {randomPickedQuestion.externalUrl && (
+                      <a
+                        href={randomPickedQuestion.externalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors flex items-center gap-1"
+                      >
+                        <span>Solve on {randomPickedQuestion.platform}</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                    <button
+                      onClick={() => handleToggleComplete(randomPickedQuestion.id)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors flex items-center gap-1 ${
+                        completedMap[randomPickedQuestion.id]
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          : 'bg-white/10 text-white border-white/15 hover:bg-white/20'
+                      }`}
+                    >
+                      <Check className="w-3 h-3" />
+                      <span>{completedMap[randomPickedQuestion.id] ? 'Completed (+10 pts)' : 'Mark Done (+10 pts)'}</span>
+                    </button>
+                    <button
+                      onClick={handlePickRandomProblem}
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-300 hover:text-white bg-white/5 hover:bg-white/10"
+                      title="Pick another random problem"
+                    >
+                      🎲 Another
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {loading ? (
         <div className="space-y-4 py-12 text-center">
           <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
@@ -1318,9 +1714,14 @@ export default function PracticePage() {
 
                       return (
                         <div
+                          id={`question-card-${item.id}`}
                           key={item.id}
-                          className={`p-4 sm:px-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${
-                            isDone ? 'bg-green-500/[0.03]' : 'hover:bg-white/[0.02]'
+                          className={`p-4 sm:px-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all rounded-xl ${
+                            randomPickedQuestion?.id === item.id
+                              ? 'ring-2 ring-amber-400 bg-amber-500/[0.12] shadow-lg shadow-amber-500/20'
+                              : isDone
+                              ? 'bg-green-500/[0.03]'
+                              : 'hover:bg-white/[0.02]'
                           }`}
                         >
                           {/* Left: Checkmark + Title + Tags */}
@@ -1363,7 +1764,7 @@ export default function PracticePage() {
                                   {item.difficulty}
                                 </span>
 
-                                {/* Platform Badge for CP Sheet / SDE */}
+                                {/* Platform Badge */}
                                 {item.platform && (
                                   <span
                                     className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
@@ -1371,6 +1772,8 @@ export default function PracticePage() {
                                         ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
                                         : item.platform === 'CodeChef'
                                         ? 'bg-amber-700/20 text-amber-300 border-amber-700/30'
+                                        : item.platform === 'Self-Created (Code & Coffee)' || item.platform === 'Internal'
+                                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
                                         : 'bg-orange-500/15 text-orange-300 border-orange-500/30'
                                     }`}
                                   >
