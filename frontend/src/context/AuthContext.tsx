@@ -10,6 +10,10 @@ export interface User {
   role: 'USER' | 'CONTRIBUTOR' | 'ADMIN';
   avatar?: string;
   bio?: string;
+  githubUrl?: string | null;
+  leetcodeUrl?: string | null;
+  codeforcesUrl?: string | null;
+  codechefUrl?: string | null;
   deletionScheduledAt?: string;
   isPendingDeletion?: boolean;
   daysRemaining?: number | null;

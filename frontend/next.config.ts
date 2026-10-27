@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
+    minimumCacheTTL: 2592000, // 30 days (prevents burning Vercel 1,000 free image transformation quota)
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
         protocol: 'https',

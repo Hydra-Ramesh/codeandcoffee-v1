@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root, html.dark {
     color-scheme: dark;
@@ -579,3 +581,59 @@ html.light .gradient-text-hero {
   margin: 1.5rem 0;
   border: 1px solid var(--card-border);
 }
+
+/* ==============================================================================
+   Activity Matrix & Streak Grid Styling (Universal Light & Dark Mode)
+   ============================================================================== */
+.activity-day-empty {
+  background-color: #e2e8f0;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  transition: all 0.15s ease-in-out;
+}
+
+.activity-day-empty:hover {
+  background-color: #cbd5e1;
+  border-color: #94a3b8;
+}
+
+html.dark .activity-day-empty {
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+html.dark .activity-day-empty:hover {
+  background-color: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.activity-day-normal {
+  background-color: #10b981;
+  border: 1px solid rgba(5, 150, 105, 0.45);
+  transition: all 0.15s ease-in-out;
+}
+
+.activity-day-normal:hover {
+  background-color: #059669;
+}
+
+html.dark .activity-day-normal {
+  background-color: #10b981;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+html.dark .activity-day-normal:hover {
+  background-color: #34d399;
+}
+
+.activity-day-fire {
+  background: linear-gradient(135deg, #f97316 0%, #f59e0b 50%, #ef4444 100%);
+  border: 1px solid rgba(251, 146, 60, 0.7);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(249, 115, 22, 0.4);
+  transition: all 0.15s ease-in-out;
+}
+
+.activity-day-fire:hover {
+  filter: brightness(1.15);
+}
+

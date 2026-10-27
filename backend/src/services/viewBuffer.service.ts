@@ -5,75 +5,110 @@ const BUFFER_KEY = 'buffer:blog:views';
 let flushTimer: NodeJS.Timeout | null = null;
 let isFlushing = false;
 
+// Local in-memory view buffer (0 Redis commands consumed for single-server setups)
+const localPendingViews = new Map<string, number>();
+
 export class ViewBufferService {
   /**
-   * Buffer a view increment in Redis hash
-   * Runs in <1ms without locking PostgreSQL rows
+   * Buffer a view increment in memory (and optionally Redis if REDIS_CLUSTER_MODE is active)
+   * Runs in microseconds without locking PostgreSQL rows or consuming Upstash commands
    */
   static async recordView(blogId: string): Promise<number> {
-    try {
-      const newBufferedCount = await redisClient.hincrby(BUFFER_KEY, blogId, 1);
-      return newBufferedCount;
-    } catch (err) {
-      console.warn(`[ViewBuffer] Failed to buffer view for ${blogId}:`, (err as Error).message);
-      return 0;
+    const current = (localPendingViews.get(blogId) || 0) + 1;
+    localPendingViews.set(blogId, current);
+
+    // Only mirror to Redis if horizontal cluster mode is explicitly turned on
+    if (process.env.REDIS_CLUSTER_MODE === 'true') {
+      try {
+        await redisClient.hincrby(BUFFER_KEY, blogId, 1);
+      } catch (err) {
+        console.warn(`[ViewBuffer] Remote Redis buffer notice for ${blogId}:`, (err as Error).message);
+      }
     }
+
+    return current;
   }
 
   /**
    * Get current buffered pending views for a post
    */
   static async getBufferedViews(blogId: string): Promise<number> {
-    try {
-      const all = await redisClient.hgetall(BUFFER_KEY);
-      const val = all[blogId];
-      return val ? parseInt(val, 10) || 0 : 0;
-    } catch {
-      return 0;
+    const local = localPendingViews.get(blogId) || 0;
+    if (process.env.REDIS_CLUSTER_MODE === 'true') {
+      try {
+        const all = await redisClient.hgetall(BUFFER_KEY);
+        const val = all[blogId];
+        return Math.max(local, val ? parseInt(val, 10) || 0 : 0);
+      } catch {
+        return local;
+      }
     }
+    return local;
   }
 
   /**
    * Consolidated batch write: flush all accumulated views to PostgreSQL
-   * Reduces PostgreSQL write load by up to 99%
+   * Reduces PostgreSQL write load by up to 99% and eliminates idle Redis polling
    */
   static async flushBufferedViews(): Promise<void> {
     if (isFlushing) return;
+
+    // Check if we have anything to flush
+    if (localPendingViews.size === 0 && process.env.REDIS_CLUSTER_MODE !== 'true') {
+      // Nothing pending! Zero database and zero Redis operations consumed.
+      return;
+    }
+
     isFlushing = true;
 
     try {
-      const allViews = await redisClient.hgetall(BUFFER_KEY);
-      const entries = Object.entries(allViews).filter(([_, countStr]) => {
-        const n = parseInt(countStr, 10);
-        return !isNaN(n) && n > 0;
-      });
+      // Snapshot pending local views and clear map for new incoming views
+      const snapshot = new Map(localPendingViews);
+      localPendingViews.clear();
 
-      if (entries.length === 0) {
-        isFlushing = false;
+      // If cluster mode is enabled, merge remote Redis hash
+      if (process.env.REDIS_CLUSTER_MODE === 'true') {
+        try {
+          const allViews = await redisClient.hgetall(BUFFER_KEY);
+          for (const [id, countStr] of Object.entries(allViews)) {
+            const count = parseInt(countStr, 10) || 0;
+            if (count > 0) {
+              snapshot.set(id, (snapshot.get(id) || 0) + count);
+            }
+          }
+        } catch (err) {
+          console.warn('[ViewBuffer] Redis view fetch notice during flush:', (err as Error).message);
+        }
+      }
+
+      if (snapshot.size === 0) {
         return;
       }
 
       let totalViewsFlushed = 0;
 
-      for (const [blogId, countStr] of entries) {
-        const incrementBy = parseInt(countStr, 10);
-        if (incrementBy <= 0) continue;
+      for (const [blogId, count] of snapshot.entries()) {
+        if (count <= 0) continue;
 
         try {
           await prisma.post.update({
             where: { id: blogId },
-            data: { views: { increment: incrementBy } },
+            data: { views: { increment: count } },
           });
 
-          await redisClient.hdel(BUFFER_KEY, blogId);
-          totalViewsFlushed += incrementBy;
+          if (process.env.REDIS_CLUSTER_MODE === 'true') {
+            await redisClient.hdel(BUFFER_KEY, blogId);
+          }
+          totalViewsFlushed += count;
         } catch (updateErr) {
           console.warn(`[ViewBuffer] Failed to flush views to post ${blogId}:`, (updateErr as Error).message);
+          // Re-queue failed views back into local map
+          localPendingViews.set(blogId, (localPendingViews.get(blogId) || 0) + count);
         }
       }
 
       if (totalViewsFlushed > 0) {
-        console.log(`🚀 [ViewBuffer] Batch write complete: flushed ${totalViewsFlushed} views across ${entries.length} posts to PostgreSQL.`);
+        console.log(`🚀 [ViewBuffer] Batch write complete: flushed ${totalViewsFlushed} views across ${snapshot.size} posts to PostgreSQL.`);
       }
     } catch (err) {
       console.error('[ViewBuffer] Flush cycle error:', (err as Error).message);
@@ -83,10 +118,10 @@ export class ViewBufferService {
   }
 
   /**
-   * Initialize recurring background flush interval (default: every 60 seconds)
+   * Initialize recurring background flush interval (default: every 5 minutes / 300,000ms)
    * and graceful shutdown handlers
    */
-  static startFlushInterval(intervalMs: number = 60000) {
+  static startFlushInterval(intervalMs: number = 300000) {
     if (flushTimer) return;
 
     flushTimer = setInterval(() => {
@@ -105,6 +140,6 @@ export class ViewBufferService {
     process.once('SIGINT', onExit);
     process.once('SIGTERM', onExit);
 
-    console.log(`⚡ [ViewBuffer] High-performance Redis batch view buffer initialized (${intervalMs / 1000}s interval).`);
+    console.log(`⚡ [ViewBuffer] High-performance batch view buffer active (Flush interval: ${intervalMs / 1000}s, Zero idle Redis polling).`);
   }
 }

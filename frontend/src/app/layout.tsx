@@ -4,6 +4,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { ToastProvider } from '../context/ToastContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import BackendWarmup from '../components/BackendWarmup';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://codeandcoffee.live'),
@@ -101,6 +102,7 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>
+              <BackendWarmup />
               <div className="relative min-h-screen flex flex-col justify-between bg-mesh-radial transition-colors duration-300">
                 <Suspense fallback={<div className="h-20" />}>
                   <Navbar />

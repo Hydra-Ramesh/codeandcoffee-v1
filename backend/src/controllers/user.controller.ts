@@ -17,6 +17,10 @@ const updateProfileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
   bio: z.string().max(500, 'Bio is too long').optional(),
   avatar: z.string().optional().or(z.string().length(0)),
+  githubUrl: z.string().optional().nullable().or(z.string().length(0)),
+  leetcodeUrl: z.string().optional().nullable().or(z.string().length(0)),
+  codeforcesUrl: z.string().optional().nullable().or(z.string().length(0)),
+  codechefUrl: z.string().optional().nullable().or(z.string().length(0)),
 });
 
 export class UserController {
@@ -68,6 +72,10 @@ export class UserController {
             isBanned: true,
             avatar: true,
             bio: true,
+            githubUrl: true,
+            leetcodeUrl: true,
+            codeforcesUrl: true,
+            codechefUrl: true,
             oauthProvider: true,
             createdAt: true,
             _count: {
@@ -201,6 +209,58 @@ export class UserController {
     }
   }
 
+  // ADMIN ONLY: Update coding profiles for any user (LeetCode, Codeforces, CodeChef, GitHub)
+  static async adminUpdateUserProfiles(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user || req.user.role !== 'ADMIN') {
+        res.status(403).json({ success: false, message: 'Admin privileges required.' });
+        return;
+      }
+
+      const id = String(req.params.id);
+      const { githubUrl, leetcodeUrl, codeforcesUrl, codechefUrl } = req.body;
+
+      const target = await prisma.user.findUnique({ where: { id } });
+      if (!target) {
+        res.status(404).json({ success: false, message: 'User not found.' });
+        return;
+      }
+
+      const updated = await prisma.user.update({
+        where: { id },
+        data: {
+          githubUrl: githubUrl !== undefined ? (githubUrl?.trim() || null) : undefined,
+          leetcodeUrl: leetcodeUrl !== undefined ? (leetcodeUrl?.trim() || null) : undefined,
+          codeforcesUrl: codeforcesUrl !== undefined ? (codeforcesUrl?.trim() || null) : undefined,
+          codechefUrl: codechefUrl !== undefined ? (codechefUrl?.trim() || null) : undefined,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatar: true,
+          githubUrl: true,
+          leetcodeUrl: true,
+          codeforcesUrl: true,
+          codechefUrl: true,
+          updatedAt: true,
+        },
+      });
+
+      // Invalidate cached user session so changes propagate immediately
+      await CacheService.invalidateUserSession(id);
+
+      res.status(200).json({
+        success: true,
+        message: `Coding profiles updated successfully for ${updated.name || updated.email}.`,
+        data: updated,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   // Authenticated User: Get personal profile & stats
   static async getProfile(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
@@ -229,6 +289,10 @@ export class UserController {
           role: true,
           avatar: true,
           bio: true,
+          githubUrl: true,
+          leetcodeUrl: true,
+          codeforcesUrl: true,
+          codechefUrl: true,
           oauthProvider: true,
           deletionRequestedAt: true,
           deletionScheduledAt: true,
@@ -297,6 +361,10 @@ export class UserController {
       if (data.name !== undefined) updatePayload.name = sanitizeText(data.name);
       if (data.bio !== undefined) updatePayload.bio = sanitizeText(data.bio);
       if (data.avatar !== undefined) updatePayload.avatar = data.avatar;
+      if (data.githubUrl !== undefined) updatePayload.githubUrl = data.githubUrl ? sanitizeText(data.githubUrl.trim()) : null;
+      if (data.leetcodeUrl !== undefined) updatePayload.leetcodeUrl = data.leetcodeUrl ? sanitizeText(data.leetcodeUrl.trim()) : null;
+      if (data.codeforcesUrl !== undefined) updatePayload.codeforcesUrl = data.codeforcesUrl ? sanitizeText(data.codeforcesUrl.trim()) : null;
+      if (data.codechefUrl !== undefined) updatePayload.codechefUrl = data.codechefUrl ? sanitizeText(data.codechefUrl.trim()) : null;
 
       const updated = await prisma.user.update({
         where: { id: req.user.id },
@@ -308,6 +376,10 @@ export class UserController {
           avatar: true,
           bio: true,
           role: true,
+          githubUrl: true,
+          leetcodeUrl: true,
+          codeforcesUrl: true,
+          codechefUrl: true,
         },
       });
 

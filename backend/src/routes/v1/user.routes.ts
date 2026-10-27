@@ -24,6 +24,7 @@ router.post('/cancel-deletion', authenticate, UserController.cancelAccountDeleti
 router.get('/', authenticate, requireAdmin, UserController.listUsers);
 router.patch('/:id/ban', authenticate, requireAdmin, UserController.toggleBanUser);
 router.patch('/:id/role', authenticate, requireAdmin, UserController.changeUserRole);
+router.patch('/:id/profiles', authenticate, requireAdmin, UserController.adminUpdateUserProfiles);
 router.delete('/:id', authenticate, requireAdmin, UserController.deleteUser);
 
 export default router;

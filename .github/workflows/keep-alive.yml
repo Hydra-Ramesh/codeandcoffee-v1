@@ -1,0 +1,37 @@
+name: Production Keep-Alive & Cold-Start Preventer
+
+on:
+  schedule:
+    # Runs every 14 minutes (safely below Render/Railway 15-minute idle sleep threshold)
+    - cron: '*/14 * * * *'
+  workflow_dispatch: # Allows one-click manual execution from GitHub Actions dashboard
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: true
+
+jobs:
+  ping-services:
+    name: Keep Backend & Database Warm
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping Production API & Neon Database
+        run: |
+          API_URL="${{ vars.PRODUCTION_API_URL || 'https://codeandcoffee-v1.onrender.com' }}"
+          echo "🌐 Dispatching keep-alive probes to: $API_URL"
+
+          # 1. Shallow liveness probe (resets host container 15-min idle timer)
+          LIVENESS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 "$API_URL/api/v1/health" || echo "000")
+          echo "📡 Liveness probe status: HTTP $LIVENESS_CODE"
+
+          # 2. Deep probe (queries Neon PostgreSQL with 'SELECT 1' and checks Redis)
+          DEEP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 "$API_URL/api/v1/health/deep" || echo "000")
+          echo "⚡ Deep probe (PostgreSQL + Redis) status: HTTP $DEEP_CODE"
+
+          if [ "$LIVENESS_CODE" = "200" ] || [ "$DEEP_CODE" = "200" ]; then
+            echo "✅ Successfully refreshed cloud container and Neon DB compute."
+          else
+            echo "ℹ️ Probes dispatched. If container was sleeping, wake-up is now initiated."
+          fi

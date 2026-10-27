@@ -74,11 +74,11 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
       }
       socketBlogsMap.get(socket.id)!.add(blogId);
 
-      // Track in Redis for multi-instance / persistence
-      try {
-        await redisClient.sadd(`blog:readers:${blogId}`, socket.id);
-      } catch (err) {
-        // Fallback to in-memory
+      // Track in Redis for multi-instance persistence (only if horizontal cluster mode is enabled)
+      if (process.env.REDIS_CLUSTER_MODE === 'true') {
+        try {
+          await redisClient.sadd(`blog:readers:${blogId}`, socket.id);
+        } catch (err) {}
       }
 
       const count = activeBlogSockets.get(blogId)?.size || 1;
@@ -103,9 +103,11 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
         socketBlogsMap.get(socket.id)!.delete(blogId);
       }
 
-      try {
-        await redisClient.srem(`blog:readers:${blogId}`, socket.id);
-      } catch (err) {}
+      if (process.env.REDIS_CLUSTER_MODE === 'true') {
+        try {
+          await redisClient.srem(`blog:readers:${blogId}`, socket.id);
+        } catch (err) {}
+      }
 
       const count = activeBlogSockets.get(blogId)?.size || 0;
       io?.to(`blog:${blogId}`).emit('readers:update', { blogId, count });
@@ -123,9 +125,11 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
               activeBlogSockets.delete(blogId);
             }
           }
-          try {
-            await redisClient.srem(`blog:readers:${blogId}`, socket.id);
-          } catch (err) {}
+          if (process.env.REDIS_CLUSTER_MODE === 'true') {
+            try {
+              await redisClient.srem(`blog:readers:${blogId}`, socket.id);
+            } catch (err) {}
+          }
 
           const count = activeBlogSockets.get(blogId)?.size || 0;
           io?.to(`blog:${blogId}`).emit('readers:update', { blogId, count });

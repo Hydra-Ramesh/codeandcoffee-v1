@@ -9,6 +9,7 @@ import uploadRoutes from './upload.routes.js';
 import contributorRoutes from './contributor.routes.js';
 import inquiryRoutes from './inquiry.routes.js';
 import waitlistRoutes from './waitlist.routes.js';
+import practiceRoutes from './practice.routes.js';
 import healthRoutes from './health.routes.js';
 import metricsRoutes from './metrics.routes.js';
 
@@ -30,5 +31,6 @@ router.use('/upload', uploadRoutes);
 router.use('/contributors', contributorRoutes);
 router.use('/inquiries', inquiryRoutes);
 router.use('/waitlist', waitlistRoutes);
+router.use('/practice', practiceRoutes);
 
 export default router;

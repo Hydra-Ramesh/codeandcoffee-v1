@@ -25,6 +25,8 @@ export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   apiVersion: process.env.API_VERSION || 'v1',
+  apiBaseUrl: defaultApiBaseUrl,
+  enableKeepAlive: process.env.ENABLE_KEEP_ALIVE !== 'false',
   clientUrl: primaryClientUrl,
   allowedClientOrigins,
 

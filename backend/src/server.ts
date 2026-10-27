@@ -7,16 +7,18 @@ import { isCloudinaryConfigured } from './config/cloudinary.js';
 import { AuthService } from './services/auth.service.js';
 import { initSocketServer } from './config/socket.js';
 import { ViewBufferService } from './services/viewBuffer.service.js';
+import { KeepAliveService } from './services/keepAlive.service.js';
 
 async function bootstrap() {
   console.log('----------------------------------------------------');
   console.log('☕ Starting Code & Coffee Fullstack Blog Platform...');
   console.log('----------------------------------------------------');
 
-  // Initialize Queues, Mongo & View Batch Buffer
+  // Initialize Queues, Mongo, View Batch Buffer & Cold-Start KeepAlive
   setupQueues();
   await connectMongo();
-  ViewBufferService.startFlushInterval(60000);
+  ViewBufferService.startFlushInterval(300000);
+  KeepAliveService.start();
 
   // Cloudinary v2 Status
   if (isCloudinaryConfigured()) {
@@ -63,6 +65,7 @@ async function bootstrap() {
 
   const shutdown = async () => {
     console.log('\n🛑 Gracefully shutting down Code & Coffee API server...');
+    KeepAliveService.stop();
     server.close(async () => {
       await prisma.$disconnect();
       console.log('👋 Clean exit completed.');
@@ -74,7 +77,19 @@ async function bootstrap() {
   process.on('SIGINT', shutdown);
 }
 
+// Global Process Crash Guards
+// In Node.js 16+, unhandled rejections terminate the process with exit code 1.
+// These guards catch rogue background promises and keep the server online.
+process.on('unhandledRejection', (reason: any) => {
+  console.error('🚨 [Server Guard] Unhandled Promise Rejection intercepted:', reason?.message || reason);
+});
+
+process.on('uncaughtException', (err: Error) => {
+  console.error('🚨 [Server Guard] Uncaught Exception intercepted:', err?.message || err, err?.stack);
+});
+
 bootstrap().catch((err) => {
   console.error('Fatal bootstrapping error:', err);
   process.exit(1);
 });
+

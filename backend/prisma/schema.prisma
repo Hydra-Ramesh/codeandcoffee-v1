@@ -33,6 +33,10 @@ model User {
   isBanned      Boolean   @default(false)
   oauthProvider String?   @default("local") // "local" | "google" | "github"
   oauthId       String?
+  githubUrl     String?
+  leetcodeUrl   String?
+  codeforcesUrl String?
+  codechefUrl   String?
   deletionRequestedAt DateTime?
   deletionScheduledAt DateTime?
   createdAt           DateTime  @default(now())
@@ -45,6 +49,8 @@ model User {
   applications  ContributorApplication[]
   sessions      UserSession[]
   waitlistEntries WaitlistEntry[]
+  practiceQuestions PracticeQuestion[]
+  practiceProgress  UserPracticeProgress[]
 
   @@index([email])
 }
@@ -200,4 +206,63 @@ model WaitlistEntry {
   @@index([status])
   @@index([track])
   @@index([createdAt(sort: Desc)])
+}
+
+enum PracticeSheetType {
+  CRACK_THE_INTERVIEW
+  SDE_SHEET
+  CP_SHEET
+  KNOWLEDGE_SHEET
+}
+
+enum ProblemDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model PracticeQuestion {
+  id            String            @id @default(cuid())
+  sheetType     PracticeSheetType
+  topic         String?           // For CRACK_THE_INTERVIEW and SDE_SHEET (e.g. "Arrays", "Strings", "Trees", "Dynamic Programming")
+  rating        Int?              // For CP_SHEET (e.g. 800, 1000, 1200, 1400, 1600, etc.)
+  platform      String            @default("LeetCode") // "LeetCode" | "Codeforces" | "CodeChef" | "Internal"
+  title         String
+  difficulty    ProblemDifficulty @default(MEDIUM)
+  content       String?           // Rich Readme / Markdown format for CRACK_THE_INTERVIEW
+  externalUrl   String?           // LeetCode / Codeforces / CodeChef link
+  videoUrl      String?           // Solution video (defaults to null / Coming Soon)
+  solutionNotes String?           // Solution notes (defaults to null / Coming Soon)
+  order         Int               @default(0)
+  isPublished   Boolean           @default(true)
+  authorId      String
+  author        User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  progress      UserPracticeProgress[]
+
+  @@index([sheetType])
+  @@index([sheetType, topic])
+  @@index([sheetType, rating])
+  @@index([isPublished])
+  @@index([sheetType, order])
+}
+
+model UserPracticeProgress {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    PracticeQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  isCompleted Boolean          @default(false)
+  notes       String?          // User revision note
+  completedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@index([questionId])
+  @@index([userId, isCompleted])
 }

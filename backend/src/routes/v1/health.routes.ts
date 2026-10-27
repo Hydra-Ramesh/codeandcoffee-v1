@@ -27,6 +27,11 @@ router.get('/', (req: Request, res: Response) => {
  * @desc    Deep readiness probe inspecting live PostgreSQL, Redis, MongoDB, and memory metrics
  * @access  Public
  */
+let cachedRedisCheck: {
+  timestamp: number;
+  result: { status: 'healthy' | 'degraded' | 'unhealthy'; latencyMs?: number; details?: string };
+} | null = null;
+
 router.get('/deep', async (req: Request, res: Response) => {
   const startTime = Date.now();
   const checks: Record<string, { status: 'healthy' | 'degraded' | 'unhealthy'; latencyMs?: number; details?: string }> = {};
@@ -47,32 +52,29 @@ router.get('/deep', async (req: Request, res: Response) => {
     };
   }
 
-  // 2. Redis Cache Ping
-  try {
-    const redisStart = Date.now();
-    const testKey = `health_ping_${Date.now()}`;
-    await redisClient.set(testKey, 'ok', 'EX', 5);
-    const readVal = await redisClient.get(testKey);
-    await redisClient.del(testKey);
-
-    if (readVal === 'ok') {
-      checks.redis = {
-        status: 'healthy',
+  // 2. Redis Cache Ping (Throttled to at most once per 60s, using a single non-destructive command)
+  const now = Date.now();
+  if (cachedRedisCheck && now - cachedRedisCheck.timestamp < 60000) {
+    checks.redis = cachedRedisCheck.result;
+  } else {
+    try {
+      const redisStart = Date.now();
+      await redisClient.get('health:probe');
+      const result = {
+        status: 'healthy' as const,
         latencyMs: Date.now() - redisStart,
-        details: 'Cache layer read/write verification succeeded',
+        details: 'Cache layer verification succeeded',
       };
-    } else {
-      checks.redis = {
-        status: 'degraded',
-        latencyMs: Date.now() - redisStart,
-        details: 'Cache responded but value did not match',
+      cachedRedisCheck = { timestamp: now, result };
+      checks.redis = result;
+    } catch (error) {
+      const result = {
+        status: 'degraded' as const,
+        details: `Operating in fallback mode: ${(error as Error).message}`,
       };
+      cachedRedisCheck = { timestamp: now, result };
+      checks.redis = result;
     }
-  } catch (error) {
-    checks.redis = {
-      status: 'degraded',
-      details: `Operating in fallback mode: ${(error as Error).message}`,
-    };
   }
 
   // 3. MongoDB State (for revisions / drafts)
