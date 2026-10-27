@@ -574,8 +574,8 @@ export default function PracticePage() {
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
+        <div className="relative z-10 flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between gap-6">
+          <div className="space-y-3 max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
               <Code2 className="w-3.5 h-3.5" />
               Algorithmic Mastery Hub
@@ -590,9 +590,9 @@ export default function PracticePage() {
           </div>
 
           {/* Quick Metrics Badges (LeetCode-Style Streak & Points) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full xl:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch gap-4 w-full 2xl:w-auto shrink-0">
             {/* LeetCode Daily Streak Widget */}
-            <div className="glass-card p-4 rounded-2xl border border-white/10 bg-black/60 space-y-2.5 min-w-[240px]">
+            <div className="glass-card p-4 sm:p-5 rounded-2xl border border-white/10 bg-black/60 space-y-2.5 w-full sm:w-[290px] shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div
@@ -649,11 +649,11 @@ export default function PracticePage() {
                 <span>
                   {myRankInfo?.todayStatus === 'FIRE' ? (
                     <span className="text-orange-400 font-bold flex items-center gap-1">
-                      🔥 {myRankInfo.todaySolves} Solved (Fire Day Active!)
+                      🔥 {myRankInfo.todaySolves} Solved (Fire Active)
                     </span>
                   ) : (myRankInfo?.todaySolves ?? 0) > 0 ? (
                     <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      🟢 {myRankInfo?.todaySolves} Solved (Normal Streak)
+                      🟢 {myRankInfo?.todaySolves} Solved (Normal)
                     </span>
                   ) : (
                     <span className="text-gray-400">0 Solved (Solve 1 to extend)</span>
@@ -663,7 +663,7 @@ export default function PracticePage() {
             </div>
 
             {/* Total Points & Sheet Progress Card */}
-            <div className="glass-card p-4 rounded-2xl border border-white/10 bg-black/60 space-y-2.5 min-w-[240px]">
+            <div className="glass-card p-4 sm:p-5 rounded-2xl border border-white/10 bg-black/60 space-y-2.5 w-full sm:w-[290px] shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20">
