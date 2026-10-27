@@ -4,6 +4,139 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { CacheService } from '../services/cache.service.js';
 import { PracticeSheetType, ProblemDifficulty } from '@prisma/client';
 
+export interface DailySolveSummary {
+  date: string; // YYYY-MM-DD
+  count: number;
+  status: 'NONE' | 'NORMAL' | 'FIRE'; // NONE: 0, NORMAL: 1-4, FIRE: >= 5
+}
+
+export interface UserStreakStats {
+  totalCompleted: number;
+  points: number; // totalCompleted * 10
+  currentStreak: number;
+  highestStreak: number;
+  fireDaysCount: number; // Days where solves >= 5
+  normalDaysCount: number; // Days where solves >= 1 and < 5
+  todaySolves: number;
+  todayStatus: 'NONE' | 'NORMAL' | 'FIRE';
+  recentDays: DailySolveSummary[]; // Last 14 days for activity heatmap
+}
+
+/**
+ * LeetCode-style streak and points calculator:
+ * - Each solved problem = 10 pts
+ * - Normal solve day (1-4 problems) = NORMAL (green)
+ * - Fire solve day (>= 5 problems) = FIRE (fire emoji 🔥)
+ * - Current streak: consecutive days with >= 1 solve up to today/yesterday
+ * - Highest streak: all-time longest consecutive solve days
+ */
+export function computeStreakAndDailyStats(
+  completedItems: { completedAt: Date | null }[]
+): UserStreakStats {
+  const totalCompleted = completedItems.length;
+  const points = totalCompleted * 10;
+
+  const dateCounts: Record<string, number> = {};
+  completedItems.forEach((item) => {
+    if (item.completedAt) {
+      const dStr = new Date(item.completedAt).toISOString().split('T')[0];
+      dateCounts[dStr] = (dateCounts[dStr] || 0) + 1;
+    }
+  });
+
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  const todaySolves = dateCounts[todayStr] || 0;
+  const todayStatus: 'NONE' | 'NORMAL' | 'FIRE' =
+    todaySolves >= 5 ? 'FIRE' : todaySolves > 0 ? 'NORMAL' : 'NONE';
+
+  let fireDaysCount = 0;
+  let normalDaysCount = 0;
+  Object.values(dateCounts).forEach((cnt) => {
+    if (cnt >= 5) fireDaysCount++;
+    else if (cnt >= 1) normalDaysCount++;
+  });
+
+  // Calculate highest streak
+  const sortedDates = Object.keys(dateCounts)
+    .filter((d) => dateCounts[d] > 0)
+    .sort();
+
+  let highestStreak = 0;
+  let runningStreak = 0;
+  let prevDate: Date | null = null;
+
+  for (const dStr of sortedDates) {
+    const curDate = new Date(dStr + 'T00:00:00Z');
+    if (!prevDate) {
+      runningStreak = 1;
+    } else {
+      const diffMs = curDate.getTime() - prevDate.getTime();
+      const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+      if (diffDays === 1) {
+        runningStreak += 1;
+      } else if (diffDays > 1) {
+        runningStreak = 1;
+      }
+    }
+    if (runningStreak > highestStreak) {
+      highestStreak = runningStreak;
+    }
+    prevDate = curDate;
+  }
+
+  // Calculate current streak
+  let currentStreak = 0;
+  let checkDate: Date | null = new Date(now);
+  if (todaySolves === 0) {
+    if ((dateCounts[yesterdayStr] || 0) > 0) {
+      checkDate = yesterday;
+    } else {
+      checkDate = null;
+    }
+  }
+
+  if (checkDate) {
+    while (true) {
+      const dKey = checkDate.toISOString().split('T')[0];
+      if ((dateCounts[dKey] || 0) > 0) {
+        currentStreak++;
+        checkDate = new Date(checkDate.getTime() - 24 * 60 * 60 * 1000);
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Generate last 14 days summary for activity heatmap
+  const recentDays: DailySolveSummary[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const day = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const dayKey = day.toISOString().split('T')[0];
+    const count = dateCounts[dayKey] || 0;
+    recentDays.push({
+      date: dayKey,
+      count,
+      status: count >= 5 ? 'FIRE' : count > 0 ? 'NORMAL' : 'NONE',
+    });
+  }
+
+  return {
+    totalCompleted,
+    points,
+    currentStreak,
+    highestStreak,
+    fireDaysCount,
+    normalDaysCount,
+    todaySolves,
+    todayStatus,
+    recentDays,
+  };
+}
+
 export class PracticeController {
   /**
    * Public: Retrieve all published practice questions for a specific sheet type
@@ -216,6 +349,9 @@ export class PracticeController {
         });
       }
 
+      // Invalidate Leaderboard Cache
+      await CacheService.del('practice:leaderboard');
+
       res.json({
         success: true,
         message: updated.isCompleted ? 'Marked as completed' : 'Marked as uncompleted',
@@ -348,6 +484,162 @@ export class PracticeController {
     } catch (error: any) {
       console.error('Error fetching user overall practice progress:', error);
       res.status(500).json({ success: false, message: 'Failed to retrieve progress summary' });
+    }
+  }
+
+  /**
+   * Public: Retrieve the Practice Leaderboard with Points and Streak Metrics
+   * - 10 pts per problem solved
+   * - Streaks tracked consecutively
+   * - Normal day (1-4 problems): green
+   * - Fire day (>= 5 problems): fire emoji 🔥
+   */
+  static async getPublicLeaderboard(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const cacheKey = 'practice:leaderboard';
+      let cachedData = await CacheService.get<any>(cacheKey);
+
+      let leaderboard = cachedData;
+      if (!leaderboard) {
+        const activeUsers = await prisma.user.findMany({
+          where: {
+            practiceProgress: {
+              some: {
+                isCompleted: true,
+              },
+            },
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            role: true,
+            practiceProgress: {
+              where: { isCompleted: true },
+              select: {
+                completedAt: true,
+                updatedAt: true,
+                question: {
+                  select: { sheetType: true, difficulty: true },
+                },
+              },
+            },
+          },
+        });
+
+        const computed = activeUsers.map((u) => {
+          const stats = computeStreakAndDailyStats(u.practiceProgress);
+          const lastActive = u.practiceProgress.reduce(
+            (acc: Date | null, cur) => (!acc || cur.updatedAt > acc ? cur.updatedAt : acc),
+            null
+          );
+
+          return {
+            id: u.id,
+            name: u.name,
+            avatar: u.avatar,
+            role: u.role,
+            totalCompleted: stats.totalCompleted,
+            points: stats.points,
+            currentStreak: stats.currentStreak,
+            highestStreak: stats.highestStreak,
+            fireDaysCount: stats.fireDaysCount,
+            normalDaysCount: stats.normalDaysCount,
+            todaySolves: stats.todaySolves,
+            todayStatus: stats.todayStatus,
+            recentDays: stats.recentDays,
+            lastActive,
+            crackCount: u.practiceProgress.filter((c) => c.question?.sheetType === 'CRACK_THE_INTERVIEW').length,
+            sdeCount: u.practiceProgress.filter((c) => c.question?.sheetType === 'SDE_SHEET').length,
+            cpCount: u.practiceProgress.filter((c) => c.question?.sheetType === 'CP_SHEET').length,
+          };
+        });
+
+        // Sort: Solved count (and points) desc, then highest streak desc, then current streak desc
+        computed.sort((a, b) => {
+          if (b.totalCompleted !== a.totalCompleted) return b.totalCompleted - a.totalCompleted;
+          if (b.highestStreak !== a.highestStreak) return b.highestStreak - a.highestStreak;
+          return b.currentStreak - a.currentStreak;
+        });
+
+        // Assign ranks
+        leaderboard = computed.map((entry, index) => ({
+          rank: index + 1,
+          ...entry,
+        }));
+
+        await CacheService.set(cacheKey, leaderboard, 60);
+      }
+
+      // Check if current user is logged in
+      let myRankInfo = null;
+      if (req.user?.id) {
+        const found = leaderboard.find((item: any) => item.id === req.user?.id);
+        if (found) {
+          myRankInfo = found;
+        } else {
+          // If user hasn't solved any questions yet
+          myRankInfo = {
+            id: req.user.id,
+            name: req.user.name,
+            rank: leaderboard.length + 1,
+            totalCompleted: 0,
+            points: 0,
+            currentStreak: 0,
+            highestStreak: 0,
+            fireDaysCount: 0,
+            normalDaysCount: 0,
+            todaySolves: 0,
+            todayStatus: 'NONE',
+            recentDays: [],
+          };
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          totalSolvers: leaderboard.length,
+          leaderboard,
+          myRankInfo,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching leaderboard:', error);
+      res.status(500).json({ success: false, message: 'Failed to retrieve practice leaderboard' });
+    }
+  }
+
+  /**
+   * Authenticated: Get detailed streak and points stats for currently logged-in user
+   */
+  static async getMyStreak(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Authentication required' });
+        return;
+      }
+
+      const progress = await prisma.userPracticeProgress.findMany({
+        where: {
+          userId: req.user.id,
+          isCompleted: true,
+        },
+        select: {
+          completedAt: true,
+        },
+      });
+
+      const stats = computeStreakAndDailyStats(progress);
+
+      res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error: any) {
+      console.error('Error fetching user streak:', error);
+      res.status(500).json({ success: false, message: 'Failed to retrieve streak data' });
     }
   }
 
@@ -752,6 +1044,7 @@ export class PracticeController {
             select: {
               isCompleted: true,
               notes: true,
+              completedAt: true,
               updatedAt: true,
               question: {
                 select: { sheetType: true },
@@ -765,6 +1058,7 @@ export class PracticeController {
         .map((u) => {
           const completed = u.practiceProgress.filter((p) => p.isCompleted);
           const withNotes = u.practiceProgress.filter((p) => p.notes && p.notes.trim().length > 0);
+          const stats = computeStreakAndDailyStats(completed);
           const lastActive = u.practiceProgress.reduce(
             (acc: Date | null, cur) => (!acc || cur.updatedAt > acc ? cur.updatedAt : acc),
             null
@@ -776,7 +1070,15 @@ export class PracticeController {
             email: u.email,
             avatar: u.avatar,
             role: u.role,
-            totalCompleted: completed.length,
+            totalCompleted: stats.totalCompleted,
+            points: stats.points,
+            currentStreak: stats.currentStreak,
+            highestStreak: stats.highestStreak,
+            fireDaysCount: stats.fireDaysCount,
+            normalDaysCount: stats.normalDaysCount,
+            todaySolves: stats.todaySolves,
+            todayStatus: stats.todayStatus,
+            recentDays: stats.recentDays,
             totalNotes: withNotes.length,
             lastActive,
             crackCount: completed.filter((c) => c.question?.sheetType === 'CRACK_THE_INTERVIEW')
@@ -785,8 +1087,9 @@ export class PracticeController {
             cpCount: completed.filter((c) => c.question?.sheetType === 'CP_SHEET').length,
           };
         })
-        .sort((a, b) => b.totalCompleted - a.totalCompleted || b.totalNotes - a.totalNotes)
-        .slice(0, 25);
+        .sort((a, b) => b.totalCompleted - a.totalCompleted || b.highestStreak - a.highestStreak)
+        .slice(0, 25)
+        .map((entry, idx) => ({ rank: idx + 1, ...entry }));
 
       res.json({
         success: true,

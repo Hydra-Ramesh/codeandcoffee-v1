@@ -55,6 +55,12 @@ interface PracticeQuestion {
   };
 }
 
+interface DailySolveSummary {
+  date: string;
+  count: number;
+  status: 'NONE' | 'NORMAL' | 'FIRE';
+}
+
 interface UserActivityData {
   metrics: {
     totalCompletions: number;
@@ -105,6 +111,14 @@ interface UserActivityData {
     avatar?: string | null;
     role: string;
     totalCompleted: number;
+    points: number;
+    currentStreak: number;
+    highestStreak: number;
+    fireDaysCount: number;
+    normalDaysCount: number;
+    todaySolves: number;
+    todayStatus: 'NONE' | 'NORMAL' | 'FIRE';
+    recentDays: DailySolveSummary[];
     totalNotes: number;
     lastActive: string | null;
     crackCount: number;
@@ -754,72 +768,139 @@ export default function AdminPracticePage() {
 
                 {/* Right 5 Cols: Student Leaderboard & Trending Problems */}
                 <div className="lg:col-span-5 space-y-6">
-                  {/* Student Leaderboard */}
+                  {/* Student Streaks & Points Monitor */}
                   <div className="glass-card rounded-2xl border border-white/10 p-5 space-y-4">
                     <div className="flex items-center justify-between pb-3 border-b border-white/10">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400">
                           <Trophy className="w-4 h-4" />
                         </div>
-                        <h3 className="text-sm font-bold text-white">Top Student Solvers</h3>
+                        <h3 className="text-sm font-bold text-white">Student Streaks &amp; Points Monitor</h3>
                       </div>
-                      <span className="text-[10px] font-mono text-amber-400">Leaderboard</span>
+                      <span className="text-[10px] font-mono text-amber-400">10 pts / solve</span>
                     </div>
 
                     {activityData.leaderboard.length === 0 ? (
                       <div className="py-8 text-center text-gray-400 text-xs">
-                        No leaderboard data yet.
+                        No student practice data recorded yet.
                       </div>
                     ) : (
-                      <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                      <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
                         {activityData.leaderboard.map((student, idx) => (
                           <div
                             key={student.id}
-                            className="p-2.5 rounded-xl bg-white/[0.02] flex items-center justify-between text-xs"
+                            className="p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 space-y-2 transition-colors"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span
-                                className={`w-5 text-center font-bold font-mono ${
-                                  idx === 0
-                                    ? 'text-amber-400'
-                                    : idx === 1
-                                    ? 'text-gray-300'
-                                    : idx === 2
-                                    ? 'text-amber-600'
-                                    : 'text-gray-500'
-                                }`}
-                              >
-                                #{idx + 1}
-                              </span>
-                              <img
-                                src={
-                                  student.avatar ||
-                                  `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
-                                    student.name
-                                  )}`
-                                }
-                                alt={student.name}
-                                className="w-7 h-7 rounded-full border border-white/20"
-                              />
-                              <div className="min-w-0">
-                                <div className="font-bold text-white truncate max-w-[130px]">
-                                  {student.name}
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span
+                                  className={`w-5 text-center font-bold font-mono ${
+                                    idx === 0
+                                      ? 'text-amber-400'
+                                      : idx === 1
+                                      ? 'text-gray-300'
+                                      : idx === 2
+                                      ? 'text-amber-600'
+                                      : 'text-gray-500'
+                                  }`}
+                                >
+                                  #{idx + 1}
+                                </span>
+                                <img
+                                  src={
+                                    student.avatar ||
+                                    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+                                      student.name
+                                    )}`
+                                  }
+                                  alt={student.name}
+                                  className="w-7 h-7 rounded-full border border-white/20"
+                                />
+                                <div className="min-w-0">
+                                  <div className="font-bold text-white truncate max-w-[130px]">
+                                    {student.name}
+                                  </div>
+                                  <div className="text-[10px] text-gray-400 font-mono truncate max-w-[130px]">
+                                    {student.email}
+                                  </div>
                                 </div>
-                                <div className="text-[10px] text-gray-400 font-mono truncate max-w-[130px]">
-                                  {student.email}
-                                </div>
+                              </div>
+
+                              <div className="text-right flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                  {student.points ?? student.totalCompleted * 10} pts
+                                </span>
+                                <span className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-white/5 text-gray-300">
+                                  {student.totalCompleted} solved
+                                </span>
                               </div>
                             </div>
 
-                            <div className="text-right">
-                              <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                                {student.totalCompleted} Solved
-                              </span>
-                              {student.totalNotes > 0 && (
-                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                                  {student.totalNotes} notes
-                                </div>
+                            {/* Streaks & Fire Days Sub-bar */}
+                            <div className="flex items-center justify-between text-[11px] font-mono pt-1 border-t border-white/5 text-gray-300">
+                              <div className="flex items-center gap-2">
+                                <span className="flex items-center gap-1 font-semibold">
+                                  Streak:
+                                  <strong className={student.todayStatus === 'FIRE' ? 'text-orange-400' : 'text-emerald-400'}>
+                                    {student.currentStreak || 0}d
+                                  </strong>
+                                  {student.todayStatus === 'FIRE' ? (
+                                    <span title="Fire Day Active! (≥5 problems solved today)">🔥</span>
+                                  ) : (student.currentStreak || 0) > 0 ? (
+                                    <span title="Normal streak day (1-4 problems solved)">🟢</span>
+                                  ) : null}
+                                </span>
+                                <span className="text-gray-600">|</span>
+                                <span className="text-gray-400">
+                                  Max: {student.highestStreak || 0}d
+                                </span>
+                                {student.fireDaysCount > 0 && (
+                                  <>
+                                    <span className="text-gray-600">|</span>
+                                    <span className="text-orange-400">
+                                      🔥 {student.fireDaysCount} {student.fireDaysCount === 1 ? 'Fire Day' : 'Fire Days'}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+
+                              {student.todaySolves > 0 ? (
+                                <span className="text-[10px] text-emerald-400 font-semibold">
+                                  +{student.todaySolves} today
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-gray-500">
+                                  0 today
+                                </span>
                               )}
+                            </div>
+
+                            {/* 14-Day Activity Heat Strip */}
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-[9px] font-mono text-gray-500">14-Day Activity:</span>
+                              <div className="flex items-center gap-1">
+                                {(student.recentDays || []).slice(-14).map((d, i) => (
+                                  <div
+                                    key={d.date || i}
+                                    title={`${d.date}: ${d.count} solved ${
+                                      d.status === 'FIRE'
+                                        ? '(🔥 Fire Day: ≥5 solves)'
+                                        : d.status === 'NORMAL'
+                                        ? '(🟢 Normal Day: 1-4 solves)'
+                                        : '(0 solves)'
+                                    }`}
+                                    className={`w-2.5 h-2.5 rounded-xs flex items-center justify-center text-[6px] ${
+                                      d.status === 'FIRE'
+                                        ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-xs'
+                                        : d.status === 'NORMAL'
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'bg-white/10'
+                                    }`}
+                                  >
+                                    {d.status === 'FIRE' ? '🔥' : ''}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         ))}

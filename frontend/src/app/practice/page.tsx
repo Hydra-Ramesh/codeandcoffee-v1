@@ -30,12 +30,44 @@ import {
   ArrowUpDown,
   RotateCcw,
   Filter,
+  Crown,
+  Medal,
+  Calendar,
+  Clock,
+  TrendingUp,
 } from 'lucide-react';
 
-type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET';
+type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET' | 'LEADERBOARD';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type StatusFilter = 'ALL' | 'COMPLETED' | 'UNCOMPLETED';
 type SortOption = 'DEFAULT' | 'LEVEL_ASC' | 'LEVEL_DESC' | 'UNSOLVED_FIRST' | 'SOLVED_FIRST' | 'TITLE_ASC';
+
+export interface DailySolveSummary {
+  date: string;
+  count: number;
+  status: 'NONE' | 'NORMAL' | 'FIRE';
+}
+
+export interface LeaderboardUser {
+  rank: number;
+  id: string;
+  name: string;
+  avatar?: string | null;
+  role: string;
+  totalCompleted: number;
+  points: number;
+  currentStreak: number;
+  highestStreak: number;
+  fireDaysCount: number;
+  normalDaysCount: number;
+  todaySolves: number;
+  todayStatus: 'NONE' | 'NORMAL' | 'FIRE';
+  recentDays: DailySolveSummary[];
+  lastActive: string | null;
+  crackCount: number;
+  sdeCount: number;
+  cpCount: number;
+}
 
 interface PracticeQuestion {
   id: string;
@@ -63,6 +95,12 @@ export default function PracticePage() {
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('ALL');
   const [sortBy, setSortBy] = useState<SortOption>('DEFAULT');
 
+  // Leaderboard & Streak State
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
+  const [myRankInfo, setMyRankInfo] = useState<LeaderboardUser | null>(null);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+  const [leaderboardSearch, setLeaderboardSearch] = useState('');
+
   // User Progress: completedMap and notesMap
   const [completedMap, setCompletedMap] = useState<Record<string, boolean>>({});
   const [notesMap, setNotesMap] = useState<Record<string, string>>({});
@@ -88,10 +126,35 @@ export default function PracticePage() {
     questionTitle: '',
   });
 
-  // Load questions whenever activeSheet changes
+  // Helper to format relative time for leaderboard
+  function formatRelativeTime(dateString: string | null | undefined): string {
+    if (!dateString) return 'Never';
+    const d = new Date(dateString);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+    if (diffSec < 60) return 'just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+    const diffDays = Math.floor(diffHour / 24);
+    if (diffDays < 30) return `${diffDays}d ago`;
+    return d.toLocaleDateString();
+  }
+
+  // Load questions or leaderboard whenever activeSheet changes
   useEffect(() => {
-    loadSheetQuestions(activeSheet);
+    if (activeSheet === 'LEADERBOARD') {
+      loadLeaderboard();
+    } else {
+      loadSheetQuestions(activeSheet);
+    }
   }, [activeSheet]);
+
+  // Load leaderboard & streak data on mount and whenever auth state changes
+  useEffect(() => {
+    loadLeaderboard();
+  }, [user]);
 
   // Load initial progress from localStorage (for immediate responsiveness & guests)
   useEffect(() => {
@@ -105,7 +168,25 @@ export default function PracticePage() {
     }
   }, []);
 
+  const loadLeaderboard = async () => {
+    setLoadingLeaderboard(true);
+    try {
+      const res = await fetchApi('/practice/leaderboard');
+      if (res.success && res.data) {
+        setLeaderboardData(res.data.leaderboard || []);
+        if (res.data.myRankInfo) {
+          setMyRankInfo(res.data.myRankInfo);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load leaderboard:', err);
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  };
+
   const loadSheetQuestions = async (sheet: SheetType) => {
+    if (sheet === 'LEADERBOARD') return;
     setLoading(true);
     try {
       const res = await fetchApi(`/practice/sheet/${sheet}`);
@@ -165,6 +246,8 @@ export default function PracticePage() {
         await fetchApi(`/practice/my-progress/${questionId}/toggle`, {
           method: 'POST',
         });
+        // Refresh leaderboard and streak telemetry immediately
+        loadLeaderboard();
       } catch (err) {
         console.error('Failed to sync progress with server:', err);
       }
@@ -320,6 +403,17 @@ export default function PracticePage() {
     return { total, completed, percentage };
   }, [questions, completedMap]);
 
+  // Filtered leaderboard solvers
+  const filteredLeaderboard = useMemo(() => {
+    if (!leaderboardSearch.trim()) return leaderboardData;
+    const q = leaderboardSearch.toLowerCase();
+    return leaderboardData.filter(
+      (u) =>
+        u.name.toLowerCase().includes(q) ||
+        (u.role && u.role.toLowerCase().includes(q))
+    );
+  }, [leaderboardData, leaderboardSearch]);
+
   // Total matching questions after filter
   const totalMatchingQuestions = useMemo(() => {
     return Object.values(groupedQuestions).reduce((acc, curr) => acc + curr.length, 0);
@@ -341,11 +435,11 @@ export default function PracticePage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-3xl glass-card border border-white/10 p-6 sm:p-10 bg-gradient-to-br from-amber-500/10 via-purple-500/5 to-cyan-500/10">
+      <div className="relative overflow-hidden rounded-3xl glass-card border border-white/10 p-6 sm:p-8 bg-gradient-to-br from-amber-500/10 via-purple-500/5 to-cyan-500/10">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
               <Code2 className="w-3.5 h-3.5" />
@@ -356,28 +450,137 @@ export default function PracticePage() {
             </h1>
             <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
               Curated problem sheets benchmarked for Tier-1 Tech Interviews and Competitive Programming.
-              Track your daily solve streak, write personal revision notes, and master core computer science patterns.
+              Track your daily solve streak, earn 10 points per solve, and climb the Global Leaderboard!
             </p>
           </div>
 
-          {/* Quick Metrics Badge */}
-          <div className="glass-card p-5 rounded-2xl border border-white/10 flex items-center gap-5 w-full md:w-auto min-w-[260px] bg-black/40">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20">
-              <Trophy className="w-6 h-6" />
+          {/* Quick Metrics Badges (LeetCode-Style Streak & Points) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full xl:w-auto">
+            {/* LeetCode Daily Streak Widget */}
+            <div className="glass-card p-4 rounded-2xl border border-white/10 bg-black/60 space-y-2.5 min-w-[240px]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`p-2.5 rounded-xl ${
+                      myRankInfo?.todayStatus === 'FIRE'
+                        ? 'bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-lg shadow-orange-500/40 animate-pulse'
+                        : (myRankInfo?.currentStreak ?? 0) > 0
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-white/5 text-gray-400 border border-white/5'
+                    }`}
+                  >
+                    <Flame className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Daily Streak
+                    </div>
+                    <div className="text-xl font-extrabold text-white font-mono flex items-center gap-1.5">
+                      <span>{myRankInfo?.currentStreak ?? 0}</span>
+                      <span className="text-xs text-gray-400 font-sans font-normal">
+                        {(myRankInfo?.currentStreak ?? 0) === 1 ? 'Day' : 'Days'}
+                      </span>
+                      {myRankInfo?.todayStatus === 'FIRE' ? (
+                        <span className="text-base" title="Fire Day Active! (≥5 problems solved today)">🔥</span>
+                      ) : (myRankInfo?.currentStreak ?? 0) > 0 ? (
+                        <span className="text-xs text-emerald-400 font-mono font-bold" title="Normal Streak Day (1-4 problems solved)">🟢</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-[10px] text-gray-400 font-mono">Highest Streak</div>
+                  <div className="text-xs font-bold text-amber-400 font-mono flex items-center justify-end gap-1">
+                    <Trophy className="w-3 h-3" />
+                    {myRankInfo?.highestStreak ?? 0}d
+                  </div>
+                </div>
+              </div>
+
+              {/* 14-Day Calendar Heat Strip */}
+              <div className="pt-1.5 border-t border-white/5 space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-gray-400">
+                  <span>14-Day Activity</span>
+                  <span className="font-mono text-gray-300">
+                    {myRankInfo?.todayStatus === 'FIRE'
+                      ? '🔥 Fire Day Active!'
+                      : myRankInfo?.todayStatus === 'NORMAL'
+                      ? '🟢 Today Active'
+                      : '○ 0 Solved Today'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  {(myRankInfo?.recentDays || []).slice(-14).map((d, i) => (
+                    <div
+                      key={d.date || i}
+                      title={`${d.date}: ${d.count} solved ${
+                        d.status === 'FIRE'
+                          ? '(🔥 Fire Day: ≥5 solves)'
+                          : d.status === 'NORMAL'
+                          ? '(🟢 Normal Day: 1-4 solves)'
+                          : '(0 solves)'
+                      }`}
+                      className={`w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[8px] transition-all ${
+                        d.status === 'FIRE'
+                          ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-sm shadow-orange-500/50 scale-110'
+                          : d.status === 'NORMAL'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-white/10 hover:bg-white/20'
+                      }`}
+                    >
+                      {d.status === 'FIRE' ? '🔥' : ''}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="space-y-1 flex-1">
-              <div className="flex items-center justify-between text-xs font-bold text-gray-300">
-                <span>Sheet Progress</span>
-                <span className="text-amber-400 font-mono text-sm">{sheetStats.percentage}%</span>
+
+            {/* Total Points & Sheet Progress Card */}
+            <div className="glass-card p-4 rounded-2xl border border-white/10 bg-black/60 space-y-2 min-w-[240px]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20">
+                    <Zap className="w-5 h-5 fill-slate-950" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Earned Points
+                    </div>
+                    <div className="text-xl font-extrabold text-amber-400 font-mono">
+                      {myRankInfo?.points ?? (Object.values(completedMap).filter(Boolean).length * 10)}
+                      <span className="text-xs text-gray-400 font-sans font-normal ml-1">pts</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-[10px] text-gray-400 font-mono">Global Rank</div>
+                  <div className="text-xs font-bold text-white font-mono">
+                    {myRankInfo ? `#${myRankInfo.rank}` : 'Unranked'}
+                  </div>
+                </div>
               </div>
-              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-gradient-to-r from-amber-400 to-amber-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${sheetStats.percentage}%` }}
-                />
-              </div>
-              <div className="text-[11px] text-gray-400 font-mono">
-                {sheetStats.completed} of {sheetStats.total} Solved
+
+              <div className="space-y-1 pt-1 border-t border-white/5">
+                <div className="flex items-center justify-between text-[11px] font-bold text-gray-300">
+                  <span>{activeSheet === 'LEADERBOARD' ? 'Global Solvers' : 'Sheet Progress'}</span>
+                  <span className="text-amber-400 font-mono">
+                    {activeSheet === 'LEADERBOARD' ? `${leaderboardData.length} Users` : `${sheetStats.percentage}%`}
+                  </span>
+                </div>
+                {activeSheet !== 'LEADERBOARD' ? (
+                  <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-amber-400 to-amber-500 h-1.5 rounded-full transition-all duration-500"
+                      style={{ width: `${sheetStats.percentage}%` }}
+                    />
+                  </div>
+                ) : null}
+                <div className="text-[10px] text-gray-400 font-mono flex items-center justify-between">
+                  <span>10 pts / problem</span>
+                  <span>{sheetStats.completed} completed in sheet</span>
+                </div>
               </div>
             </div>
           </div>
@@ -430,10 +633,27 @@ export default function PracticePage() {
             Rating-Wise
           </span>
         </button>
+
+        <button
+          onClick={() => setActiveSheet('LEADERBOARD')}
+          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all whitespace-nowrap ${
+            activeSheet === 'LEADERBOARD'
+              ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/25 scale-[1.02]'
+              : 'glass-card text-gray-300 hover:text-white hover:bg-white/5 border border-white/10'
+          }`}
+        >
+          <Trophy className="w-4 h-4" />
+          <span>4. Global Leaderboard</span>
+          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-black/30">
+            Top Solvers &amp; Streaks
+          </span>
+        </button>
       </div>
 
-      {/* Search, Filter & Sort Controls Bar */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 glass-card rounded-2xl border border-white/10 bg-white/[0.02]">
+      {/* Search, Filter & Sort Controls Bar (Hidden on Leaderboard) */}
+      {activeSheet !== 'LEADERBOARD' && (
+        <>
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 glass-card rounded-2xl border border-white/10 bg-white/[0.02]">
         {/* Search Input */}
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -587,9 +807,452 @@ export default function PracticePage() {
           </span>
         )}
       </div>
+    </>
+  )}
 
       {/* Content Area */}
-      {loading ? (
+      {activeSheet === 'LEADERBOARD' ? (
+        /* ============================================================ */
+        /* GLOBAL LEADERBOARD & STREAKS TAB */
+        /* ============================================================ */
+        <div className="space-y-8 animate-fade-in">
+          {/* Rules & Scoring Banner */}
+          <div className="p-5 rounded-2xl glass-card border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-purple-500/10">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20">
+                  <Trophy className="w-5 h-5 fill-slate-950" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    Global Solvers League &amp; Daily Streaks
+                  </h3>
+                  <p className="text-xs text-gray-300">
+                    Solve daily problems to build consecutive streaks like LeetCode and climb the global ranks!
+                  </p>
+                </div>
+              </div>
+
+              {/* Rules Badges */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-3 py-1 rounded-xl text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 fill-amber-300" />
+                  +10 pts / Problem
+                </span>
+                <span className="px-3 py-1 rounded-xl text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                  🟢 1-4 Solves = Normal Day
+                </span>
+                <span className="px-3 py-1 rounded-xl text-xs font-mono font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30 flex items-center gap-1.5 animate-pulse">
+                  🔥 ≥5 Solves = Fire Day
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Top 3 Podium */}
+          {!loadingLeaderboard && leaderboardData.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 items-end">
+              {/* Rank 2 - Silver (Left) */}
+              {leaderboardData[1] && (
+                <div className="glass-card rounded-2xl border border-slate-300/30 bg-gradient-to-b from-slate-400/10 to-transparent p-6 text-center space-y-3 relative order-2 md:order-1 hover:border-slate-300/50 transition-all">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-xs font-bold font-mono bg-slate-300 text-slate-950 shadow-md">
+                    🥈 Rank #2
+                  </div>
+                  <div className="relative inline-block mt-2">
+                    <img
+                      src={
+                        leaderboardData[1].avatar ||
+                        `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+                          leaderboardData[1].name
+                        )}`
+                      }
+                      alt={leaderboardData[1].name}
+                      className="w-16 h-16 rounded-full mx-auto border-2 border-slate-300 shadow-lg object-cover"
+                    />
+                    <div className="absolute -bottom-1 -right-1 p-1 rounded-full bg-slate-300 text-slate-950">
+                      <Medal className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-white truncate">
+                      {leaderboardData[1].name}
+                    </h4>
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-white/10 text-gray-300">
+                      {leaderboardData[1].role}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                    <div className="text-xl font-extrabold text-amber-400 font-mono">
+                      {leaderboardData[1].points} <span className="text-xs font-normal text-gray-400">pts</span>
+                    </div>
+                    <div className="text-xs text-gray-300 font-mono">
+                      {leaderboardData[1].totalCompleted} Problems Solved
+                    </div>
+                    <div className="text-[11px] font-mono text-gray-400 flex items-center justify-center gap-1.5 pt-1">
+                      <span>Streak: {leaderboardData[1].currentStreak}d {leaderboardData[1].todayStatus === 'FIRE' ? '🔥' : '🟢'}</span>
+                      <span>•</span>
+                      <span>Max: {leaderboardData[1].highestStreak}d</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Rank 1 - Gold (Center, Elevated) */}
+              {leaderboardData[0] && (
+                <div className="glass-card rounded-2xl border-2 border-amber-400/50 bg-gradient-to-b from-amber-500/20 via-black/40 to-black/60 p-7 text-center space-y-3.5 relative order-1 md:order-2 shadow-xl shadow-amber-500/20 md:-translate-y-3 hover:border-amber-400 transition-all">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-extrabold font-mono bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-lg flex items-center gap-1">
+                    <Crown className="w-3.5 h-3.5 fill-slate-950" />
+                    🥇 Champion #1
+                  </div>
+                  <div className="relative inline-block mt-3">
+                    <img
+                      src={
+                        leaderboardData[0].avatar ||
+                        `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+                          leaderboardData[0].name
+                        )}`
+                      }
+                      alt={leaderboardData[0].name}
+                      className="w-20 h-20 rounded-full mx-auto border-3 border-amber-400 shadow-xl object-cover ring-4 ring-amber-400/20"
+                    />
+                    <div className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-amber-400 text-slate-950 shadow-md">
+                      <Crown className="w-4 h-4 fill-slate-950" />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-extrabold text-white truncate">
+                      {leaderboardData[0].name}
+                    </h4>
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {leaderboardData[0].role}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-black/60 border border-amber-500/30 space-y-1">
+                    <div className="text-2xl font-black text-amber-400 font-mono flex items-center justify-center gap-1">
+                      <Zap className="w-5 h-5 fill-amber-400" />
+                      {leaderboardData[0].points} <span className="text-xs font-normal text-gray-400">pts</span>
+                    </div>
+                    <div className="text-xs text-white font-mono font-semibold">
+                      {leaderboardData[0].totalCompleted} Problems Mastered
+                    </div>
+                    <div className="text-xs font-mono text-emerald-400 flex items-center justify-center gap-2 pt-1">
+                      <span className="flex items-center gap-1">
+                        Current Streak: <strong>{leaderboardData[0].currentStreak}d</strong>
+                        {leaderboardData[0].todayStatus === 'FIRE' ? '🔥' : '🟢'}
+                      </span>
+                      <span>•</span>
+                      <span>Max: <strong>{leaderboardData[0].highestStreak}d</strong></span>
+                    </div>
+                    {leaderboardData[0].fireDaysCount > 0 && (
+                      <div className="text-[10px] text-orange-400 font-mono">
+                        🔥 {leaderboardData[0].fireDaysCount} Fire Days (≥5 solves/day)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Rank 3 - Bronze (Right) */}
+              {leaderboardData[2] && (
+                <div className="glass-card rounded-2xl border border-amber-700/40 bg-gradient-to-b from-amber-700/15 to-transparent p-6 text-center space-y-3 relative order-3 md:order-3 hover:border-amber-700/60 transition-all">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-xs font-bold font-mono bg-amber-700 text-white shadow-md">
+                    🥉 Rank #3
+                  </div>
+                  <div className="relative inline-block mt-2">
+                    <img
+                      src={
+                        leaderboardData[2].avatar ||
+                        `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+                          leaderboardData[2].name
+                        )}`
+                      }
+                      alt={leaderboardData[2].name}
+                      className="w-16 h-16 rounded-full mx-auto border-2 border-amber-700 shadow-lg object-cover"
+                    />
+                    <div className="absolute -bottom-1 -right-1 p-1 rounded-full bg-amber-700 text-white">
+                      <Award className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-white truncate">
+                      {leaderboardData[2].name}
+                    </h4>
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-white/10 text-gray-300">
+                      {leaderboardData[2].role}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                    <div className="text-xl font-extrabold text-amber-400 font-mono">
+                      {leaderboardData[2].points} <span className="text-xs font-normal text-gray-400">pts</span>
+                    </div>
+                    <div className="text-xs text-gray-300 font-mono">
+                      {leaderboardData[2].totalCompleted} Problems Solved
+                    </div>
+                    <div className="text-[11px] font-mono text-gray-400 flex items-center justify-center gap-1.5 pt-1">
+                      <span>Streak: {leaderboardData[2].currentStreak}d {leaderboardData[2].todayStatus === 'FIRE' ? '🔥' : '🟢'}</span>
+                      <span>•</span>
+                      <span>Max: {leaderboardData[2].highestStreak}d</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* User's Own Standing Card (If Logged In) */}
+          {user && myRankInfo && (
+            <div className="p-4 rounded-2xl glass-card border border-amber-500/30 bg-amber-500/[0.04] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-mono font-black text-sm">
+                  #{myRankInfo.rank}
+                </div>
+                <div>
+                  <div className="text-xs text-amber-300 font-bold uppercase tracking-wider">
+                    Your Current Standing
+                  </div>
+                  <div className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>{myRankInfo.name}</span>
+                    <span className="text-xs text-gray-400 font-mono">
+                      ({myRankInfo.points} pts • {myRankInfo.totalCompleted} solved)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-200">
+                  Current Streak: <strong className="text-white">{myRankInfo.currentStreak}d</strong> {myRankInfo.todayStatus === 'FIRE' ? '🔥' : '🟢'}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-amber-300">
+                  Best: <strong className="text-white">{myRankInfo.highestStreak}d</strong>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Search Table Controls */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 glass-card rounded-2xl border border-white/10">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={leaderboardSearch}
+                onChange={(e) => setLeaderboardSearch(e.target.value)}
+                placeholder="Search solver by name..."
+                className="w-full pl-9 pr-8 py-2 rounded-xl text-xs glass-card border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400"
+              />
+              {leaderboardSearch && (
+                <button
+                  onClick={() => setLeaderboardSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="text-xs font-mono text-gray-400 flex items-center gap-2">
+              <span>Total Solvers: <strong className="text-amber-400">{filteredLeaderboard.length}</strong></span>
+              <span>•</span>
+              <button
+                onClick={loadLeaderboard}
+                className="text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                title="Refresh Leaderboard"
+              >
+                <RotateCcw className="w-3 h-3" /> Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* Full Solvers Table */}
+          {loadingLeaderboard ? (
+            <div className="py-16 text-center space-y-3">
+              <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-gray-400 text-xs font-mono">Ranking all practice arena coders...</p>
+            </div>
+          ) : filteredLeaderboard.length === 0 ? (
+            <div className="text-center py-16 glass-card rounded-2xl border border-white/10 space-y-2">
+              <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
+              <h3 className="text-base font-bold text-white">No solvers match search</h3>
+              <p className="text-gray-400 text-xs">Try clearing the search query.</p>
+            </div>
+          ) : (
+            <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/[0.02] text-[11px] font-bold uppercase tracking-wider text-gray-400 font-mono">
+                      <th className="px-5 py-3.5 text-center">Rank</th>
+                      <th className="px-5 py-3.5">Coder</th>
+                      <th className="px-5 py-3.5 text-center">Problems Solved</th>
+                      <th className="px-5 py-3.5 text-center">Total Score</th>
+                      <th className="px-5 py-3.5 text-center">Current Streak</th>
+                      <th className="px-5 py-3.5 text-center">Max Streak</th>
+                      <th className="px-5 py-3.5 text-center">Fire Days (≥5)</th>
+                      <th className="px-5 py-3.5 text-center">14-Day Activity</th>
+                      <th className="px-5 py-3.5 text-right">Last Active</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-xs">
+                    {filteredLeaderboard.map((coder) => {
+                      const isMe = user?.id === coder.id;
+                      return (
+                        <tr
+                          key={coder.id}
+                          className={`transition-colors ${
+                            isMe
+                              ? 'bg-amber-500/[0.08] hover:bg-amber-500/[0.12] border-l-2 border-l-amber-400'
+                              : 'hover:bg-white/[0.02]'
+                          }`}
+                        >
+                          {/* Rank */}
+                          <td className="px-5 py-3.5 whitespace-nowrap text-center font-mono font-bold">
+                            {coder.rank === 1 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black shadow-sm">
+                                🥇 #1
+                              </span>
+                            ) : coder.rank === 2 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-300 text-slate-950 font-black shadow-sm">
+                                🥈 #2
+                              </span>
+                            ) : coder.rank === 3 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-700 text-white font-black shadow-sm">
+                                🥉 #3
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">#{coder.rank}</span>
+                            )}
+                          </td>
+
+                          {/* Coder */}
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={
+                                  coder.avatar ||
+                                  `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+                                    coder.name
+                                  )}`
+                                }
+                                alt={coder.name}
+                                className="w-8 h-8 rounded-full border border-white/20 object-cover"
+                              />
+                              <div>
+                                <div className="font-bold text-white flex items-center gap-2">
+                                  <span>{coder.name}</span>
+                                  {isMe && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-400 text-slate-950">
+                                      You
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-gray-400 font-mono">
+                                  {coder.role}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Problems Solved */}
+                          <td className="px-5 py-3.5 whitespace-nowrap text-center font-mono">
+                            <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-white/5 text-gray-200 border border-white/10">
+                              {coder.totalCompleted} solved
+                            </span>
+                          </td>
+
+                          {/* Total Score */}
+                          <td className="px-5 py-3.5 whitespace-nowrap text-center font-mono">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              <Zap className="w-3.5 h-3.5 fill-amber-300" />
+                              {coder.points} pts
+                            </span>
+                          </td>
+
+                          {/* Current Streak */}
+                          <td className="px-5 py-3.5 whitespace-nowrap text-center font-mono">
+                            {coder.currentStreak > 0 ? (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold ${
+                                  coder.todayStatus === 'FIRE'
+                                    ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40 shadow-sm shadow-orange-500/20'
+                                    : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                }`}
+                                title={
+                                  coder.todayStatus === 'FIRE'
+                                    ? '🔥 Fire Day Active! (≥5 problems solved today)'
+                                    : '🟢 Active solve streak'
+                                }
+                              >
+                                {coder.todayStatus === 'FIRE' ? '🔥' : '🟢'}
+                                {coder.currentStreak} {coder.currentStreak === 1 ? 'day' : 'days'}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500 text-xs">0 days</span>
+                            )}
+                          </td>
+
+                          {/* Highest Streak */}
+                          <td className="px-5 py-3.5 whitespace-nowrap text-center font-mono text-gray-300">
+                            <span className="inline-flex items-center gap-1 font-semibold">
+                              <Trophy className="w-3 h-3 text-amber-400" />
+                              {coder.highestStreak}d
+                            </span>
+                          </td>
+
+                          {/* Fire Days */}
+                          <td className="px-5 py-3.5 whitespace-nowrap text-center font-mono">
+                            {coder.fireDaysCount > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20">
+                                🔥 {coder.fireDaysCount}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">-</span>
+                            )}
+                          </td>
+
+                          {/* 14-Day Activity Matrix */}
+                          <td className="px-5 py-3.5 whitespace-nowrap text-center">
+                            <div className="inline-flex items-center gap-1">
+                              {(coder.recentDays || []).slice(-14).map((d, i) => (
+                                <div
+                                  key={d.date || i}
+                                  title={`${d.date}: ${d.count} solved ${
+                                    d.status === 'FIRE'
+                                      ? '(🔥 Fire Day: ≥5 solves)'
+                                      : d.status === 'NORMAL'
+                                      ? '(🟢 Normal Day: 1-4 solves)'
+                                      : '(0 solves)'
+                                  }`}
+                                  className={`w-3 h-3 rounded-xs flex items-center justify-center text-[7px] ${
+                                    d.status === 'FIRE'
+                                      ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-xs'
+                                      : d.status === 'NORMAL'
+                                      ? 'bg-emerald-500 text-white'
+                                      : 'bg-white/10'
+                                  }`}
+                                >
+                                  {d.status === 'FIRE' ? '🔥' : ''}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+
+                          {/* Last Active */}
+                          <td className="px-5 py-3.5 whitespace-nowrap text-right font-mono text-[11px] text-gray-400">
+                            {formatRelativeTime(coder.lastActive)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {loading ? (
         <div className="space-y-4 py-12 text-center">
           <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-gray-400 text-xs font-mono">Loading curated problem collection...</p>
@@ -812,6 +1475,8 @@ export default function PracticePage() {
           })}
         </div>
       )}
+    </>
+  )}
 
       {/* ============================================================ */}
       {/* README MODAL FOR CRACK THE INTERVIEW */}

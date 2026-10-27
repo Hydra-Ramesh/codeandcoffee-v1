@@ -42,40 +42,69 @@ async function main() {
 
   let count = 0;
   for (const user of users) {
-    // Each user solves a few questions
-    const userQuestions = questions.slice(0, user.email.includes('alex') ? 6 : 4);
+    // Distribute questions across multiple days for streak simulation
+    // Alex: 10 questions (5 today [FIRE 🔥], 2 yesterday, 2 2-days-ago, 1 3-days-ago) -> 4 day streak!
+    // Sarah: 11 questions (3 today, 3 yesterday, 5 2-days-ago [FIRE 🔥]) -> 3 day streak!
+    // Ramesh: 3 questions (2 today, 1 yesterday) -> 2 day streak!
+    let plan = [];
+    if (user.email.includes('alex')) {
+      plan = [
+        { dayOffset: 0, count: 5 }, // 5 solves today -> FIRE DAY 🔥
+        { dayOffset: 1, count: 2 }, // 2 solves yesterday -> NORMAL DAY 🟢
+        { dayOffset: 2, count: 2 }, // 2 solves 2 days ago -> NORMAL DAY 🟢
+        { dayOffset: 3, count: 1 }, // 1 solve 3 days ago -> NORMAL DAY 🟢
+      ];
+    } else if (user.email.includes('sarah')) {
+      plan = [
+        { dayOffset: 0, count: 3 }, // 3 solves today -> NORMAL DAY 🟢
+        { dayOffset: 1, count: 3 }, // 3 solves yesterday -> NORMAL DAY 🟢
+        { dayOffset: 2, count: 5 }, // 5 solves 2 days ago -> FIRE DAY 🔥
+      ];
+    } else {
+      plan = [
+        { dayOffset: 0, count: 2 }, // 2 solves today -> NORMAL DAY 🟢
+        { dayOffset: 1, count: 1 }, // 1 solve yesterday -> NORMAL DAY 🟢
+      ];
+    }
 
-    for (let i = 0; i < userQuestions.length; i++) {
-      const q = userQuestions[i];
-      const hasNote = i % 2 === 0;
+    let qIndex = 0;
+    for (const step of plan) {
+      for (let s = 0; s < step.count; s++) {
+        const q = questions[qIndex % questions.length];
+        qIndex++;
+        const hasNote = s % 2 === 0;
 
-      await prisma.userPracticeProgress.upsert({
-        where: {
-          userId_questionId: {
+        // Base timestamp for this day offset
+        const targetDate = new Date(Date.now() - step.dayOffset * 86400000 - s * 3600000);
+
+        await prisma.userPracticeProgress.upsert({
+          where: {
+            userId_questionId: {
+              userId: user.id,
+              questionId: q.id,
+            },
+          },
+          update: {
+            isCompleted: true,
+            notes: hasNote ? sampleNotes[s % sampleNotes.length] : null,
+            completedAt: targetDate,
+            updatedAt: targetDate,
+          },
+          create: {
             userId: user.id,
             questionId: q.id,
+            isCompleted: true,
+            notes: hasNote ? sampleNotes[s % sampleNotes.length] : null,
+            completedAt: targetDate,
+            updatedAt: targetDate,
           },
-        },
-        update: {
-          isCompleted: true,
-          notes: hasNote ? sampleNotes[i % sampleNotes.length] : null,
-          completedAt: new Date(Date.now() - i * 3600000),
-          updatedAt: new Date(Date.now() - i * 1800000),
-        },
-        create: {
-          userId: user.id,
-          questionId: q.id,
-          isCompleted: true,
-          notes: hasNote ? sampleNotes[i % sampleNotes.length] : null,
-          completedAt: new Date(Date.now() - i * 3600000),
-          updatedAt: new Date(Date.now() - i * 1800000),
-        },
-      });
-      count++;
+        });
+        count++;
+      }
     }
   }
 
-  console.log(`✅ Seeded ${count} practice activity records for demo users!`);
+  console.log(`✅ Seeded ${count} practice activity records with realistic multi-day streaks & fire days!`);
 }
 
 main()

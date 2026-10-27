@@ -140,6 +140,7 @@ export class CacheService {
       } else {
         await this.delPattern('practice:sheet:*');
       }
+      await this.del('practice:leaderboard');
       await this.delPattern('practice:admin:*');
     } catch (err) {
       console.warn('Error during practice cache invalidation:', (err as Error).message);

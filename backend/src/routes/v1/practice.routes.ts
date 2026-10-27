@@ -18,6 +18,12 @@ router.get('/sheet/:sheetType', optionalAuth, PracticeController.getSheetQuestio
 // Get single question detail
 router.get('/question/:id', optionalAuth, PracticeController.getQuestionById);
 
+// Public Practice Leaderboard (Points & Streaks)
+router.get('/leaderboard', optionalAuth, PracticeController.getPublicLeaderboard);
+
+// Personal detailed streak stats for logged-in user
+router.get('/my-streak', authenticate, PracticeController.getMyStreak);
+
 // Get overall progress summary for authenticated user
 router.get('/my-progress', authenticate, PracticeController.getMyOverallProgress);
 
