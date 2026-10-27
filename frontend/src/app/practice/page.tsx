@@ -1654,10 +1654,38 @@ export default function PracticePage() {
           <p className="text-gray-400 text-xs font-mono">Loading curated problem collection...</p>
         </div>
       ) : Object.keys(groupedQuestions).length === 0 ? (
-        <div className="text-center py-16 glass-card rounded-2xl border border-white/10 space-y-3">
-          <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
-          <h3 className="text-base font-bold text-white">No questions found</h3>
-          <p className="text-gray-400 text-xs">Try adjusting your search query or difficulty filter.</p>
+        <div className="text-center py-16 glass-card rounded-2xl border border-white/10 space-y-4 max-w-xl mx-auto">
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-block">
+            <BookOpen className="w-8 h-8" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-bold text-white">
+              {questions.length === 0
+                ? 'This sheet is currently blank'
+                : 'No matching problems found'}
+            </h3>
+            <p className="text-gray-400 text-xs leading-relaxed">
+              {questions.length === 0
+                ? 'No questions added to this sheet yet. Practice Chapter 1 (Arrays & Strings) in "Crack the Interview" or add new problems from the Admin Panel.'
+                : 'Try adjusting your search query, difficulty level, or completion status filters.'}
+            </p>
+          </div>
+          {questions.length === 0 ? (
+            <button
+              onClick={() => setActiveSheet('CRACK_THE_INTERVIEW')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-all shadow-md shadow-amber-500/20 cursor-pointer"
+            >
+              <span>Explore Crack the Interview (Arrays &amp; Strings)</span>
+            </button>
+          ) : hasActiveFilters ? (
+            <button
+              onClick={handleResetFilters}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset Filters</span>
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-6">
