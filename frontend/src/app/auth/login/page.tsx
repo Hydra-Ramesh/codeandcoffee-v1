@@ -38,6 +38,9 @@ function LoginFormContent() {
 
     const res = await login(email, password);
     if (res.success) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('cnc_just_authenticated', 'true');
+      }
       router.push(safeRedirect);
     } else {
       setError(res.message || 'Invalid email or password.');

@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { Coffee, ShieldAlert, User, LogOut, Menu, X, Sparkles, PenTool, Code2 } from 'lucide-react';
+import { Coffee, ShieldAlert, User, LogOut, Menu, X, Sparkles, PenTool, Code2, Compass } from 'lucide-react';
 import { optimizeImageUrl } from '../lib/image';
+import { startProductTour } from './ProductTour';
 
 import ThemeToggle from './ThemeToggle';
 
@@ -15,9 +16,9 @@ export default function Navbar() {
   const pathname = usePathname();
 
   const navLinks = [
-    { name: 'Explore Blogs', href: '/blogs' },
-    { name: 'Practice', href: '/practice', isPractice: true },
-    { name: "What's Coming?", href: '/whats-coming', isHighlight: true },
+    { name: 'Explore Blogs', href: '/blogs', dataTour: 'tour-nav-blogs' },
+    { name: 'Practice', href: '/practice', isPractice: true, dataTour: 'tour-nav-practice' },
+    { name: "What's Coming?", href: '/whats-coming', isHighlight: true, dataTour: 'tour-nav-roadmap' },
     { name: 'Contact', href: '/contact' },
   ];
 
@@ -25,7 +26,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 w-full glass-card border-b border-white/10 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-3 group">
+        <Link href="/" data-tour="tour-brand" className="flex items-center gap-3 group">
           <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-amber-500/20 via-purple-500/10 to-transparent border border-amber-500/30 group-hover:border-amber-400/60 transition-all duration-300">
             <Coffee className="w-6 h-6 text-amber-400 group-hover:rotate-6 transition-transform duration-300" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full pulse-beacon" />
@@ -41,12 +42,14 @@ export default function Navbar() {
             const isActive = pathname === link.href;
             const isHighlight = (link as any).isHighlight;
             const isPractice = (link as any).isPractice;
+            const dataTour = (link as any).dataTour;
 
             if (isPractice) {
               return (
                 <Link
                   key={link.name}
                   href={link.href}
+                  data-tour={dataTour}
                   className={`group relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
                     isActive
                       ? 'text-cyan-300 bg-cyan-500/15 border border-cyan-500/40 shadow-sm shadow-cyan-500/25'
@@ -67,6 +70,7 @@ export default function Navbar() {
                 <Link
                   key={link.name}
                   href={link.href}
+                  data-tour={dataTour}
                   className={`group relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
                     isActive
                       ? 'text-amber-300 bg-amber-500/15 border border-amber-500/40 shadow-sm shadow-amber-500/25'
@@ -86,6 +90,7 @@ export default function Navbar() {
               <Link
                 key={link.name}
                 href={link.href}
+                data-tour={dataTour}
                 className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
@@ -100,10 +105,22 @@ export default function Navbar() {
 
         {/* Action Buttons & Profile */}
         <div className="hidden md:flex items-center gap-3">
-          <ThemeToggle />
+          <div data-tour="tour-theme-toggle">
+            <ThemeToggle />
+          </div>
+
+          {/* Interactive Tour Launcher */}
+          <button
+            onClick={startProductTour}
+            type="button"
+            title="Interactive Tour Guide"
+            className="p-2 rounded-xl text-amber-400/80 hover:text-amber-300 hover:bg-amber-500/10 transition-colors border border-amber-500/20 cursor-pointer"
+          >
+            <Compass className="w-5 h-5 animate-spin-slow" />
+          </button>
 
           {user ? (
-            <div className="flex items-center gap-3">
+            <div data-tour="tour-nav-user" className="flex items-center gap-3">
               {isAdmin && (
                 <Link
                   href="/admin"
@@ -150,7 +167,7 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2.5">
+            <div data-tour="tour-nav-user" className="flex items-center gap-2.5">
               <Link
                 href="/auth/login"
                 className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors"
@@ -299,6 +316,25 @@ export default function Navbar() {
               </Link>
             </div>
           )}
+
+          <div className="pt-3 border-t border-white/10 space-y-2">
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                startProductTour();
+              }}
+              type="button"
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-amber-400" />
+                Interactive Feature Tour
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-300">
+                Explore
+              </span>
+            </button>
+          </div>
 
           <div className="pt-3 border-t border-white/10 flex items-center justify-between px-3 py-2">
             <span className="text-sm font-medium text-gray-400">Appearance</span>

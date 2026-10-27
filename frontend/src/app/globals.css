@@ -637,3 +637,34 @@ html.dark .activity-day-normal:hover {
   filter: brightness(1.15);
 }
 
+/* ==============================================================================
+   Production Feature Tour Animations & Keyframes
+   ============================================================================== */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 14s linear infinite;
+}
+
+@keyframes tour-pulse-halo {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.45), inset 0 0 10px rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.9);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(245, 158, 11, 0.75), inset 0 0 16px rgba(245, 158, 11, 0.4);
+    border-color: rgba(251, 191, 36, 1);
+  }
+}
+
+.tour-spotlight-active {
+  animation: tour-pulse-halo 2.5s ease-in-out infinite;
+}
+

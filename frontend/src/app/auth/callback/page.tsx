@@ -41,6 +41,7 @@ function OAuthCallbackContent() {
             (typeof window !== 'undefined' ? sessionStorage.getItem('auth_redirect') : null);
           if (typeof window !== 'undefined') {
             sessionStorage.removeItem('auth_redirect');
+            sessionStorage.setItem('cnc_just_authenticated', 'true');
           }
           const safeRedirect = getSafeRedirectUrl(rawRedirect, '/blogs');
           setTimeout(() => {

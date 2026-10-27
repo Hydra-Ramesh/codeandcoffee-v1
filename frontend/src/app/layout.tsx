@@ -65,7 +65,7 @@ import React, { Suspense } from 'react';
 import { ThemeProvider } from '../context/ThemeContext';
 
 import { ServiceWorkerRegister } from '../components/ServiceWorkerRegister';
-import { OnboardingModal } from '../components/OnboardingModal';
+import { ProductTour } from '../components/ProductTour';
 import { PerformanceMonitor } from '../components/PerformanceMonitor';
 
 export default function RootLayout({
@@ -109,7 +109,7 @@ export default function RootLayout({
               <BackendWarmup />
               <ServiceWorkerRegister />
               <PerformanceMonitor />
-              <OnboardingModal />
+              <ProductTour />
               <a
                 href="#main-content"
                 className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 z-50 px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl shadow-xl transition-transform"
