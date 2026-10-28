@@ -85,78 +85,107 @@ export default function ReadCatalogPage() {
   }
 
   return (
-    <div className="space-y-12 pb-16 animate-fade-in">
-      {/* Hero Section */}
-      <section className="relative pt-6 pb-10 text-center">
-        {/* Glow backdrop */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] sm:w-[700px] h-[300px] bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-cyan-500/15 rounded-full blur-[110px] pointer-events-none -z-10" />
+    <div className="space-y-8 pb-16 animate-fade-in">
+      {/* Sleek, Professional Header Banner */}
+      <section className="relative pt-2 pb-2">
+        {/* Subtle backdrop glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] sm:w-[600px] h-[180px] bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-cyan-500/10 rounded-full blur-[90px] pointer-events-none -z-10" />
 
-        <div className="max-w-3xl mx-auto space-y-5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full glass-card border border-amber-500/30 text-amber-300 text-xs font-mono font-bold uppercase tracking-wider shadow-lg shadow-amber-500/10">
-            <BookOpen className="w-4 h-4 text-amber-400" />
-            <span>Interactive Reading &amp; Curriculum</span>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass-card border border-amber-500/30 text-amber-300 text-[11px] font-mono font-bold uppercase tracking-wider">
+                <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                <span>Interactive Curriculums</span>
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+                Engineering Readmes <span className="gradient-text-amber">&amp; Guided Tracks</span>
+              </h1>
+
+              <p className="text-xs sm:text-sm text-gray-400 max-w-2xl leading-relaxed">
+                Production-grade systems deep dives with architectural diagrams, interactive sandboxes, and sequential verification quizzes.
+              </p>
+            </div>
+
+            {/* Feature Highlights Pills */}
+            <div className="hidden lg:flex flex-col gap-1.5 shrink-0 text-[11px]">
+              <div className="flex items-center gap-2 text-gray-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span>Sequential Unlocking (25%+ on Quizzes)</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                <span>In-Depth Code Diagrams &amp; Sandboxes</span>
+              </div>
+            </div>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            Engineering Masterclasses <br className="hidden sm:inline" />
-            <span className="gradient-text-amber">&amp; Deep-Dive Readmes</span>
-          </h1>
+          {/* Unified Compact Filter & Search Toolbar */}
+          <div className="glass-card p-2 sm:p-2.5 rounded-2xl border border-white/10 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-lg bg-slate-900/60 backdrop-blur-md">
+            {/* Category Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 md:pb-0">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-bold scale-[1.02]'
+                      : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
 
-          <p className="text-sm sm:text-base text-gray-300 leading-relaxed max-w-2xl mx-auto">
-            Step-by-step sequential courses crafted by production engineers. Read in-depth architectural breakdowns, inspect embedded code diagrams, solve LeetCode practice challenges, and unlock sequential modules by scoring 25%+ on interactive verification quizzes.
-          </p>
+            {/* Search Input & Action */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="relative flex-1 md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Filter tracks by keyword..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-1.5 rounded-xl bg-slate-950/80 border border-white/10 text-white placeholder-gray-500 text-xs focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/20 transition-all"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs cursor-pointer"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
 
-          {/* Search bar */}
-          <div className="relative max-w-xl mx-auto pt-2">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search courses by topic, language, or concept (e.g. C++, Pointers, RAII)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-900/80 border border-white/10 text-white placeholder-gray-400 text-sm focus:outline-none focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/20 backdrop-blur-md transition-all shadow-xl"
-            />
-          </div>
-
-          {/* Category Chips */}
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-105 font-bold'
-                    : 'glass-card border border-white/10 text-gray-300 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+              {user && (user.role === 'ADMIN' || user.role === 'CONTRIBUTOR') && (
+                <Link
+                  href="/admin/courses"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                  title="Manage and create curriculums"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Author Studio</span>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Courses Grid */}
-      <section className="space-y-6">
-        <div className="flex items-center justify-between">
+      {/* Courses Grid Section */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between text-xs text-gray-400">
           <div className="flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-amber-400" />
-            <h2 className="text-xl font-bold text-white tracking-tight">
-              Available Curriculums
-            </h2>
-            <span className="text-xs text-gray-400 font-mono">({filteredCourses.length})</span>
+            <GraduationCap className="w-4 h-4 text-amber-400" />
+            <span className="font-semibold text-gray-300">Available Tracks</span>
+            <span className="font-mono bg-white/5 px-2 py-0.5 rounded-md text-[11px] text-gray-400">
+              {filteredCourses.length} {filteredCourses.length === 1 ? 'curriculum' : 'curriculums'}
+            </span>
           </div>
-
-          {user && (user.role === 'ADMIN' || user.role === 'CONTRIBUTOR') && (
-            <Link
-              href="/admin/courses"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Manage / Author Courses</span>
-            </Link>
-          )}
         </div>
 
         {loading ? (
