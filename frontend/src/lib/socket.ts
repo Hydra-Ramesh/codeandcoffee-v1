@@ -58,3 +58,46 @@ export function leaveBlogRoom(blogId: string) {
     s.emit('leave:blog', blogId);
   }
 }
+
+export function joinUserRoom(userId: string) {
+  const s = getSocket();
+  if (s && s.emit && userId) {
+    s.emit('join:user', userId);
+  }
+}
+
+export function leaveUserRoom(userId: string) {
+  const s = getSocket();
+  if (s && s.emit && userId) {
+    s.emit('leave:user', userId);
+  }
+}
+
+export function joinLessonRoom(subtopicId: string) {
+  const s = getSocket();
+  if (s && s.emit && subtopicId) {
+    s.emit('join:lesson', subtopicId);
+  }
+}
+
+export function leaveLessonRoom(subtopicId: string) {
+  const s = getSocket();
+  if (s && s.emit && subtopicId) {
+    s.emit('leave:lesson', subtopicId);
+  }
+}
+
+export function joinAdminRoom() {
+  const s = getSocket();
+  if (s && s.emit) {
+    s.emit('join:admin');
+  }
+}
+
+export function leaveAdminRoom() {
+  const s = getSocket();
+  if (s && s.emit) {
+    s.emit('leave:admin');
+  }
+}
+

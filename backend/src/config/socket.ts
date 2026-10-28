@@ -10,6 +10,11 @@ const activeBlogSockets = new Map<string, Set<string>>();
 // Track which blogs a socket is currently viewing: socketId -> Set of blogIds
 const socketBlogsMap = new Map<string, Set<string>>();
 
+// Track active lesson learners: subtopicId -> Set of socket IDs
+const activeLessonSockets = new Map<string, Set<string>>();
+// Track which lessons a socket is currently viewing: socketId -> Set of subtopicIds
+const socketLessonsMap = new Map<string, Set<string>>();
+
 export function initSocketServer(httpServer: HttpServer): SocketIOServer {
   const rawClientOrigins = config.allowedClientOrigins || [config.clientUrl];
   const staticOrigins = new Set([
@@ -58,13 +63,38 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
     // Increment global live visitor count
     broadcastGlobalTelemetry();
 
-    // Client joins a specific blog room
+    // -------------------------------------------------------------
+    // USER PERSONAL CHANNEL
+    // -------------------------------------------------------------
+    socket.on('join:user', (userId: string) => {
+      if (!userId) return;
+      socket.join(`user:${userId}`);
+    });
+
+    socket.on('leave:user', (userId: string) => {
+      if (!userId) return;
+      socket.leave(`user:${userId}`);
+    });
+
+    // -------------------------------------------------------------
+    // ADMIN / INSTRUCTOR CHANNEL
+    // -------------------------------------------------------------
+    socket.on('join:admin', () => {
+      socket.join('admin:channel');
+    });
+
+    socket.on('leave:admin', () => {
+      socket.leave('admin:channel');
+    });
+
+    // -------------------------------------------------------------
+    // BLOG READERS
+    // -------------------------------------------------------------
     socket.on('join:blog', async (blogId: string) => {
       if (!blogId) return;
 
       socket.join(`blog:${blogId}`);
 
-      // Track socket in memory
       if (!activeBlogSockets.has(blogId)) {
         activeBlogSockets.set(blogId, new Set());
       }
@@ -75,7 +105,6 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
       }
       socketBlogsMap.get(socket.id)!.add(blogId);
 
-      // Track in Redis for multi-instance persistence (only if horizontal cluster mode is enabled)
       if (process.env.REDIS_CLUSTER_MODE === 'true') {
         try {
           await redisClient.sadd(`blog:readers:${blogId}`, socket.id);
@@ -87,7 +116,6 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
       broadcastGlobalTelemetry();
     });
 
-    // Client leaves a specific blog room
     socket.on('leave:blog', async (blogId: string) => {
       if (!blogId) return;
 
@@ -115,8 +143,53 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
       broadcastGlobalTelemetry();
     });
 
-    // Disconnect handler
+    // -------------------------------------------------------------
+    // COURSE LESSON LEARNERS PRESENCE
+    // -------------------------------------------------------------
+    socket.on('join:lesson', (subtopicId: string) => {
+      if (!subtopicId) return;
+
+      socket.join(`lesson:${subtopicId}`);
+
+      if (!activeLessonSockets.has(subtopicId)) {
+        activeLessonSockets.set(subtopicId, new Set());
+      }
+      activeLessonSockets.get(subtopicId)!.add(socket.id);
+
+      if (!socketLessonsMap.has(socket.id)) {
+        socketLessonsMap.set(socket.id, new Set());
+      }
+      socketLessonsMap.get(socket.id)!.add(subtopicId);
+
+      const count = activeLessonSockets.get(subtopicId)?.size || 1;
+      io?.to(`lesson:${subtopicId}`).emit('lesson:readers:update', { subtopicId, count });
+    });
+
+    socket.on('leave:lesson', (subtopicId: string) => {
+      if (!subtopicId) return;
+
+      socket.leave(`lesson:${subtopicId}`);
+
+      if (activeLessonSockets.has(subtopicId)) {
+        activeLessonSockets.get(subtopicId)!.delete(socket.id);
+        if (activeLessonSockets.get(subtopicId)!.size === 0) {
+          activeLessonSockets.delete(subtopicId);
+        }
+      }
+
+      if (socketLessonsMap.has(socket.id)) {
+        socketLessonsMap.get(socket.id)!.delete(subtopicId);
+      }
+
+      const count = activeLessonSockets.get(subtopicId)?.size || 0;
+      io?.to(`lesson:${subtopicId}`).emit('lesson:readers:update', { subtopicId, count });
+    });
+
+    // -------------------------------------------------------------
+    // DISCONNECT CLEANUP
+    // -------------------------------------------------------------
     socket.on('disconnect', async () => {
+      // Clean up blog listeners
       const blogs = socketBlogsMap.get(socket.id);
       if (blogs) {
         for (const blogId of blogs) {
@@ -137,6 +210,23 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
         }
         socketBlogsMap.delete(socket.id);
       }
+
+      // Clean up lesson listeners
+      const lessons = socketLessonsMap.get(socket.id);
+      if (lessons) {
+        for (const subtopicId of lessons) {
+          if (activeLessonSockets.has(subtopicId)) {
+            activeLessonSockets.get(subtopicId)!.delete(socket.id);
+            if (activeLessonSockets.get(subtopicId)!.size === 0) {
+              activeLessonSockets.delete(subtopicId);
+            }
+          }
+          const count = activeLessonSockets.get(subtopicId)?.size || 0;
+          io?.to(`lesson:${subtopicId}`).emit('lesson:readers:update', { subtopicId, count });
+        }
+        socketLessonsMap.delete(socket.id);
+      }
+
       broadcastGlobalTelemetry();
     });
   });
@@ -149,9 +239,10 @@ export function getIO(): SocketIOServer | null {
   return io;
 }
 
-/**
- * Broadcast updated global developer presence telemetry across all clients
- */
+// ==============================================================================
+// 1. GLOBAL & TELEMETRY BROADCASTS
+// ==============================================================================
+
 export function broadcastGlobalTelemetry() {
   if (!io) return;
 
@@ -161,7 +252,6 @@ export function broadcastGlobalTelemetry() {
     totalBlogReaders += set.size;
   }
 
-  // Baseline minimum for presentation
   const activeVisitors = Math.max(totalConnected, 12);
   const activeReaders = Math.max(totalBlogReaders, 4);
 
@@ -171,9 +261,10 @@ export function broadcastGlobalTelemetry() {
   });
 }
 
-/**
- * Broadcast real-time reaction (like/dislike) count change to everyone viewing the blog
- */
+// ==============================================================================
+// 2. BLOG & SOCIAL BROADCASTS
+// ==============================================================================
+
 export function broadcastReactionUpdate(blogId: string, data: { likesCount: number; dislikesCount: number }) {
   if (!io) return;
   io.to(`blog:${blogId}`).emit('reaction:update', {
@@ -183,9 +274,6 @@ export function broadcastReactionUpdate(blogId: string, data: { likesCount: numb
   });
 }
 
-/**
- * Broadcast new comment or comment deletion to everyone viewing the blog
- */
 export function broadcastCommentUpdate(blogId: string, action: 'create' | 'delete', commentData: any) {
   if (!io) return;
   io.to(`blog:${blogId}`).emit('comment:update', {
@@ -195,9 +283,6 @@ export function broadcastCommentUpdate(blogId: string, action: 'create' | 'delet
   });
 }
 
-/**
- * Broadcast new published blog notification across the entire network
- */
 export function broadcastBlogPublished(blog: {
   id: string;
   title: string;
@@ -213,9 +298,158 @@ export function broadcastBlogPublished(blog: {
   });
 }
 
-/**
- * Broadcast updated pending contributor application count to admin console
- */
+export function broadcastAdminBlogUpdated(action: 'created' | 'updated' | 'published' | 'unpublished' | 'deleted', blog: any) {
+  if (!io) return;
+  io.emit('admin:blog_updated', {
+    action,
+    blog,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// ==============================================================================
+// 3. COURSES & LEARNING PLATFORM BROADCASTS
+// ==============================================================================
+
+export function getActiveLessonReadersCount(subtopicId: string): number {
+  return activeLessonSockets.get(subtopicId)?.size || 1;
+}
+
+export function broadcastCourseTelemetry(courseId: string, payload: any) {
+  if (!io) return;
+  // Broadcast to admin channel and specific course room
+  io.to('admin:channel').emit('course:telemetry:update', {
+    courseId,
+    ...payload,
+    timestamp: new Date().toISOString(),
+  });
+  io.emit('admin:course_telemetry', {
+    courseId,
+    ...payload,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function broadcastCourseContentUpdated(courseId: string, action: string, data?: any) {
+  if (!io) return;
+  io.emit('course:content_updated', {
+    courseId,
+    action,
+    data,
+    timestamp: new Date().toISOString(),
+  });
+  io.emit('admin:course_updated', {
+    action,
+    courseId,
+    data,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function broadcastUserLessonUnlocked(userId: string, data: { courseId: string; subtopicId: string; nextSubtopicSlug?: string }) {
+  if (!io) return;
+  io.to(`user:${userId}`).emit('user:progress:update', {
+    ...data,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// ==============================================================================
+// 4. PRACTICE PLATFORM BROADCASTS
+// ==============================================================================
+
+export function broadcastPracticeSolveGlobal(solveData: {
+  userName: string;
+  questionTitle: string;
+  sheetType: string;
+  difficulty: string;
+  streak: number;
+}) {
+  if (!io) return;
+  io.emit('practice:solve:global', {
+    ...solveData,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function broadcastUserPracticeProgress(userId: string, progressData: any) {
+  if (!io) return;
+  io.to(`user:${userId}`).emit('user:practice:progress', {
+    ...progressData,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function broadcastAdminPracticeUpdated(action: 'created' | 'updated' | 'deleted', question: any) {
+  if (!io) return;
+  io.emit('admin:practice_updated', {
+    action,
+    question,
+    timestamp: new Date().toISOString(),
+  });
+  io.emit('practice:catalog_updated', {
+    action,
+    question,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// ==============================================================================
+// 5. USER SECURITY & AUTH SESSION BROADCASTS
+// ==============================================================================
+
+export function broadcastUserBanned(userId: string) {
+  if (!io) return;
+  io.to(`user:${userId}`).emit('auth:user_banned', {
+    userId,
+    message: 'Your account has been suspended by an administrator.',
+    timestamp: new Date().toISOString(),
+  });
+  io.to('admin:channel').emit('admin:user_updated', {
+    userId,
+    isBanned: true,
+  });
+}
+
+export function broadcastSessionRevoked(sessionId: string, userId: string) {
+  if (!io) return;
+  io.to(`user:${userId}`).emit('auth:session_revoked', {
+    sessionId,
+    userId,
+    message: 'This session has been revoked.',
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function broadcastUserRoleChanged(userId: string, role: string) {
+  if (!io) return;
+  io.to(`user:${userId}`).emit('auth:role_changed', {
+    userId,
+    role,
+    timestamp: new Date().toISOString(),
+  });
+  io.to('admin:channel').emit('admin:user_updated', {
+    userId,
+    role,
+  });
+}
+
+// ==============================================================================
+// 6. IN-APP USER NOTIFICATIONS
+// ==============================================================================
+
+export function broadcastNotificationToUser(userId: string, notification: any) {
+  if (!io) return;
+  io.to(`user:${userId}`).emit('notification:new', {
+    notification,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// ==============================================================================
+// 7. MULTI-ADMIN WORKFLOW BROADCASTS
+// ==============================================================================
+
 export function broadcastPendingContributorCount(pendingCount: number) {
   if (!io) return;
   io.emit('admin:contributor_count', {
@@ -224,9 +458,6 @@ export function broadcastPendingContributorCount(pendingCount: number) {
   });
 }
 
-/**
- * Broadcast new contributor application submission event
- */
 export function broadcastNewContributorApplication(application: any) {
   if (!io) return;
   io.emit('admin:new_application', {
@@ -235,9 +466,14 @@ export function broadcastNewContributorApplication(application: any) {
   });
 }
 
-/**
- * Broadcast updated pending inquiry count to admin console
- */
+export function broadcastContributorApplicationUpdated(application: any) {
+  if (!io) return;
+  io.emit('admin:application_updated', {
+    application,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 export function broadcastPendingInquiryCount(pendingCount: number) {
   if (!io) return;
   io.emit('admin:inquiry_count', {
@@ -246,9 +482,6 @@ export function broadcastPendingInquiryCount(pendingCount: number) {
   });
 }
 
-/**
- * Broadcast new inquiry submission event to admin console
- */
 export function broadcastNewInquiry(inquiry: any) {
   if (!io) return;
   io.emit('admin:new_inquiry', {
@@ -257,9 +490,22 @@ export function broadcastNewInquiry(inquiry: any) {
   });
 }
 
-/**
- * Broadcast new early access waitlist entry to admin console
- */
+export function broadcastInquiryUpdated(inquiry: any) {
+  if (!io) return;
+  io.emit('admin:inquiry_updated', {
+    inquiry,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function broadcastInquiryDeleted(id: string) {
+  if (!io) return;
+  io.emit('admin:inquiry_deleted', {
+    id,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 export function broadcastNewWaitlistEntry(entry: any) {
   if (!io) return;
   io.emit('admin:new_waitlist', {
@@ -268,9 +514,6 @@ export function broadcastNewWaitlistEntry(entry: any) {
   });
 }
 
-/**
- * Broadcast updated waitlist count to admin console
- */
 export function broadcastWaitlistCount(count: number) {
   if (!io) return;
   io.emit('admin:waitlist_count', {
@@ -279,16 +522,26 @@ export function broadcastWaitlistCount(count: number) {
   });
 }
 
-/**
- * Fast O(1) in-memory reader count for a blog post
- */
+export function broadcastWaitlistUpdated(entry: any) {
+  if (!io) return;
+  io.emit('admin:waitlist_updated', {
+    entry,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function broadcastWaitlistDeleted(id: string) {
+  if (!io) return;
+  io.emit('admin:waitlist_deleted', {
+    id,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 export function getActiveBlogReadersCount(blogId: string): number {
   return activeBlogSockets.get(blogId)?.size || 1;
 }
 
-/**
- * Fast O(1) in-memory telemetry stats for global platforms
- */
 export function getGlobalActiveStats(): { totalActiveBlogReaders: number; totalActiveSiteVisitors: number } {
   const totalConnected = io?.engine?.clientsCount || 1;
   let totalBlogReaders = 0;

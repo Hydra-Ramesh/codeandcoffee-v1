@@ -59,12 +59,14 @@ export default function AdminContributorApplicationsPage() {
 
     if (socket && socket.on) {
       socket.on('admin:new_application', handleRealtimeRefresh);
+      socket.on('admin:application_updated', handleRealtimeRefresh);
       socket.on('admin:contributor_count', handleRealtimeRefresh);
     }
 
     return () => {
       if (socket && socket.off) {
         socket.off('admin:new_application', handleRealtimeRefresh);
+        socket.off('admin:application_updated', handleRealtimeRefresh);
         socket.off('admin:contributor_count', handleRealtimeRefresh);
       }
     };

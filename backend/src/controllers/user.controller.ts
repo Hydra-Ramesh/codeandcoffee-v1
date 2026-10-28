@@ -12,6 +12,8 @@ import {
 } from '../config/email.js';
 import { z } from 'zod';
 import { sanitizeText } from '../utils/sanitize.js';
+import { broadcastUserBanned, broadcastUserRoleChanged } from '../config/socket.js';
+import { createAndSendNotification } from './notification.controller.js';
 
 const updateProfileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
@@ -142,6 +144,11 @@ export class UserController {
       // Invalidate session cache immediately so bans take effect instantly
       await CacheService.invalidateUserSession(id);
 
+      // Real-time ban disconnection via WebSocket
+      if (updated.isBanned) {
+        broadcastUserBanned(id);
+      }
+
       res.status(200).json({
         success: true,
         message: `User ${updated.email} has been ${updated.isBanned ? 'suspended' : 'reactivated'} successfully.`,
@@ -196,6 +203,16 @@ export class UserController {
 
       // Invalidate session cache immediately so role changes apply instantly
       await CacheService.invalidateUserSession(id);
+
+      // Real-time role elevation / demotion via WebSocket
+      broadcastUserRoleChanged(id, updated.role);
+
+      createAndSendNotification(id, {
+        title: 'Account Role Updated',
+        message: `Your account role has been updated to ${updated.role}. Enjoy your updated privileges!`,
+        type: 'SUCCESS',
+        link: updated.role === 'ADMIN' ? '/admin' : updated.role === 'CONTRIBUTOR' ? '/admin/courses' : '/blogs',
+      }).catch(() => {});
 
       res.status(200).json({
         success: true,

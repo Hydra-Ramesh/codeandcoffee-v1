@@ -6,7 +6,12 @@ import { redisClient } from '../config/redis.js';
 import { queueNewBlogBroadcast } from '../config/queues.js';
 import { CacheService } from '../services/cache.service.js';
 import { ViewBufferService } from '../services/viewBuffer.service.js';
-import { broadcastBlogPublished, broadcastReactionUpdate, getActiveBlogReadersCount } from '../config/socket.js';
+import { 
+  broadcastBlogPublished, 
+  broadcastReactionUpdate, 
+  getActiveBlogReadersCount,
+  broadcastAdminBlogUpdated,
+} from '../config/socket.js';
 
 function generateSlug(title: string): string {
   const base = title
@@ -313,6 +318,10 @@ export class BlogController {
       // Invalidate query caches
       await CacheService.invalidateBlogCaches(post.slug, post.id);
 
+      try {
+        broadcastAdminBlogUpdated('created', post);
+      } catch (err) {}
+
       res.status(201).json({
         success: true,
         message: 'Blog post created successfully.',
@@ -411,6 +420,15 @@ export class BlogController {
       // Invalidate caches
       await CacheService.invalidateBlogCaches(updated.slug, updated.id);
 
+      try {
+        const action = !existing.isPublished && updated.isPublished
+          ? 'published'
+          : existing.isPublished && !updated.isPublished
+          ? 'unpublished'
+          : 'updated';
+        broadcastAdminBlogUpdated(action, updated);
+      } catch (err) {}
+
       res.status(200).json({
         success: true,
         message: 'Blog post updated successfully.',
@@ -451,6 +469,10 @@ export class BlogController {
 
       // Invalidate caches
       await CacheService.invalidateBlogCaches(existing.slug, existing.id);
+
+      try {
+        broadcastAdminBlogUpdated('deleted', { id, slug: existing.slug, title: existing.title });
+      } catch (err) {}
 
       res.status(200).json({
         success: true,

@@ -31,3 +31,7 @@ backend/backups/*
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Scratch
+scratch/
+

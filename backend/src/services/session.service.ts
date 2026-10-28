@@ -2,6 +2,7 @@ import { Request } from 'express';
 import { prisma } from '../config/database.js';
 import { parseDeviceInfo, DeviceInfo } from '../utils/deviceParser.js';
 import { sendNewDeviceLoginAlertEmail } from '../config/email.js';
+import { broadcastSessionRevoked } from '../config/socket.js';
 
 export class SessionService {
   /**
@@ -158,6 +159,8 @@ export class SessionService {
       data: { isRevoked: true },
     });
 
+    broadcastSessionRevoked(sessionId, userId);
+
     return { success: true, message: 'Device session successfully revoked.' };
   }
 
@@ -190,6 +193,8 @@ export class SessionService {
       },
       data: { isRevoked: true },
     });
+
+    broadcastSessionRevoked(excludeId || 'others', userId);
 
     return {
       success: true,

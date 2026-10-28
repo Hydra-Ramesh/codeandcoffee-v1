@@ -1,6 +1,12 @@
 import { Response } from 'express';
 import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+import {
+  broadcastCourseTelemetry,
+  broadcastCourseContentUpdated,
+  broadcastUserLessonUnlocked,
+} from '../config/socket.js';
+import { createAndSendNotification } from './notification.controller.js';
 
 function slugify(text: string): string {
   return text
@@ -682,6 +688,35 @@ export async function submitQuiz(req: AuthenticatedRequest, res: Response): Prom
       },
     });
 
+    // Real-time socket events for student unlocks and instructor telemetry
+    if (passed) {
+      broadcastUserLessonUnlocked(userId, {
+        courseId: subtopic.topic.courseId,
+        subtopicId: subtopic.id,
+        nextSubtopicSlug: nextSubtopicInfo?.slug,
+      });
+
+      broadcastCourseTelemetry(subtopic.topic.courseId, {
+        type: 'QUIZ_PASSED',
+        userId,
+        studentName: req.user?.name || 'Learner',
+        subtopicId: subtopic.id,
+        subtopicTitle: subtopic.title,
+        scorePercent,
+        completedLessonsCount: userCompletedCount,
+        progressPercent: Math.round(progressPercent),
+      });
+
+      if (scorePercent === 100) {
+        createAndSendNotification(userId, {
+          title: '🏆 Perfect Quiz Score!',
+          message: `Congratulations! You scored 100% on "${subtopic.title}".`,
+          type: 'ACHIEVEMENT',
+          link: `/read/${subtopic.topic.course.slug}/${subtopic.topic.slug}/${subtopic.slug}`,
+        }).catch(() => {});
+      }
+    }
+
     res.json({
       success: true,
       data: {
@@ -845,6 +880,23 @@ export async function markLessonComplete(req: AuthenticatedRequest, res: Respons
       },
     });
 
+    // Real-time socket events for lesson completion
+    broadcastUserLessonUnlocked(userId, {
+      courseId: subtopic.topic.courseId,
+      subtopicId: subtopic.id,
+      nextSubtopicSlug: nextSubtopicInfo?.slug,
+    });
+
+    broadcastCourseTelemetry(subtopic.topic.courseId, {
+      type: 'LESSON_COMPLETED',
+      userId,
+      studentName: req.user?.name || 'Learner',
+      subtopicId: subtopic.id,
+      subtopicTitle: subtopic.title,
+      completedLessonsCount: userCompletedCount,
+      progressPercent: Math.round(progressPercent),
+    });
+
     res.json({
       success: true,
       data: {
@@ -902,6 +954,8 @@ export async function createCourse(req: AuthenticatedRequest, res: Response): Pr
       },
     });
 
+    broadcastCourseContentUpdated(course.id, 'course_created', course);
+
     res.status(201).json({
       success: true,
       message: 'Course created successfully.',
@@ -947,6 +1001,8 @@ export async function updateCourse(req: AuthenticatedRequest, res: Response): Pr
       },
     });
 
+    broadcastCourseContentUpdated(updated.id, 'course_updated', updated);
+
     res.json({
       success: true,
       message: 'Course updated successfully.',
@@ -979,6 +1035,8 @@ export async function deleteCourse(req: AuthenticatedRequest, res: Response): Pr
     }
 
     await prisma.course.delete({ where: { id } });
+
+    broadcastCourseContentUpdated(id, 'course_deleted', { id });
 
     res.json({
       success: true,
@@ -1024,6 +1082,8 @@ export async function createTopic(req: AuthenticatedRequest, res: Response): Pro
       },
     });
 
+    broadcastCourseContentUpdated(courseId, 'topic_created', topic);
+
     res.status(201).json({
       success: true,
       message: 'Topic created successfully.',
@@ -1059,6 +1119,8 @@ export async function updateTopic(req: AuthenticatedRequest, res: Response): Pro
       },
     });
 
+    broadcastCourseContentUpdated(topic.courseId, 'topic_updated', updated);
+
     res.json({
       success: true,
       message: 'Topic updated successfully.',
@@ -1078,6 +1140,8 @@ export async function deleteTopic(req: AuthenticatedRequest, res: Response): Pro
     const topicId = req.params.topicId as string;
 
     await prisma.courseTopic.delete({ where: { id: topicId } });
+
+    broadcastCourseContentUpdated(topicId, 'topic_deleted', { id: topicId });
 
     res.json({
       success: true,
@@ -1137,6 +1201,8 @@ export async function createSubtopic(req: AuthenticatedRequest, res: Response): 
       },
     });
 
+    broadcastCourseContentUpdated(subtopic.topicId, 'subtopic_created', subtopic);
+
     res.status(201).json({
       success: true,
       message: 'Lesson created successfully.',
@@ -1187,6 +1253,8 @@ export async function updateSubtopic(req: AuthenticatedRequest, res: Response): 
       },
     });
 
+    broadcastCourseContentUpdated(subtopic.topicId, 'subtopic_updated', updated);
+
     res.json({
       success: true,
       message: 'Lesson updated successfully.',
@@ -1206,6 +1274,8 @@ export async function deleteSubtopic(req: AuthenticatedRequest, res: Response): 
     const subtopicId = req.params.subtopicId as string;
 
     await prisma.courseSubtopic.delete({ where: { id: subtopicId } });
+
+    broadcastCourseContentUpdated(subtopicId, 'subtopic_deleted', { id: subtopicId });
 
     res.json({
       success: true,

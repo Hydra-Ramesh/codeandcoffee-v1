@@ -11,6 +11,7 @@ import inquiryRoutes from './inquiry.routes.js';
 import waitlistRoutes from './waitlist.routes.js';
 import practiceRoutes from './practice.routes.js';
 import courseRoutes from './course.routes.js';
+import notificationRoutes from './notification.routes.js';
 import healthRoutes from './health.routes.js';
 import metricsRoutes from './metrics.routes.js';
 
@@ -34,5 +35,6 @@ router.use('/inquiries', inquiryRoutes);
 router.use('/waitlist', waitlistRoutes);
 router.use('/practice', practiceRoutes);
 router.use('/courses', courseRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;

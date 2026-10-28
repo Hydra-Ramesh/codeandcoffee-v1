@@ -78,7 +78,7 @@ export default function AdminWaitlistPage() {
   useEffect(() => {
     loadWaitlistData();
 
-    // Real-time socket listener for live waitlist registrations
+    // Real-time socket listener for live waitlist registrations and updates
     const socket = getSocket();
     const handleNewWaitlist = (data: { entry: WaitlistEntry }) => {
       if (data?.entry) {
@@ -87,13 +87,32 @@ export default function AdminWaitlistPage() {
       }
     };
 
+    const handleWaitlistUpdated = (data: { entry: WaitlistEntry }) => {
+      if (data?.entry) {
+        setWaitlist((prev) =>
+          prev.map((item) => (item.id === data.entry.id ? { ...item, ...data.entry } : item))
+        );
+      }
+    };
+
+    const handleWaitlistDeleted = (data: { id: string }) => {
+      if (data?.id) {
+        setWaitlist((prev) => prev.filter((item) => item.id !== data.id));
+        setTotalCount((prev) => Math.max(0, prev - 1));
+      }
+    };
+
     if (socket && socket.on) {
       socket.on('admin:new_waitlist', handleNewWaitlist);
+      socket.on('admin:waitlist_updated', handleWaitlistUpdated);
+      socket.on('admin:waitlist_deleted', handleWaitlistDeleted);
     }
 
     return () => {
       if (socket && socket.off) {
         socket.off('admin:new_waitlist', handleNewWaitlist);
+        socket.off('admin:waitlist_updated', handleWaitlistUpdated);
+        socket.off('admin:waitlist_deleted', handleWaitlistDeleted);
       }
     };
   }, [page, selectedTrack, selectedStatus]);

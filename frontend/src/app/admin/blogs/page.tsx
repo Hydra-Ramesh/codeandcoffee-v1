@@ -16,6 +16,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
+import { getSocket } from '../../../lib/socket';
 import AdminTableSkeleton from '../../../components/skeletons/AdminTableSkeleton';
 import { useToast } from '../../../context/ToastContext';
 import WarningCardModal, { WarningDetail } from '../../../components/WarningCardModal';
@@ -27,6 +28,29 @@ export default function AdminBlogManagementPage() {
 
   useEffect(() => {
     loadBlogs();
+
+    const socket = getSocket();
+    const handleAdminBlogUpdated = (data: { action: string; blog: any }) => {
+      if (data?.action === 'deleted') {
+        setBlogs((prev) => prev.filter((b) => b.id !== data.blog.id));
+      } else if (data?.action === 'created') {
+        loadBlogs();
+      } else if (data?.blog) {
+        setBlogs((prev) =>
+          prev.map((b) => (b.id === data.blog.id ? { ...b, ...data.blog } : b))
+        );
+      }
+    };
+
+    if (socket && socket.on) {
+      socket.on('admin:blog_updated', handleAdminBlogUpdated);
+    }
+
+    return () => {
+      if (socket && socket.off) {
+        socket.off('admin:blog_updated', handleAdminBlogUpdated);
+      }
+    };
   }, []);
 
   const loadBlogs = async () => {

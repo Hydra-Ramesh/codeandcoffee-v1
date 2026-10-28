@@ -9,6 +9,8 @@ import {
 import {
   broadcastPendingInquiryCount,
   broadcastNewInquiry,
+  broadcastInquiryUpdated,
+  broadcastInquiryDeleted,
 } from '../config/socket.js';
 import { CacheService } from '../services/cache.service.js';
 
@@ -240,6 +242,7 @@ export class InquiryController {
           where: { status: 'PENDING' },
         });
         broadcastPendingInquiryCount(pendingCount);
+        broadcastInquiryUpdated(resolved);
       } catch (err) {
         console.warn('Could not broadcast updated inquiry count:', (err as Error).message);
       }
@@ -267,11 +270,12 @@ export class InquiryController {
       // Invalidate admin inquiries badge cache
       await CacheService.del('admin:badge:inquiries');
 
-      // Update broadcast count
+      // Update broadcast count & emit deletion
       const pendingCount = await prisma.inquiry.count({
         where: { status: 'PENDING' },
       });
       broadcastPendingInquiryCount(pendingCount);
+      broadcastInquiryDeleted(id);
 
       res.status(200).json({
         success: true,

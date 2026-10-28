@@ -3,6 +3,11 @@ import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { CacheService } from '../services/cache.service.js';
 import { PracticeSheetType, ProblemDifficulty } from '@prisma/client';
+import {
+  broadcastPracticeSolveGlobal,
+  broadcastUserPracticeProgress,
+  broadcastAdminPracticeUpdated,
+} from '../config/socket.js';
 
 export interface DailySolveSummary {
   date: string; // YYYY-MM-DD
@@ -320,7 +325,7 @@ export class PracticeController {
       // Verify question exists
       const question = await prisma.practiceQuestion.findUnique({
         where: { id: questionId },
-        select: { id: true, sheetType: true },
+        select: { id: true, title: true, sheetType: true, difficulty: true },
       });
 
       if (!question) {
@@ -357,6 +362,24 @@ export class PracticeController {
 
       // Invalidate Leaderboard Cache
       await CacheService.del('practice:leaderboard');
+
+      // Real-time multi-tab progress synchronization
+      broadcastUserPracticeProgress(userId, {
+        questionId,
+        isCompleted: updated.isCompleted,
+        completedAt: updated.completedAt,
+      });
+
+      // If problem was solved, broadcast to live global ticker
+      if (updated.isCompleted) {
+        broadcastPracticeSolveGlobal({
+          userName: req.user?.name || 'Engineer',
+          questionTitle: (question as any).title || 'Practice Challenge',
+          sheetType: question.sheetType,
+          difficulty: (question as any).difficulty || 'MEDIUM',
+          streak: 1,
+        });
+      }
 
       res.json({
         success: true,
@@ -803,6 +826,8 @@ export class PracticeController {
       // Invalidate Redis Cache
       await CacheService.invalidatePracticeCaches(sheetType);
 
+      broadcastAdminPracticeUpdated('created', question);
+
       res.status(201).json({
         success: true,
         message: 'Practice question created successfully',
@@ -885,6 +910,8 @@ export class PracticeController {
         await CacheService.invalidatePracticeCaches(sheetType);
       }
 
+      broadcastAdminPracticeUpdated('updated', updated);
+
       res.json({
         success: true,
         message: 'Question updated successfully',
@@ -927,6 +954,8 @@ export class PracticeController {
 
       // Invalidate Redis Cache
       await CacheService.invalidatePracticeCaches(existing.sheetType);
+
+      broadcastAdminPracticeUpdated('deleted', { id });
 
       res.json({
         success: true,

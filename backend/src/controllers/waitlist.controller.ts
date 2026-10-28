@@ -2,7 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
-import { broadcastNewWaitlistEntry, broadcastWaitlistCount } from '../config/socket.js';
+import { 
+  broadcastNewWaitlistEntry, 
+  broadcastWaitlistCount,
+  broadcastWaitlistUpdated,
+  broadcastWaitlistDeleted,
+} from '../config/socket.js';
 import { CacheService } from '../services/cache.service.js';
 
 const joinWaitlistSchema = z.object({
@@ -321,6 +326,12 @@ export class WaitlistController {
       // Invalidate waitlist cache
       await CacheService.invalidateWaitlist(entry.userId || undefined);
 
+      try {
+        broadcastWaitlistUpdated(entry);
+      } catch (err) {
+        console.warn('⚠️ Could not broadcast waitlist update:', (err as Error).message);
+      }
+
       res.json({
         success: true,
         message: `Status updated to ${status}.`,
@@ -344,6 +355,14 @@ export class WaitlistController {
 
       // Invalidate waitlist cache
       await CacheService.invalidateWaitlist(entry.userId || undefined);
+
+      try {
+        broadcastWaitlistDeleted(id);
+        const count = await prisma.waitlistEntry.count();
+        broadcastWaitlistCount(count);
+      } catch (err) {
+        console.warn('⚠️ Could not broadcast waitlist deletion:', (err as Error).message);
+      }
 
       res.json({
         success: true,

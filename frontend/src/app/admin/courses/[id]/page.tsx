@@ -34,6 +34,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { fetchApi } from '../../../../lib/api';
+import { getSocket } from '../../../../lib/socket';
 import { useAuth } from '../../../../context/AuthContext';
 import { useToast } from '../../../../context/ToastContext';
 import AdminCurriculumBuilderSkeleton from '../../../../components/skeletons/AdminCurriculumBuilderSkeleton';
@@ -163,6 +164,23 @@ export default function CourseCurriculumBuilderPage() {
   useEffect(() => {
     if (courseId) {
       loadCourse();
+
+      const socket = getSocket();
+      const handleContentUpdate = (data: { courseId: string }) => {
+        if (data.courseId === courseId) {
+          loadCourse();
+        }
+      };
+
+      if (socket && socket.on) {
+        socket.on('course:content_updated', handleContentUpdate);
+      }
+
+      return () => {
+        if (socket && socket.off) {
+          socket.off('course:content_updated', handleContentUpdate);
+        }
+      };
     }
   }, [courseId]);
 

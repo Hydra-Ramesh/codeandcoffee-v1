@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { fetchApi } from '../../lib/api';
+import { getSocket } from '../../lib/socket';
 import MarkdownViewer from '../../components/MarkdownViewer';
 import PracticeQuestionsSkeleton from '../../components/skeletons/PracticeQuestionsSkeleton';
 import PracticeLeaderboardSkeleton from '../../components/skeletons/PracticeLeaderboardSkeleton';
@@ -107,6 +108,16 @@ export default function PracticePage() {
   const [selectedPlatform, setSelectedPlatform] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<SortOption>('DEFAULT');
   const [randomPickedQuestion, setRandomPickedQuestion] = useState<PracticeQuestion | null>(null);
+
+  // Real-time Global Solve Ticker
+  const [liveSolveTicker, setLiveSolveTicker] = useState<{
+    userName: string;
+    questionTitle: string;
+    sheetType: string;
+    difficulty: string;
+    streak: number;
+    timestamp: string;
+  } | null>(null);
 
   // Leaderboard & Streak State
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
@@ -260,6 +271,55 @@ export default function PracticePage() {
       setLoading(false);
     }
   };
+
+  // Real-time WebSocket: Live Solve Ticker, Multi-tab Progress, and Catalog Updates
+  useEffect(() => {
+    const socket = getSocket();
+
+    const handleGlobalSolve = (data: any) => {
+      setLiveSolveTicker(data);
+      const timer = setTimeout(() => {
+        setLiveSolveTicker((curr) => (curr?.timestamp === data.timestamp ? null : curr));
+      }, 8000);
+      return () => clearTimeout(timer);
+    };
+
+    const handleUserPracticeProgress = (data: { questionId: string; isCompleted: boolean; points?: number; currentStreak?: number }) => {
+      if (data.questionId) {
+        setCompletedMap((prev) => ({
+          ...prev,
+          [data.questionId]: data.isCompleted,
+        }));
+      }
+      if (data.points !== undefined || data.currentStreak !== undefined) {
+        setMyRankInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                points: data.points ?? prev.points,
+                currentStreak: data.currentStreak ?? prev.currentStreak,
+              }
+            : null
+        );
+      }
+    };
+
+    const handleCatalogUpdated = () => {
+      if (activeSheet !== 'LEADERBOARD') {
+        loadSheetQuestions(activeSheet);
+      }
+    };
+
+    socket.on('practice:solve:global', handleGlobalSolve);
+    socket.on('user:practice:progress', handleUserPracticeProgress);
+    socket.on('practice:catalog_updated', handleCatalogUpdated);
+
+    return () => {
+      socket.off('practice:solve:global', handleGlobalSolve);
+      socket.off('user:practice:progress', handleUserPracticeProgress);
+      socket.off('practice:catalog_updated', handleCatalogUpdated);
+    };
+  }, [activeSheet]);
 
   // Check profile prerequisites for SDE Sheet (LeetCode) or CP Sheet (Codeforces + CodeChef)
   const executeWithProfileCheck = (
@@ -717,6 +777,31 @@ export default function PracticePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Real-time Global Solve Notification Ticker */}
+      {liveSolveTicker && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-emerald-500/20 border border-amber-500/30 text-xs text-amber-200 backdrop-blur-md shadow-lg shadow-amber-500/10 animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2 truncate">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+            <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-bold text-white truncate">{liveSolveTicker.userName}</span>
+            <span className="text-gray-300">just solved</span>
+            <span className="font-semibold text-amber-300 truncate">&ldquo;{liveSolveTicker.questionTitle}&rdquo;</span>
+            {liveSolveTicker.streak > 1 && (
+              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-500/30 text-orange-300 border border-orange-500/40 shrink-0">
+                <Flame className="w-3 h-3 text-orange-400" /> {liveSolveTicker.streak} streak
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setLiveSolveTicker(null)}
+            className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 shrink-0 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Hero Header */}
       <div className="relative overflow-hidden rounded-3xl glass-card border border-white/10 p-6 sm:p-8 bg-gradient-to-br from-amber-500/10 via-purple-500/5 to-cyan-500/10">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />

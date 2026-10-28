@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { z } from 'zod';
 import { CacheService } from '../services/cache.service.js';
 import { broadcastCommentUpdate } from '../config/socket.js';
+import { createAndSendNotification } from './notification.controller.js';
 
 import { sanitizeText } from '../utils/sanitize.js';
 
@@ -65,6 +66,11 @@ export class CommentController {
         return;
       }
 
+      const post = await prisma.post.findUnique({
+        where: { id: data.postId },
+        select: { id: true, title: true, slug: true, authorId: true },
+      });
+
       const comment = await prisma.comment.create({
         data: {
           content: cleanContent,
@@ -78,6 +84,16 @@ export class CommentController {
 
       // Real-time WebSocket broadcast to all readers in the blog room
       broadcastCommentUpdate(data.postId, 'create', comment);
+
+      // Notify post author if commenter is not author
+      if (post && post.authorId && post.authorId !== req.user.id) {
+        createAndSendNotification(post.authorId, {
+          title: 'New Comment on Your Article',
+          message: `${req.user.name || 'A reader'} commented on "${post.title}": "${cleanContent.slice(0, 60)}${cleanContent.length > 60 ? '...' : ''}"`,
+          type: 'INFO',
+          link: `/blogs/${post.slug}`,
+        }).catch((err) => console.warn('Could not send comment notification:', err));
+      }
 
       // Invalidate comments cache & blog count cache & user profile
       await CacheService.del(`comments:post:${data.postId}`);

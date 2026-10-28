@@ -7,7 +7,10 @@ import { CacheService } from '../services/cache.service.js';
 import {
   broadcastPendingContributorCount,
   broadcastNewContributorApplication,
+  broadcastContributorApplicationUpdated,
+  broadcastUserRoleChanged,
 } from '../config/socket.js';
+import { createAndSendNotification } from './notification.controller.js';
 
 const applySchema = z.object({
   reason: z.string().min(10, 'Please provide at least 10 characters explaining your interest and experience.'),
@@ -245,6 +248,20 @@ export class ContributorController {
             where: { status: 'PENDING' },
           });
           broadcastPendingContributorCount(pendingCount);
+          broadcastContributorApplicationUpdated(updated);
+
+          if (status === 'APPROVED') {
+            broadcastUserRoleChanged(application.userId, 'CONTRIBUTOR');
+          }
+
+          createAndSendNotification(application.userId, {
+            title: status === 'APPROVED' ? '🎉 Application Approved!' : 'Application Update',
+            message: status === 'APPROVED'
+              ? 'Congratulations! You are now an official Contributor at Code & Coffee.'
+              : 'Thank you for your interest. Your contributor application status has been updated.',
+            type: status === 'APPROVED' ? 'SUCCESS' : 'INFO',
+            link: status === 'APPROVED' ? '/admin/courses' : '/become-contributor',
+          }).catch(() => {});
         } catch (e) {
           console.warn('Real-time contributor count update note:', e);
         }

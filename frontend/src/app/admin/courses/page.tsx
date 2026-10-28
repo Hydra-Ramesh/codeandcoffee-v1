@@ -26,6 +26,7 @@ import {
   GraduationCap,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
+import { getSocket } from '../../../lib/socket';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { optimizeImageUrl } from '../../../lib/image';
@@ -120,7 +121,33 @@ export default function AdminCoursesPage() {
 
   useEffect(() => {
     loadCourses();
-  }, []);
+
+    const socket = getSocket();
+    const handleCourseUpdated = () => {
+      loadCourses();
+    };
+    const handleTelemetryUpdate = (data: any) => {
+      if (selectedCourseForTelemetry && data.courseId === selectedCourseForTelemetry) {
+        fetchApi(`/courses/admin/telemetry/${selectedCourseForTelemetry}`).then((res) => {
+          if (res.success && res.data) {
+            setTelemetryData(res.data);
+          }
+        });
+      }
+    };
+
+    if (socket && socket.on) {
+      socket.on('admin:course_updated', handleCourseUpdated);
+      socket.on('admin:course_telemetry', handleTelemetryUpdate);
+    }
+
+    return () => {
+      if (socket && socket.off) {
+        socket.off('admin:course_updated', handleCourseUpdated);
+        socket.off('admin:course_telemetry', handleTelemetryUpdate);
+      }
+    };
+  }, [selectedCourseForTelemetry]);
 
   const loadCourses = async () => {
     setLoading(true);

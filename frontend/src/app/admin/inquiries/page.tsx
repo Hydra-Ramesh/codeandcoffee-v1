@@ -66,6 +66,18 @@ export default function AdminInquiriesPage() {
     const handleNewInquiry = () => {
       loadInquiries();
     };
+    const handleInquiryUpdated = (data: { inquiry: Inquiry }) => {
+      if (data?.inquiry) {
+        setInquiries((prev) =>
+          prev.map((inq) => (inq.id === data.inquiry.id ? { ...inq, ...data.inquiry } : inq))
+        );
+      }
+    };
+    const handleInquiryDeleted = (data: { id: string }) => {
+      if (data?.id) {
+        setInquiries((prev) => prev.filter((inq) => inq.id !== data.id));
+      }
+    };
     const handleInquiryCount = (data: { pendingCount: number }) => {
       if (typeof data?.pendingCount === 'number') {
         setPendingCount(data.pendingCount);
@@ -74,12 +86,16 @@ export default function AdminInquiriesPage() {
 
     if (socket && socket.on) {
       socket.on('admin:new_inquiry', handleNewInquiry);
+      socket.on('admin:inquiry_updated', handleInquiryUpdated);
+      socket.on('admin:inquiry_deleted', handleInquiryDeleted);
       socket.on('admin:inquiry_count', handleInquiryCount);
     }
 
     return () => {
       if (socket && socket.off) {
         socket.off('admin:new_inquiry', handleNewInquiry);
+        socket.off('admin:inquiry_updated', handleInquiryUpdated);
+        socket.off('admin:inquiry_deleted', handleInquiryDeleted);
         socket.off('admin:inquiry_count', handleInquiryCount);
       }
     };

@@ -9,6 +9,7 @@ import { optimizeImageUrl } from '../lib/image';
 import { startProductTour } from './ProductTour';
 
 import ThemeToggle from './ThemeToggle';
+import { NotificationBell } from './NotificationBell';
 
 export default function Navbar() {
   const { user, isAdmin, logout } = useAuth();
@@ -152,6 +153,8 @@ export default function Navbar() {
                 </Link>
               )}
 
+              <NotificationBell />
+
               <Link
                 href="/user/profile"
                 className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg glass-card hover:border-amber-500/40 transition-all"
@@ -198,6 +201,7 @@ export default function Navbar() {
 
         {/* Mobile menu button & Theme Toggle */}
         <div className="flex md:hidden items-center gap-2">
+          <NotificationBell />
           <ThemeToggle />
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

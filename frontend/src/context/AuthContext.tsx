@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { fetchApi } from '../lib/api';
+import { getSocket, joinUserRoom, leaveUserRoom, joinAdminRoom, leaveAdminRoom } from '../lib/socket';
 
 export interface User {
   id: string;
@@ -68,6 +69,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    joinUserRoom(user.id);
+    if (user.role === 'ADMIN' || user.role === 'CONTRIBUTOR') {
+      joinAdminRoom();
+    }
+
+    const socket = getSocket();
+
+    const handleUserBanned = (data: { userId: string; message: string }) => {
+      if (data.userId === user.id) {
+        alert(data.message || 'Your account has been suspended by an administrator.');
+        logout();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login?banned=true';
+        }
+      }
+    };
+
+    const handleSessionRevoked = (data: { sessionId: string; userId: string; message: string }) => {
+      if (data.userId === user.id) {
+        logout();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login?revoked=true';
+        }
+      }
+    };
+
+    const handleRoleChanged = (data: { userId: string; role: 'USER' | 'CONTRIBUTOR' | 'ADMIN' }) => {
+      if (data.userId === user.id) {
+        setUser((prev) => (prev ? { ...prev, role: data.role } : null));
+        if (data.role === 'ADMIN' || data.role === 'CONTRIBUTOR') {
+          joinAdminRoom();
+        } else {
+          leaveAdminRoom();
+        }
+      }
+    };
+
+    socket.on('auth:user_banned', handleUserBanned);
+    socket.on('auth:session_revoked', handleSessionRevoked);
+    socket.on('auth:role_changed', handleRoleChanged);
+
+    return () => {
+      socket.off('auth:user_banned', handleUserBanned);
+      socket.off('auth:session_revoked', handleSessionRevoked);
+      socket.off('auth:role_changed', handleRoleChanged);
+      leaveUserRoom(user.id);
+      if (user.role === 'ADMIN' || user.role === 'CONTRIBUTOR') {
+        leaveAdminRoom();
+      }
+    };
+  }, [user?.id, user?.role]);
 
   const login = async (email: string, password: string) => {
     const res = await fetchApi('/auth/login', {

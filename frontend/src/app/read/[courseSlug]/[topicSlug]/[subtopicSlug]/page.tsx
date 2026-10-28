@@ -34,9 +34,11 @@ import {
   UserPlus,
   ShieldCheck,
   FileText,
+  Users,
 } from 'lucide-react';
 import { fetchApi } from '../../../../../lib/api';
 import { useAuth } from '../../../../../context/AuthContext';
+import { getSocket, joinLessonRoom, leaveLessonRoom } from '../../../../../lib/socket';
 import MarkdownViewer from '../../../../../components/MarkdownViewer';
 import ReadStudioSkeleton from '../../../../../components/skeletons/ReadStudioSkeleton';
 import ThemeToggle from '../../../../../components/ThemeToggle';
@@ -140,6 +142,7 @@ export default function SubtopicReaderPage() {
 
   const [loading, setLoading] = useState(true);
   const [lockedError, setLockedError] = useState<string | null>(null);
+  const [activeReadersCount, setActiveReadersCount] = useState<number>(1);
 
   // Quiz Form State
   const [quizAnswers, setQuizAnswers] = useState<Record<string, any>>({});
@@ -241,6 +244,45 @@ export default function SubtopicReaderPage() {
     }
     setLoading(false);
   };
+
+  // Real-time WebSocket: Join lesson room and listen for presence + curriculum updates
+  useEffect(() => {
+    if (!lesson?.id) return;
+
+    joinLessonRoom(lesson.id);
+
+    const socket = getSocket();
+
+    const handleReadersUpdate = (data: { subtopicId: string; count: number }) => {
+      if (data.subtopicId === lesson.id) {
+        setActiveReadersCount(data.count || 1);
+      }
+    };
+
+    const handleUserProgressUpdate = (data: { courseId: string; subtopicId: string }) => {
+      // If another tab unlocked a lesson or updated progress, refresh
+      if (syllabus && data.courseId === syllabus.id) {
+        loadLessonAndSyllabus();
+      }
+    };
+
+    const handleCourseContentUpdated = (data: { courseId: string }) => {
+      if (syllabus && data.courseId === syllabus.id) {
+        loadLessonAndSyllabus();
+      }
+    };
+
+    socket.on('lesson:readers:update', handleReadersUpdate);
+    socket.on('user:progress:update', handleUserProgressUpdate);
+    socket.on('course:content_updated', handleCourseContentUpdated);
+
+    return () => {
+      socket.off('lesson:readers:update', handleReadersUpdate);
+      socket.off('user:progress:update', handleUserProgressUpdate);
+      socket.off('course:content_updated', handleCourseContentUpdated);
+      leaveLessonRoom(lesson.id);
+    };
+  }, [lesson?.id, syllabus?.id]);
 
   const saveAnswersToStorage = () => {
     if (typeof window !== 'undefined' && lesson?.id) {
@@ -449,6 +491,15 @@ export default function SubtopicReaderPage() {
 
         {/* Header Right Completion & Progress Indicator */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Live Learner Pulse Badge */}
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shadow-xs" title={`${activeReadersCount} learners currently studying this lesson`}>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>{activeReadersCount} {activeReadersCount === 1 ? 'learner' : 'learners'} studying</span>
+          </span>
+
           {isCurrentCompleted ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
               <CheckCircle2 className="w-3.5 h-3.5" />

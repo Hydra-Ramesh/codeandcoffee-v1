@@ -54,6 +54,7 @@ model User {
   coursesCreated    Course[]
   lessonProgress    UserLessonProgress[]
   courseEnrollments UserCourseEnrollment[]
+  notifications     Notification[]
 
   @@index([email])
 }
@@ -379,5 +380,20 @@ model UserCourseEnrollment {
   @@unique([userId, courseId])
   @@index([userId])
   @@index([courseId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO") // "INFO" | "SUCCESS" | "WARNING" | "ACHIEVEMENT"
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
