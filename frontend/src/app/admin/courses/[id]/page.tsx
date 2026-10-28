@@ -27,6 +27,10 @@ import {
   Loader2,
   Copy,
   Check,
+  CheckCircle,
+  XCircle,
+  Eye,
+  EyeOff,
   Globe,
 } from 'lucide-react';
 import { fetchApi } from '../../../../lib/api';
@@ -99,6 +103,7 @@ interface TopicView {
   slug: string;
   description: string;
   order: number;
+  isPublished?: boolean;
   subtopics: SubtopicView[];
 }
 
@@ -126,7 +131,7 @@ export default function CourseCurriculumBuilderPage() {
   // Topic Modals State
   const [topicModalOpen, setTopicModalOpen] = useState(false);
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
-  const [topicForm, setTopicForm] = useState({ title: '', description: '' });
+  const [topicForm, setTopicForm] = useState({ title: '', description: '', isPublished: true });
   const [savingTopic, setSavingTopic] = useState(false);
 
   // Subtopic Editor Modal State
@@ -164,7 +169,7 @@ export default function CourseCurriculumBuilderPage() {
   const loadCourse = async () => {
     setLoading(true);
     // Find course by ID or load all courses
-    const allCoursesRes = await fetchApi('/courses');
+    const allCoursesRes = await fetchApi('/courses?includeDrafts=true');
     if (allCoursesRes.success && allCoursesRes.data?.courses) {
       const match = allCoursesRes.data.courses.find((c: any) => c.id === courseId);
       if (match) {
@@ -177,16 +182,98 @@ export default function CourseCurriculumBuilderPage() {
     setLoading(false);
   };
 
-  // Topic Handlers
+  // Course Publish Toggle
+  const handleTogglePublishCourse = async () => {
+    if (!course) return;
+    const nextState = !course.isPublished;
+    const res = await fetchApi(`/courses/${course.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ isPublished: nextState }),
+    });
+    if (res.success) {
+      setCourse((prev) => (prev ? { ...prev, isPublished: nextState } : null));
+      success(
+        nextState
+          ? `Published course "${course.title}" to student catalog!`
+          : `Unpublished course "${course.title}" (saved as draft).`
+      );
+    } else {
+      toastError(res.message || 'Failed to update course publication status.');
+    }
+  };
+
+  // Topic (Module) Handlers
+  const handleTogglePublishTopic = async (topic: TopicView) => {
+    const nextState = topic.isPublished === false;
+    const res = await fetchApi(`/courses/topics/${topic.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ isPublished: nextState }),
+    });
+    if (res.success) {
+      setCourse((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          topics: prev.topics.map((t) =>
+            t.id === topic.id ? { ...t, isPublished: nextState } : t
+          ),
+        };
+      });
+      success(
+        nextState
+          ? `Published module "${topic.title}"`
+          : `Unpublished module "${topic.title}" (saved as draft)`
+      );
+    } else {
+      toastError(res.message || 'Failed to update module publication status.');
+    }
+  };
+
+  const handleTogglePublishSubtopic = async (topicId: string, sub: SubtopicView) => {
+    const nextState = sub.isPublished === false;
+    const res = await fetchApi(`/courses/subtopics/${sub.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ isPublished: nextState }),
+    });
+    if (res.success) {
+      setCourse((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          topics: prev.topics.map((t) => {
+            if (t.id !== topicId) return t;
+            return {
+              ...t,
+              subtopics: t.subtopics.map((s) =>
+                s.id === sub.id ? { ...s, isPublished: nextState } : s
+              ),
+            };
+          }),
+        };
+      });
+      success(
+        nextState
+          ? `Published lesson "${sub.title}"`
+          : `Unpublished lesson "${sub.title}" (saved as draft)`
+      );
+    } else {
+      toastError(res.message || 'Failed to update lesson publication status.');
+    }
+  };
+
   const openNewTopicModal = () => {
     setEditingTopicId(null);
-    setTopicForm({ title: '', description: '' });
+    setTopicForm({ title: '', description: '', isPublished: true });
     setTopicModalOpen(true);
   };
 
   const openEditTopicModal = (topic: TopicView) => {
     setEditingTopicId(topic.id);
-    setTopicForm({ title: topic.title, description: topic.description || '' });
+    setTopicForm({
+      title: topic.title,
+      description: topic.description || '',
+      isPublished: topic.isPublished !== false,
+    });
     setTopicModalOpen(true);
   };
 
@@ -305,7 +392,7 @@ export default function CourseCurriculumBuilderPage() {
                   examples: Array.isArray(q.examples) ? q.examples : [],
                 }))
               : [],
-            isPublished: true,
+            isPublished: s.isPublished !== undefined ? s.isPublished : (sub.isPublished !== undefined ? sub.isPublished : true),
           });
           setActiveSubtopicTab('CONTENT');
           setSubtopicModalOpen(true);
@@ -523,23 +610,54 @@ export default function CourseCurriculumBuilderPage() {
     <div className="space-y-8 animate-fade-in pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Link
             href="/admin/courses"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Courses
           </Link>
-          <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-            <span>Curriculum Builder:</span>
-            <span className="text-amber-400">{course.title}</span>
-          </h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+              <span>Curriculum Builder:</span>
+              <span className="text-amber-400">{course.title}</span>
+            </h1>
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1 border ${
+                course.isPublished
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                  : 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
+              }`}
+            >
+              {course.isPublished ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+              <span>{course.isPublished ? 'Course Published' : 'Course in Draft'}</span>
+            </span>
+          </div>
           <p className="text-xs text-gray-400">
             Structure topics, subtopics, Markdown readmes, photo attachments, LeetCode challenges, and mandatory quizzes.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Publish / Unpublish Course Button */}
+          <button
+            type="button"
+            onClick={handleTogglePublishCourse}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 cursor-pointer transition-all ${
+              course.isPublished
+                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+            }`}
+            title={
+              course.isPublished
+                ? 'Unpublish Course (Hide from learners)'
+                : 'Publish Course (Make public to students)'
+            }
+          >
+            {course.isPublished ? <EyeOff className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+            <span>{course.isPublished ? 'Unpublish Course' : 'Publish Course'}</span>
+          </button>
+
           <Link
             href={`/read/${course.slug}`}
             target="_blank"
@@ -571,7 +689,7 @@ export default function CourseCurriculumBuilderPage() {
             <button
               type="button"
               onClick={openNewTopicModal}
-              className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs"
+              className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs cursor-pointer"
             >
               Add Module
             </button>
@@ -583,22 +701,56 @@ export default function CourseCurriculumBuilderPage() {
               className="glass-card rounded-2xl border border-white/10 overflow-hidden shadow-xl"
             >
               {/* Topic Header Bar */}
-              <div className="p-4 sm:p-5 bg-white/[0.02] border-b border-white/10 flex items-center justify-between gap-4">
+              <div className="p-4 sm:p-5 bg-white/[0.02] border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-300 font-mono font-bold text-xs flex items-center justify-center border border-amber-500/30 shrink-0">
                     {tIdx + 1}
                   </span>
                   <div className="min-w-0">
-                    <h2 className="text-sm sm:text-base font-bold text-white truncate">
-                      {topic.title}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm sm:text-base font-bold text-white truncate">
+                        {topic.title}
+                      </h2>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${
+                          topic.isPublished !== false
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            : 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
+                        }`}
+                      >
+                        {topic.isPublished !== false ? 'Published' : 'Draft'}
+                      </span>
+                    </div>
                     {topic.description && (
                       <p className="text-xs text-gray-400 truncate">{topic.description}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {/* Publish / Unpublish Module Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePublishTopic(topic)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 cursor-pointer transition-all ${
+                      topic.isPublished !== false
+                        ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}
+                    title={
+                      topic.isPublished !== false
+                        ? 'Unpublish Module (Hide from public syllabus)'
+                        : 'Publish Module (Make visible in syllabus)'
+                    }
+                  >
+                    {topic.isPublished !== false ? (
+                      <EyeOff className="w-3.5 h-3.5" />
+                    ) : (
+                      <CheckCircle className="w-3.5 h-3.5" />
+                    )}
+                    <span>{topic.isPublished !== false ? 'Unpublish' : 'Publish'}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => openNewSubtopicModal(topic.id)}
@@ -610,16 +762,16 @@ export default function CourseCurriculumBuilderPage() {
                   <button
                     type="button"
                     onClick={() => openEditTopicModal(topic)}
-                    className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300"
-                    title="Edit Topic Details"
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 cursor-pointer"
+                    title="Edit Module Details"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteTopic(topic.id, topic.title)}
-                    className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400"
-                    title="Delete Topic"
+                    className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 cursor-pointer"
+                    title="Delete Module"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -636,16 +788,27 @@ export default function CourseCurriculumBuilderPage() {
                   topic.subtopics.map((sub, sIdx) => (
                     <div
                       key={sub.id}
-                      className="p-4 sm:px-6 flex items-center justify-between gap-4 hover:bg-white/[0.02] transition-colors"
+                      className="p-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-white/[0.02] transition-colors"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
                         <span className="text-xs font-mono text-gray-500 shrink-0">
                           {tIdx + 1}.{sIdx + 1}
                         </span>
                         <div className="min-w-0">
-                          <h4 className="text-xs sm:text-sm font-semibold text-white truncate">
-                            {sub.title}
-                          </h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs sm:text-sm font-semibold text-white truncate">
+                              {sub.title}
+                            </h4>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border shrink-0 ${
+                                sub.isPublished !== false
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                  : 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
+                              }`}
+                            >
+                              {sub.isPublished !== false ? 'Published' : 'Draft'}
+                            </span>
+                          </div>
                           <div className="flex flex-wrap items-center gap-2 mt-1">
                             {sub.hasQuiz && (
                               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/25 flex items-center gap-1">
@@ -664,10 +827,32 @@ export default function CourseCurriculumBuilderPage() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
+                        {/* Publish / Unpublish Lesson Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePublishSubtopic(topic.id, sub)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 cursor-pointer transition-all ${
+                            sub.isPublished !== false
+                              ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                              : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          }`}
+                          title={
+                            sub.isPublished !== false
+                              ? 'Unpublish Lesson (Hide from learners)'
+                              : 'Publish Lesson (Make available to learners)'
+                          }
+                        >
+                          {sub.isPublished !== false ? (
+                            <EyeOff className="w-3.5 h-3.5" />
+                          ) : (
+                            <CheckCircle className="w-3.5 h-3.5" />
+                          )}
+                          <span>{sub.isPublished !== false ? 'Unpublish' : 'Publish'}</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => openEditSubtopicModal(topic.id, sub)}
-                          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-200 border border-white/10 flex items-center gap-1"
+                          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-200 border border-white/10 flex items-center gap-1 cursor-pointer"
                         >
                           <Edit className="w-3.5 h-3.5" />
                           <span>Edit Lesson</span>
@@ -675,7 +860,7 @@ export default function CourseCurriculumBuilderPage() {
                         <button
                           type="button"
                           onClick={() => handleDeleteSubtopic(sub.id, sub.title)}
-                          className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400"
+                          className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 cursor-pointer"
                           title="Delete Lesson"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -731,6 +916,19 @@ export default function CourseCurriculumBuilderPage() {
                   placeholder="Overview of this module's objectives..."
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white"
                 />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="topicPublished"
+                  checked={topicForm.isPublished}
+                  onChange={(e) => setTopicForm({ ...topicForm, isPublished: e.target.checked })}
+                  className="rounded text-amber-500 focus:ring-amber-500 bg-slate-900 border-white/20"
+                />
+                <label htmlFor="topicPublished" className="text-xs text-gray-300 cursor-pointer select-none">
+                  Publish module (visible in course syllabus)
+                </label>
               </div>
 
               <div className="flex justify-end gap-2.5 pt-2">
@@ -1518,9 +1716,21 @@ export default function CourseCurriculumBuilderPage() {
 
             {/* Bottom Actions */}
             <div className="flex items-center justify-between pt-3 border-t border-white/10 shrink-0">
-              <span className="text-[11px] text-gray-400">
-                Minimum score to unlock next topic: <strong>{subtopicForm.quizPassingScore}%</strong>
-              </span>
+              <div className="flex items-center gap-4">
+                <span className="text-[11px] text-gray-400">
+                  Minimum score to unlock next topic: <strong>{subtopicForm.quizPassingScore}%</strong>
+                </span>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-lg border border-white/10 select-none">
+                  <input
+                    type="checkbox"
+                    checked={subtopicForm.isPublished}
+                    onChange={(e) => setSubtopicForm({ ...subtopicForm, isPublished: e.target.checked })}
+                    className="rounded text-amber-500 focus:ring-amber-500 bg-slate-900 border-white/20"
+                  />
+                  <span>Published Lesson</span>
+                </label>
+              </div>
 
               <div className="flex gap-2.5">
                 <button

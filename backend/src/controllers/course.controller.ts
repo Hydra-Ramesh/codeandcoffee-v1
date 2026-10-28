@@ -17,13 +17,13 @@ function slugify(text: string): string {
 /**
  * Helper to fetch flattened ordered subtopics for a course
  */
-async function getOrderedSubtopicsForCourse(courseId: string) {
+async function getOrderedSubtopicsForCourse(courseId: string, includeDrafts = false) {
   const topics = await prisma.courseTopic.findMany({
-    where: { courseId },
+    where: includeDrafts ? { courseId } : { courseId, isPublished: true },
     orderBy: { order: 'asc' },
     include: {
       subtopics: {
-        where: { isPublished: true },
+        where: includeDrafts ? {} : { isPublished: true },
         orderBy: { order: 'asc' },
         select: { id: true, slug: true, topicId: true, title: true, order: true },
       },
@@ -59,8 +59,12 @@ export async function getAllCourses(req: AuthenticatedRequest, res: Response): P
     const category = req.query.category as string | undefined;
     const search = req.query.search as string | undefined;
     const userId = req.user?.id;
+    const includeDrafts = req.query.includeDrafts === 'true' || req.user?.role === 'ADMIN';
 
-    const where: any = { isPublished: true };
+    const where: any = {};
+    if (!includeDrafts) {
+      where.isPublished = true;
+    }
     if (category && category !== 'All') {
       where.category = category;
     }
@@ -82,8 +86,8 @@ export async function getAllCourses(req: AuthenticatedRequest, res: Response): P
           orderBy: { order: 'asc' },
           include: {
             subtopics: {
-              where: { isPublished: true },
-              select: { id: true, title: true, hasQuiz: true },
+              where: includeDrafts ? {} : { isPublished: true },
+              select: { id: true, title: true, hasQuiz: true, isPublished: true },
             },
           },
         },
@@ -120,6 +124,7 @@ export async function getAllCourses(req: AuthenticatedRequest, res: Response): P
         bannerImage: c.bannerImage,
         level: c.level,
         author: c.author,
+        isPublished: c.isPublished,
         topicsCount: c.topics.length,
         lessonsCount: totalLessons,
         quizzesCount: totalQuizzes,
@@ -160,10 +165,11 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
           select: { id: true, name: true, avatar: true, bio: true, role: true },
         },
         topics: {
+          where: isStaff ? {} : { isPublished: true },
           orderBy: { order: 'asc' },
           include: {
             subtopics: {
-              where: { isPublished: true },
+              where: isStaff ? {} : { isPublished: true },
               orderBy: { order: 'asc' },
               select: {
                 id: true,
@@ -172,6 +178,7 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
                 order: true,
                 hasQuiz: true,
                 quizPassingScore: true,
+                isPublished: true,
               },
             },
           },
@@ -179,7 +186,7 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
       },
     });
 
-    if (!course) {
+    if (!course || (!course.isPublished && !isStaff)) {
       res.status(404).json({ success: false, message: 'Course not found.' });
       return;
     }
@@ -254,6 +261,7 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
           order: st.order,
           hasQuiz: st.hasQuiz,
           quizPassingScore: st.quizPassingScore,
+          isPublished: st.isPublished,
           isUnlocked,
           isCompleted,
           quizPassed,
@@ -267,6 +275,7 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
         slug: topic.slug,
         description: topic.description,
         order: topic.order,
+        isPublished: topic.isPublished,
         subtopics: subtopicsWithLocks,
       };
     });
@@ -286,6 +295,7 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
           category: course.category,
           bannerImage: course.bannerImage,
           level: course.level,
+          isPublished: course.isPublished,
           author: course.author,
           topics: topicsWithLocks,
           totalLessons: totalLessonsCount,
@@ -346,7 +356,7 @@ export async function getSubtopicDetail(req: AuthenticatedRequest, res: Response
       },
     });
 
-    if (!subtopic || !subtopic.isPublished) {
+    if (!subtopic || (!subtopic.isPublished && !isStaff)) {
       res.status(404).json({ success: false, message: 'Lesson not found.' });
       return;
     }
@@ -371,7 +381,7 @@ export async function getSubtopicDetail(req: AuthenticatedRequest, res: Response
 
     // If it's the very first lesson of the entire course, it's always unlocked
     if (!isUnlocked) {
-      const { flat } = await getOrderedSubtopicsForCourse(course.id);
+      const { flat } = await getOrderedSubtopicsForCourse(course.id, isStaff);
       if (flat.length > 0 && flat[0].id === subtopic.id) {
         isUnlocked = true;
       }
@@ -400,7 +410,7 @@ export async function getSubtopicDetail(req: AuthenticatedRequest, res: Response
     }
 
     // Find previous and next subtopics in sequence
-    const { flat, topics } = await getOrderedSubtopicsForCourse(course.id);
+    const { flat, topics } = await getOrderedSubtopicsForCourse(course.id, isStaff);
     const currentIndex = flat.findIndex((item) => item.id === subtopic.id);
     const previousSubtopic = currentIndex > 0 ? flat[currentIndex - 1] : null;
     const nextSubtopic = currentIndex >= 0 && currentIndex + 1 < flat.length ? flat[currentIndex + 1] : null;
@@ -447,6 +457,8 @@ export async function getSubtopicDetail(req: AuthenticatedRequest, res: Response
           hasQuiz: subtopic.hasQuiz,
           quizPassingScore: subtopic.quizPassingScore || 25,
           quiz: sanitizedQuiz,
+          quizData: isStaff ? subtopic.quizData : undefined,
+          isPublished: subtopic.isPublished,
           createdAt: subtopic.createdAt,
           updatedAt: subtopic.updatedAt,
         },
@@ -855,7 +867,7 @@ export async function markLessonComplete(req: AuthenticatedRequest, res: Respons
  */
 export async function createCourse(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { title, description, category, bannerImage, level } = req.body;
+    const { title, description, category, bannerImage, level, isPublished } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -884,6 +896,7 @@ export async function createCourse(req: AuthenticatedRequest, res: Response): Pr
         category: category || 'Programming Languages',
         bannerImage: bannerImage || null,
         level: level || 'BEGINNER',
+        isPublished: isPublished !== undefined ? Boolean(isPublished) : true,
         order: count,
         authorId: userId,
       },
@@ -983,7 +996,7 @@ export async function deleteCourse(req: AuthenticatedRequest, res: Response): Pr
 export async function createTopic(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const courseId = req.params.courseId as string;
-    const { title, description } = req.body;
+    const { title, description, isPublished } = req.body;
 
     if (!title) {
       res.status(400).json({ success: false, message: 'Topic title is required.' });
@@ -1007,6 +1020,7 @@ export async function createTopic(req: AuthenticatedRequest, res: Response): Pro
         slug,
         description: description || null,
         order: orderCount,
+        isPublished: isPublished !== undefined ? Boolean(isPublished) : true,
       },
     });
 
@@ -1027,7 +1041,7 @@ export async function createTopic(req: AuthenticatedRequest, res: Response): Pro
 export async function updateTopic(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const topicId = req.params.topicId as string;
-    const { title, description, order } = req.body;
+    const { title, description, order, isPublished } = req.body;
 
     const topic = await prisma.courseTopic.findUnique({ where: { id: topicId } });
     if (!topic) {
@@ -1041,6 +1055,7 @@ export async function updateTopic(req: AuthenticatedRequest, res: Response): Pro
         title: title ?? topic.title,
         description: description !== undefined ? description : topic.description,
         order: order !== undefined ? order : topic.order,
+        isPublished: isPublished !== undefined ? Boolean(isPublished) : topic.isPublished,
       },
     });
 
@@ -1088,6 +1103,7 @@ export async function createSubtopic(req: AuthenticatedRequest, res: Response): 
       quizPassingScore,
       quizData,
       codingQuestions,
+      isPublished,
     } = req.body;
 
     if (!title) {
@@ -1117,6 +1133,7 @@ export async function createSubtopic(req: AuthenticatedRequest, res: Response): 
         quizPassingScore: typeof quizPassingScore === 'number' ? quizPassingScore : 25,
         quizData: quizData || [],
         codingQuestions: codingQuestions || [],
+        isPublished: isPublished !== undefined ? Boolean(isPublished) : true,
       },
     });
 

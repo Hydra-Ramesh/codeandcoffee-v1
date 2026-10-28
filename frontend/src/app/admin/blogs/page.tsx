@@ -11,6 +11,7 @@ import {
   CheckCircle,
   XCircle,
   Eye,
+  EyeOff,
   ThumbsUp,
   MessageSquare,
 } from 'lucide-react';
@@ -208,24 +209,46 @@ export default function AdminBlogManagementPage() {
                       {new Date(blog.createdAt).toLocaleDateString()}
                     </td>
                     <td className="p-4 text-right space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePublish(blog)}
+                        className={`p-1.5 px-2.5 rounded-lg inline-flex items-center gap-1.5 text-[11px] font-semibold border transition-all cursor-pointer ${
+                          blog.isPublished
+                            ? 'text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30'
+                            : 'text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30'
+                        }`}
+                        title={blog.isPublished ? 'Unpublish Article (Move to Drafts)' : 'Publish Article to Live Feed'}
+                      >
+                        {blog.isPublished ? (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Unpublish</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Publish</span>
+                          </>
+                        )}
+                      </button>
                       <Link
                         href={`/blogs/${blog.slug}`}
                         target="_blank"
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 inline-block"
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 inline-block align-middle"
                         title="View Live Article"
                       >
                         <ExternalLink className="w-4 h-4" />
                       </Link>
                       <Link
                         href={`/admin/blogs/${blog.id}/edit`}
-                        className="p-1.5 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-white/10 inline-block"
+                        className="p-1.5 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-white/10 inline-block align-middle"
                         title="Edit Article"
                       >
                         <Edit className="w-4 h-4" />
                       </Link>
                       <button
                         onClick={() => promptDeleteBlog(blog.id, blog.title, blog.category)}
-                        className="p-2 min-h-[36px] min-w-[36px] rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 inline-flex items-center justify-center transition-all border border-transparent hover:border-red-500/20 active:scale-95 cursor-pointer"
+                        className="p-2 min-h-[36px] min-w-[36px] rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 inline-flex items-center justify-center transition-all border border-transparent hover:border-red-500/20 active:scale-95 cursor-pointer align-middle"
                         title="Delete Article"
                       >
                         <Trash2 className="w-4 h-4" />

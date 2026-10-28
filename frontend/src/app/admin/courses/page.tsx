@@ -11,6 +11,8 @@ import {
   Edit,
   Trash2,
   CheckCircle2,
+  CheckCircle,
+  XCircle,
   HelpCircle,
   Code2,
   ArrowRight,
@@ -19,11 +21,13 @@ import {
   ExternalLink,
   Shield,
   Eye,
+  EyeOff,
   AlertCircle,
   GraduationCap,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
+import { useToast } from '../../../context/ToastContext';
 import { optimizeImageUrl } from '../../../lib/image';
 import AdminCoursesSkeleton from '../../../components/skeletons/AdminCoursesSkeleton';
 
@@ -35,6 +39,7 @@ interface CourseItem {
   category: string;
   bannerImage: string | null;
   level: string;
+  isPublished: boolean;
   author: {
     id: string;
     name: string;
@@ -90,6 +95,7 @@ interface TelemetryData {
 
 export default function AdminCoursesPage() {
   const { user, isAdmin } = useAuth();
+  const { success, error: toastError } = useToast();
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,11 +124,31 @@ export default function AdminCoursesPage() {
 
   const loadCourses = async () => {
     setLoading(true);
-    const res = await fetchApi('/courses');
+    const res = await fetchApi('/courses?includeDrafts=true');
     if (res.success && res.data?.courses) {
       setCourses(res.data.courses);
     }
     setLoading(false);
+  };
+
+  const handleTogglePublishCourse = async (course: CourseItem) => {
+    const nextState = !course.isPublished;
+    const res = await fetchApi(`/courses/${course.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ isPublished: nextState }),
+    });
+    if (res.success) {
+      setCourses((prev) =>
+        prev.map((c) => (c.id === course.id ? { ...c, isPublished: nextState } : c))
+      );
+      success(
+        nextState
+          ? `Published "${course.title}" to student catalog!`
+          : `Unpublished "${course.title}" (saved as draft).`
+      );
+    } else {
+      toastError(res.message || 'Failed to update course publication status.');
+    }
   };
 
   const handleCreateCourse = async (e: React.FormEvent) => {
@@ -254,6 +280,16 @@ export default function AdminCoursesPage() {
             >
               <div className="space-y-2.5 flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1 border ${
+                      c.isPublished
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        : 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
+                    }`}
+                  >
+                    {c.isPublished ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                    <span>{c.isPublished ? 'Published' : 'Draft'}</span>
+                  </span>
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                     {c.level}
                   </span>
@@ -288,6 +324,27 @@ export default function AdminCoursesPage() {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-white/5">
+                {/* Publish / Unpublish Toggle */}
+                {(isAdmin || user?.id === c.author.id) && (
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePublishCourse(c)}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 cursor-pointer transition-all ${
+                      c.isPublished
+                        ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}
+                    title={
+                      c.isPublished
+                        ? 'Unpublish Course (Hide from Learners Catalog)'
+                        : 'Publish Course (Make Available to Students)'
+                    }
+                  >
+                    {c.isPublished ? <EyeOff className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                    <span>{c.isPublished ? 'Unpublish' : 'Publish'}</span>
+                  </button>
+                )}
+
                 {/* Telemetry / Monitor */}
                 <button
                   type="button"

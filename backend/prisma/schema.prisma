@@ -306,6 +306,7 @@ model CourseTopic {
   slug        String
   description String?
   order       Int      @default(0)
+  isPublished Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -314,6 +315,7 @@ model CourseTopic {
   @@unique([courseId, slug])
   @@index([courseId])
   @@index([courseId, order])
+  @@index([isPublished])
 }
 
 model CourseSubtopic {
