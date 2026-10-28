@@ -16,6 +16,14 @@ export default function Navbar() {
   const pathname = usePathname();
   const isStaff = Boolean(user && (user.role === 'ADMIN' || user.role === 'CONTRIBUTOR'));
 
+  const isReaderStudio = Boolean(
+    pathname?.startsWith('/read/') && pathname.split('/').filter(Boolean).length >= 4
+  );
+
+  if (isReaderStudio) {
+    return null;
+  }
+
   const navLinks = [
     { name: 'Explore Blogs', href: '/blogs', dataTour: 'tour-nav-blogs' },
     { name: 'Read', href: '/read', isRead: true, dataTour: 'tour-nav-read' },

@@ -8,11 +8,16 @@ import { Mail, MapPin, Heart, Sparkles, ArrowRight, BookOpen } from 'lucide-reac
 export default function Footer() {
   const pathname = usePathname();
 
-  // Hide footer on authentication flows, admin dashboard, and the Explore Blogs catalog (/blogs)
+  // Hide footer on authentication flows, admin dashboard, Explore Blogs catalog, and full-screen reading studio
+  const isReaderStudio = Boolean(
+    pathname?.startsWith('/read/') && pathname.split('/').filter(Boolean).length >= 4
+  );
+
   if (
     pathname?.startsWith('/auth') ||
     pathname?.startsWith('/admin') ||
-    pathname === '/blogs'
+    pathname === '/blogs' ||
+    isReaderStudio
   ) {
     return null;
   }

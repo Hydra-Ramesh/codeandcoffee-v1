@@ -4,6 +4,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { ToastProvider } from '../context/ToastContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import MainContentWrapper from '../components/MainContentWrapper';
 import BackendWarmup from '../components/BackendWarmup';
 
 export const metadata: Metadata = {
@@ -120,9 +121,9 @@ export default function RootLayout({
                 <Suspense fallback={<div className="h-20" />}>
                   <Navbar />
                 </Suspense>
-                <main id="main-content" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 focus:outline-none">
+                <MainContentWrapper>
                   {children}
-                </main>
+                </MainContentWrapper>
                 <Footer />
               </div>
             </ToastProvider>

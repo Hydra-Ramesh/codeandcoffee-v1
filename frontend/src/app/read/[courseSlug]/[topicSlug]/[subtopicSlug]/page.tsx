@@ -28,6 +28,8 @@ import {
   Bookmark,
   Check,
   Maximize2,
+  Minimize2,
+  Coffee,
 } from 'lucide-react';
 import { fetchApi } from '../../../../../lib/api';
 import { useAuth } from '../../../../../context/AuthContext';
@@ -151,6 +153,30 @@ export default function SubtopicReaderPage() {
 
   // Code Sandbox "Coming Soon" notification
   const [sandboxModalOpen, setSandboxModalOpen] = useState(false);
+
+  // Fullscreen Mode State
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = () => {
+    if (typeof document === 'undefined') return;
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+        setIsFullscreen(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   useEffect(() => {
     if (courseSlug && topicSlug && subtopicSlug) {
@@ -337,23 +363,36 @@ export default function SubtopicReaderPage() {
   const isCurrentCompleted = userProgress.isCompleted || (lesson.hasQuiz && userProgress.quizPassed);
 
   return (
-    <div className="min-h-screen flex flex-col -mx-4 sm:-mx-6 lg:-mx-8 -my-6 bg-slate-950 text-gray-100">
+    <div className="w-full h-screen flex flex-col bg-slate-950 text-gray-100 overflow-hidden">
       {/* Top Sticky App Header */}
-      <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-white/10 px-4 sm:px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <header className="h-14 shrink-0 bg-slate-950/95 backdrop-blur-md border-b border-white/10 px-4 sm:px-6 flex items-center justify-between z-30">
+        <div className="flex items-center gap-3 min-w-0">
           {/* Mobile Sidebar Toggle */}
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-2 rounded-xl glass-card text-gray-300 hover:text-white border border-white/10 cursor-pointer"
+            className="lg:hidden p-1.5 rounded-xl glass-card text-gray-300 hover:text-white border border-white/10 cursor-pointer"
             aria-label="Toggle Syllabus Sidebar"
           >
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </button>
 
+          {/* Brand Logo */}
+          <Link href="/" className="flex items-center gap-2 group shrink-0">
+            <div className="p-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400">
+              <Coffee className="w-4 h-4 group-hover:rotate-6 transition-transform" />
+            </div>
+            <span className="font-extrabold text-sm text-white hidden sm:inline tracking-tight">
+              Code <span className="gradient-text-amber">&amp; Coffee</span>
+            </span>
+          </Link>
+
+          <div className="h-4 w-[1px] bg-white/15 hidden sm:block" />
+
+          {/* Back to Course Syllabus Link */}
           <Link
             href={`/read/${courseSlug}`}
-            className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-amber-400 transition-colors font-medium truncate max-w-[200px] sm:max-w-xs"
+            className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-amber-400 transition-colors font-medium truncate max-w-[180px] sm:max-w-xs"
           >
             <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{syllabus?.title || 'Course'}</span>
@@ -361,22 +400,22 @@ export default function SubtopicReaderPage() {
         </div>
 
         {/* Current Lesson Title in Header */}
-        <div className="hidden md:flex items-center gap-2 text-xs text-gray-300">
-          <span className="text-gray-500">Topic:</span>
+        <div className="hidden lg:flex items-center gap-2 text-xs text-gray-300 px-4">
+          <span className="text-gray-500">{topicInfo?.title} &gt;</span>
           <span className="font-semibold text-white truncate max-w-sm">{lesson.title}</span>
         </div>
 
         {/* Header Right Completion & Progress Indicator */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 shrink-0">
           {isCurrentCompleted ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Completed</span>
+              <span className="hidden sm:inline">Completed</span>
             </span>
           ) : lesson.hasQuiz ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/25">
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/25">
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>Quiz Required (&ge; {lesson.quizPassingScore}%)</span>
+              <span>Quiz &ge; {lesson.quizPassingScore}%</span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/10 text-blue-300 border border-blue-500/25">
@@ -384,14 +423,46 @@ export default function SubtopicReaderPage() {
               <span>Reading</span>
             </span>
           )}
+
+          {/* Fullscreen Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen Mode'}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4 text-amber-400" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+
+          {/* User Profile / Auth */}
+          {user ? (
+            <Link
+              href="/user/profile"
+              className="flex items-center gap-1.5 p-1 rounded-full hover:ring-2 hover:ring-amber-500/50 transition-all"
+              title={user.name}
+            >
+              <img
+                src={user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.name)}`}
+                alt={user.name}
+                className="w-7 h-7 rounded-full border border-white/20 bg-slate-800 object-cover"
+              />
+            </Link>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </header>
 
       {/* Main GeeksforGeeks-style Layout Arena */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative w-full h-[calc(100vh-56px)]">
         {/* Full Height Left Syllabus Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-80 sm:w-96 bg-slate-900/95 lg:bg-slate-900/60 backdrop-blur-xl border-r border-white/10 flex flex-col transition-transform duration-300 lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 w-80 sm:w-96 lg:w-[380px] shrink-0 bg-slate-900/95 lg:bg-slate-900/80 backdrop-blur-xl border-r border-white/10 flex flex-col transition-transform duration-300 lg:static lg:translate-x-0 h-full ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -451,31 +522,31 @@ export default function SubtopicReaderPage() {
                               <Link
                                 href={href}
                                 onClick={() => setSidebarOpen(false)}
-                                className={`flex items-center justify-between p-2.5 rounded-lg text-xs transition-all ${
+                                className={`flex items-start justify-between p-2.5 rounded-xl text-xs transition-all ${
                                   isCurrent
                                     ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30'
                                     : 'text-gray-300 hover:text-white hover:bg-white/5'
                                 }`}
                               >
-                                <div className="flex items-center gap-2 min-w-0 pr-2">
+                                <div className="flex items-start gap-2.5 min-w-0 pr-2">
                                   {st.isCompleted ? (
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                                   ) : (
-                                    <Unlock className="w-3.5 h-3.5 text-amber-400/70 shrink-0" />
+                                    <Unlock className="w-3.5 h-3.5 text-amber-400/70 shrink-0 mt-0.5" />
                                   )}
-                                  <span className="truncate">{st.title}</span>
+                                  <span className="leading-snug line-clamp-2 font-medium">{st.title}</span>
                                 </div>
                                 {st.hasQuiz && (
-                                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 shrink-0">
+                                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 shrink-0 mt-0.5">
                                     Quiz
                                   </span>
                                 )}
                               </Link>
                             ) : (
-                              <div className="flex items-center justify-between p-2.5 text-xs text-gray-400 opacity-60 cursor-not-allowed">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                  <span className="truncate">{st.title}</span>
+                              <div className="flex items-start justify-between p-2.5 text-xs text-gray-400 opacity-60 cursor-not-allowed">
+                                <div className="flex items-start gap-2.5 min-w-0 pr-2">
+                                  <Lock className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                                  <span className="leading-snug line-clamp-2">{st.title}</span>
                                 </div>
                               </div>
                             )}
@@ -491,7 +562,8 @@ export default function SubtopicReaderPage() {
         </aside>
 
         {/* Center Reading Arena */}
-        <main className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-12 py-8 max-w-5xl mx-auto space-y-10 custom-scrollbar">
+        <main className="flex-1 h-full overflow-y-auto px-6 sm:px-10 lg:px-16 py-8 custom-scrollbar bg-slate-950/40">
+          <div className="max-w-4xl xl:max-w-5xl mx-auto space-y-10">
           {/* Breadcrumb Trail */}
           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
             <Link href="/read" className="hover:text-amber-400 transition-colors">
@@ -959,6 +1031,7 @@ export default function SubtopicReaderPage() {
               </div>
             )}
           </footer>
+          </div>
         </main>
       </div>
 
