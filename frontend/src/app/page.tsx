@@ -91,13 +91,13 @@ export default function HomePage() {
   const standardBlogs = blogs.length > 1 ? blogs.slice(1) : blogs;
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-8 sm:space-y-10">
       {/* Hero Section */}
-      <section className="relative pt-8 pb-14 text-center">
+      <section className="relative pt-4 sm:pt-6 pb-2 sm:pb-4 text-center">
         {/* Ambient subtle glow backdrop */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] sm:w-[700px] h-[320px] bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-600/15 rounded-full blur-[110px] pointer-events-none -z-10" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] sm:w-[700px] h-[280px] bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-600/15 rounded-full blur-[110px] pointer-events-none -z-10" />
 
-        <div className="max-w-3xl mx-auto flex flex-col items-center space-y-6">
+        <div className="max-w-3xl mx-auto flex flex-col items-center space-y-4 sm:space-y-5">
           {/* Live Indicator Pill */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold backdrop-blur-md shadow-lg shadow-amber-500/10">
             <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-beacon" />
@@ -114,20 +114,20 @@ export default function HomePage() {
           </h1>
 
           {/* Tagline */}
-          <p className="text-gray-300 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-gray-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             Curated architectural deep-dives, distributed system blueprints, database
             internals, and modern engineering practices crafted for technical leaders and builders.
           </p>
 
           {/* Centered Search Bar */}
-          <div className="relative w-full max-w-xl mx-auto pt-2">
+          <div className="relative w-full max-w-xl mx-auto pt-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search articles on system design, architecture, performance, clean code..."
-              className="w-full pl-12 pr-16 py-3.5 rounded-2xl glass-input text-sm text-white placeholder-gray-400 shadow-xl focus:border-amber-500/50"
+              className="w-full pl-12 pr-16 py-3 rounded-2xl glass-input text-sm text-white placeholder-gray-400 shadow-xl focus:border-amber-500/50"
             />
             {search && (
               <button
@@ -138,27 +138,27 @@ export default function HomePage() {
               </button>
             )}
           </div>
-        </div>
-      </section>
 
-      {/* Category Pills Navigation - Centered */}
-      <section className="flex items-center justify-center flex-wrap gap-2.5 pb-2">
-        {categories.map((cat) => {
-          const isSelected = selectedCategory === cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
-                isSelected
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20 scale-[1.02]'
-                  : 'glass-card text-gray-300 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              {cat}
-            </button>
-          );
-        })}
+          {/* Category Pills Navigation - Tightly integrated below search bar */}
+          <div className="flex items-center justify-center flex-wrap gap-2 pt-1">
+            {categories.map((cat) => {
+              const isSelected = selectedCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20 scale-[1.02]'
+                      : 'glass-card text-gray-300 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </section>
 
       {/* Featured Spotlight Article (if available) */}
