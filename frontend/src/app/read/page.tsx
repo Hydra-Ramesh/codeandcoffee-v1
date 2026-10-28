@@ -19,6 +19,7 @@ import {
 import { fetchApi } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { optimizeImageUrl } from '../../lib/image';
+import ReadCatalogSkeleton from '../../components/skeletons/ReadCatalogSkeleton';
 
 interface Course {
   id: string;
@@ -78,6 +79,10 @@ export default function ReadCatalogPage() {
     const q = searchQuery.toLowerCase();
     return c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q);
   });
+
+  if (loading && courses.length === 0) {
+    return <ReadCatalogSkeleton />;
+  }
 
   return (
     <div className="space-y-12 pb-16 animate-fade-in">
@@ -155,18 +160,48 @@ export default function ReadCatalogPage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((n) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse select-none">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
               <div
                 key={n}
-                className="glass-card rounded-3xl p-6 border border-white/10 h-80 animate-pulse flex flex-col justify-between"
+                className="glass-card rounded-3xl p-6 border border-white/10 flex flex-col justify-between space-y-6 bg-slate-900/40"
               >
                 <div className="space-y-4">
-                  <div className="w-full h-36 bg-slate-800/80 rounded-2xl" />
-                  <div className="w-3/4 h-5 bg-slate-800 rounded" />
-                  <div className="w-full h-4 bg-slate-800 rounded" />
+                  <div className="relative w-full h-44 rounded-2xl bg-gradient-to-br from-slate-800/90 via-slate-900 to-slate-950 border border-white/10 p-4 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <div className="h-5 w-20 bg-amber-500/20 rounded-full border border-amber-500/30" />
+                      <div className="h-5 w-16 bg-slate-800/90 rounded-full" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10" />
+                      <div className="h-4 w-28 bg-slate-800 rounded" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="h-5 w-11/12 bg-slate-800 rounded-lg" />
+                    <div className="h-5 w-2/3 bg-slate-800/80 rounded-lg" />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="h-3.5 w-full bg-slate-800/60 rounded" />
+                    <div className="h-3.5 w-4/5 bg-slate-800/60 rounded" />
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/5 grid grid-cols-3 gap-2">
+                    <div className="h-5 bg-slate-800/70 rounded" />
+                    <div className="h-5 bg-slate-800/70 rounded" />
+                    <div className="h-5 bg-slate-800/70 rounded" />
+                  </div>
                 </div>
-                <div className="w-1/2 h-8 bg-slate-800 rounded-xl" />
+
+                <div className="pt-4 border-t border-white/10 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10" />
+                    <div className="h-3 w-20 bg-slate-800/70 rounded" />
+                  </div>
+                  <div className="h-9 w-28 bg-amber-500/30 rounded-xl" />
+                </div>
               </div>
             ))}
           </div>

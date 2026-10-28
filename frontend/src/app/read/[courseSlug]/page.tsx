@@ -25,6 +25,7 @@ import {
 import { fetchApi } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import { optimizeImageUrl } from '../../../lib/image';
+import CourseOverviewSkeleton from '../../../components/skeletons/CourseOverviewSkeleton';
 
 interface SubtopicSummary {
   id: string;
@@ -109,16 +110,7 @@ export default function CourseOverviewPage() {
   };
 
   if (loading) {
-    return (
-      <div className="max-w-5xl mx-auto py-16 space-y-8 animate-pulse">
-        <div className="h-8 w-40 bg-white/10 rounded-xl" />
-        <div className="h-64 bg-white/5 rounded-3xl" />
-        <div className="space-y-4">
-          <div className="h-10 w-64 bg-white/10 rounded-xl" />
-          <div className="h-40 bg-white/5 rounded-2xl" />
-        </div>
-      </div>
-    );
+    return <CourseOverviewSkeleton />;
   }
 
   if (!course) {

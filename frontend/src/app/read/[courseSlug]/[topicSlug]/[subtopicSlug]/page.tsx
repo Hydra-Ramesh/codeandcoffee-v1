@@ -37,6 +37,7 @@ import {
 import { fetchApi } from '../../../../../lib/api';
 import { useAuth } from '../../../../../context/AuthContext';
 import MarkdownViewer from '../../../../../components/MarkdownViewer';
+import ReadStudioSkeleton from '../../../../../components/skeletons/ReadStudioSkeleton';
 
 interface QuizQuestion {
   id: string;
@@ -393,14 +394,7 @@ export default function SubtopicReaderPage() {
   }
 
   if (loading || !lesson) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400 text-sm animate-pulse">
-        <div className="flex items-center gap-3">
-          <BookOpen className="w-6 h-6 text-amber-400 animate-spin" />
-          <span>Loading Curriculum Lesson...</span>
-        </div>
-      </div>
-    );
+    return <ReadStudioSkeleton />;
   }
 
   const isCurrentCompleted = userProgress.isCompleted || (lesson.hasQuiz && userProgress.quizPassed);
