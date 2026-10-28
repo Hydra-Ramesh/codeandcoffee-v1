@@ -165,6 +165,7 @@ export default function AdminPracticePage() {
   const [formTopic, setFormTopic] = useState('Arrays');
   const [formRating, setFormRating] = useState('800');
   const [formPlatform, setFormPlatform] = useState('LeetCode');
+  const [formCustomPlatform, setFormCustomPlatform] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formDifficulty, setFormDifficulty] = useState<Difficulty>('MEDIUM');
   const [formContent, setFormContent] = useState('');
@@ -220,6 +221,7 @@ export default function AdminPracticePage() {
     setFormTopic('Arrays');
     setFormRating('800');
     setFormPlatform('LeetCode');
+    setFormCustomPlatform('');
     setFormTitle('');
     setFormDifficulty('MEDIUM');
     setFormContent(
@@ -237,7 +239,14 @@ export default function AdminPracticePage() {
     setFormSheetType(q.sheetType);
     setFormTopic(q.topic || '');
     setFormRating(q.rating ? q.rating.toString() : '800');
-    setFormPlatform(q.platform || (q.sheetType === 'CP_SHEET' ? 'Codeforces' : 'LeetCode'));
+    const standardPlatforms = ['LeetCode', 'Codeforces', 'CodeChef', 'InterviewBit', 'Hello Interview', 'AtCoder', 'GeeksforGeeks', 'Self-Created (Code & Coffee)', 'Internal'];
+    if (q.platform && !standardPlatforms.includes(q.platform)) {
+      setFormPlatform('Other');
+      setFormCustomPlatform(q.platform);
+    } else {
+      setFormPlatform(q.platform || (q.sheetType === 'CP_SHEET' ? 'Codeforces' : 'LeetCode'));
+      setFormCustomPlatform('');
+    }
     setFormTitle(q.title);
     setFormDifficulty(q.difficulty);
     setFormContent(q.content || '');
@@ -278,7 +287,7 @@ export default function AdminPracticePage() {
         sheetType: formSheetType,
         topic: formSheetType === 'CP_SHEET' ? null : (formTopic.trim() || 'General Practice'),
         rating: formSheetType === 'CP_SHEET' ? parseInt(formRating, 10) : null,
-        platform: formPlatform,
+        platform: formPlatform === 'Other' ? (formCustomPlatform.trim() || 'Other') : formPlatform,
         title: formTitle.trim(),
         difficulty: formDifficulty,
         content: formContent.trim() || null,
@@ -1142,45 +1151,68 @@ export default function AdminPracticePage() {
                       <option value="CodeChef">CodeChef</option>
                       <option value="AtCoder">AtCoder</option>
                       <option value="LeetCode">LeetCode</option>
+                      <option value="InterviewBit">InterviewBit</option>
+                      <option value="Hello Interview">Hello Interview</option>
                       <option value="Self-Created (Code & Coffee)">Self-Created (Code & Coffee)</option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">
-                      Topic Name {formSheetType === 'KNOWLEDGE_SHEET' && '(Optional)'}
-                    </label>
-                    <input
-                      type="text"
-                      value={formTopic}
-                      onChange={(e) => setFormTopic(e.target.value)}
-                      placeholder={
-                        formSheetType === 'KNOWLEDGE_SHEET'
-                          ? 'e.g. Arrays, System Design, Random Practice'
-                          : 'e.g. Arrays, Dynamic Programming, Trees'
-                      }
-                      className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-300 mb-1">
+                        Topic Name {formSheetType === 'KNOWLEDGE_SHEET' && '(Optional)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={formTopic}
+                        onChange={(e) => setFormTopic(e.target.value)}
+                        placeholder={
+                          formSheetType === 'KNOWLEDGE_SHEET'
+                            ? 'e.g. Arrays, System Design, Random Practice'
+                            : 'e.g. Arrays, Dynamic Programming, Trees'
+                        }
+                        className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Platform</label>
-                    <select
-                      value={formPlatform}
-                      onChange={(e) => setFormPlatform(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
-                    >
-                      <option value="LeetCode">LeetCode</option>
-                      <option value="Self-Created (Code & Coffee)">Self-Created (Code & Coffee)</option>
-                      <option value="Internal">Internal (Readme)</option>
-                      <option value="Codeforces">Codeforces</option>
-                      <option value="CodeChef">CodeChef</option>
-                      <option value="GeeksforGeeks">GeeksforGeeks</option>
-                      <option value="Other">Other</option>
-                    </select>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-300 mb-1">Platform</label>
+                      <select
+                        value={formPlatform}
+                        onChange={(e) => setFormPlatform(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
+                      >
+                        <option value="LeetCode">LeetCode</option>
+                        <option value="Self-Created (Code & Coffee)">Self-Created (Code & Coffee)</option>
+                        <option value="Internal">Internal (Readme)</option>
+                        <option value="InterviewBit">InterviewBit</option>
+                        <option value="Hello Interview">Hello Interview</option>
+                        <option value="Codeforces">Codeforces</option>
+                        <option value="CodeChef">CodeChef</option>
+                        <option value="GeeksforGeeks">GeeksforGeeks</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
                   </div>
+                </div>
+              )}
+
+              {/* If Platform === 'Other', custom platform name input */}
+              {formPlatform === 'Other' && (
+                <div>
+                  <label className="block text-xs font-semibold text-amber-300 mb-1">
+                    Website / Platform Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formCustomPlatform}
+                    onChange={(e) => setFormCustomPlatform(e.target.value)}
+                    placeholder="e.g. HackerRank, CSES, Spoj, Kattis"
+                    className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-amber-500/40 text-white bg-slate-900 placeholder-gray-500 focus:outline-none focus:border-amber-400"
+                  />
                 </div>
               )}
 

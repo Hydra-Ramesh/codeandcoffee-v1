@@ -31,6 +31,7 @@ import {
 import { fetchApi } from '../../../lib/api';
 import { getSocket } from '../../../lib/socket';
 import { useToast } from '../../../context/ToastContext';
+import AdminTableSkeleton from '../../../components/skeletons/AdminTableSkeleton';
 
 interface WaitlistEntry {
   id: string;
@@ -379,10 +380,7 @@ export default function AdminWaitlistPage() {
       {/* WAITLIST TABLE / CARDS */}
       <div className="glass-card rounded-2xl border border-white/10 overflow-hidden shadow-xl">
         {loading ? (
-          <div className="py-20 text-center space-y-3">
-            <Loader2 className="w-8 h-8 animate-spin text-amber-400 mx-auto" />
-            <p className="text-xs text-gray-400">Loading waitlist entries...</p>
-          </div>
+          <AdminTableSkeleton columns={6} rows={6} hasAvatar={true} />
         ) : waitlist.length === 0 ? (
           <div className="py-20 text-center space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-white/5 text-gray-400 mx-auto flex items-center justify-center">

@@ -25,6 +25,7 @@ import {
 import { fetchApi } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import { optimizeImageUrl } from '../../../lib/image';
+import AdminCoursesSkeleton from '../../../components/skeletons/AdminCoursesSkeleton';
 
 interface CourseItem {
   id: string;
@@ -210,10 +211,7 @@ export default function AdminCoursesPage() {
 
       {/* Courses List */}
       {loading ? (
-        <div className="p-12 text-center text-xs text-gray-400 space-y-3">
-          <BookOpen className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
-          <p>Loading course curricula...</p>
-        </div>
+        <AdminCoursesSkeleton />
       ) : filteredCourses.length === 0 ? (
         <div className="p-12 glass-card rounded-2xl border border-white/10 text-center space-y-4">
           <Layers className="w-10 h-10 text-gray-500 mx-auto" />

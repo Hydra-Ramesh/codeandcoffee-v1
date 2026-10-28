@@ -33,6 +33,7 @@ import {
   LogIn,
   UserPlus,
   ShieldCheck,
+  FileText,
 } from 'lucide-react';
 import { fetchApi } from '../../../../../lib/api';
 import { useAuth } from '../../../../../context/AuthContext';
@@ -51,6 +52,9 @@ interface QuizQuestion {
 interface CodingQuestion {
   id: string;
   title: string;
+  platform?: string;
+  customPlatformName?: string;
+  problemUrl?: string;
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   description: string;
   leetcodeUrl?: string;
@@ -701,42 +705,85 @@ export default function SubtopicReaderPage() {
               </div>
 
               <div className="space-y-6">
-                {lesson.codingQuestions.map((q, qIdx) => (
-                  <div
-                    key={q.id || qIdx}
-                    className="rounded-2xl border border-slate-200 dark:border-white/10 p-6 space-y-5 shadow-sm dark:shadow-xl bg-white dark:bg-slate-900/50"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-white/10">
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-400 font-mono font-bold text-xs flex items-center justify-center">
-                          #{qIdx + 1}
-                        </span>
-                        <h3 className="text-base font-bold text-slate-900 dark:text-white">{q.title}</h3>
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                            q.difficulty === 'EASY'
-                              ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
-                              : q.difficulty === 'MEDIUM'
-                              ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30'
-                              : 'bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/30'
-                          }`}
-                        >
-                          {q.difficulty}
-                        </span>
-                      </div>
+                {lesson.codingQuestions.map((q, qIdx) => {
+                  const platform = q.platform || (q.leetcodeUrl ? 'LeetCode' : 'Self-created');
+                  const platformName = platform === 'Other' ? (q.customPlatformName || 'Platform') : platform;
+                  const problemUrl = q.problemUrl || q.leetcodeUrl;
+                  const isSelfCreated = platform === 'Self-created';
 
-                      {q.leetcodeUrl && (
-                        <a
-                          href={q.leetcodeUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-amber-500/10 dark:hover:bg-amber-500/20 text-xs font-semibold text-amber-700 dark:text-amber-300 border border-slate-200 dark:border-white/15 transition-all"
-                        >
-                          <span>Solve on LeetCode</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                    </div>
+                  return (
+                    <div
+                      key={q.id || qIdx}
+                      className="rounded-2xl border border-slate-200 dark:border-white/10 p-6 space-y-5 shadow-sm dark:shadow-xl bg-white dark:bg-slate-900/50"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-white/10">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-400 font-mono font-bold text-xs flex items-center justify-center">
+                            #{qIdx + 1}
+                          </span>
+                          <h3 className="text-base font-bold text-slate-900 dark:text-white">{q.title}</h3>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                              q.difficulty === 'EASY'
+                                ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                                : q.difficulty === 'MEDIUM'
+                                ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                                : 'bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/30'
+                            }`}
+                          >
+                            {q.difficulty}
+                          </span>
+
+                          {/* Dynamic Platform Badge */}
+                          {isSelfCreated ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-purple-500" />
+                              <span>Code &amp; Coffee Original</span>
+                            </span>
+                          ) : platform === 'LeetCode' ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                              LeetCode
+                            </span>
+                          ) : platform === 'Codeforces' ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30">
+                              Codeforces
+                            </span>
+                          ) : platform === 'CodeChef' ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-600/15 text-amber-800 dark:text-amber-200 border border-amber-600/30">
+                              CodeChef
+                            </span>
+                          ) : platform === 'InterviewBit' ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                              InterviewBit
+                            </span>
+                          ) : platform === 'Hello Interview' ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                              Hello Interview
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+                              {platformName}
+                            </span>
+                          )}
+                        </div>
+
+                        {problemUrl ? (
+                          <a
+                            href={problemUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-amber-500/10 dark:hover:bg-amber-500/20 text-xs font-semibold text-amber-700 dark:text-amber-300 border border-slate-200 dark:border-white/15 transition-all shadow-sm"
+                          >
+                            <span>Solve on {platformName}</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        ) : isSelfCreated ? (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 text-xs font-semibold">
+                            <FileText className="w-3.5 h-3.5 text-purple-500" />
+                            <span>Practice Sheet Problem</span>
+                          </div>
+                        ) : null}
+                      </div>
 
                     <div className="text-xs text-slate-700 dark:text-gray-300 leading-relaxed">
                       <MarkdownViewer content={q.description} />
@@ -809,7 +856,8 @@ export default function SubtopicReaderPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </section>
           )}

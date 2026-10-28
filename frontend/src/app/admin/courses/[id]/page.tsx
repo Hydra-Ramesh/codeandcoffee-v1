@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
@@ -23,9 +23,16 @@ import {
   AlertTriangle,
   Sparkles,
   Terminal,
+  UploadCloud,
+  Loader2,
+  Copy,
+  Check,
+  Globe,
 } from 'lucide-react';
 import { fetchApi } from '../../../../lib/api';
 import { useAuth } from '../../../../context/AuthContext';
+import { useToast } from '../../../../context/ToastContext';
+import AdminCurriculumBuilderSkeleton from '../../../../components/skeletons/AdminCurriculumBuilderSkeleton';
 
 interface QuizQuestionForm {
   id: string;
@@ -37,14 +44,26 @@ interface QuizQuestionForm {
   explanation: string;
 }
 
+export type CodingPlatform =
+  | 'Self-created'
+  | 'LeetCode'
+  | 'Codeforces'
+  | 'CodeChef'
+  | 'InterviewBit'
+  | 'Hello Interview'
+  | 'Other';
+
 interface CodingQuestionForm {
   id: string;
   title: string;
+  platform?: CodingPlatform | string;
+  customPlatformName?: string;
+  problemUrl?: string;
+  leetcodeUrl?: string;
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   description: string;
-  leetcodeUrl: string;
-  starterCode: string;
-  examples: Array<{ input: string; output: string; explanation?: string }>;
+  starterCode?: string;
+  examples?: Array<{ input: string; output: string; explanation?: string }>;
 }
 
 interface SubtopicForm {
@@ -126,6 +145,12 @@ export default function CourseCurriculumBuilderPage() {
   });
   const [savingSubtopic, setSavingSubtopic] = useState(false);
   const [newAttachmentUrl, setNewAttachmentUrl] = useState('');
+
+  // Toast & Cloudinary Attachment Upload
+  const { success, error: toastError } = useToast();
+  const attachmentFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [copiedAttachmentIdx, setCopiedAttachmentIdx] = useState<number | null>(null);
 
   // Active Tab in Subtopic Modal: 'CONTENT' | 'ATTACHMENTS' | 'PRACTICE' | 'QUIZ'
   const [activeSubtopicTab, setActiveSubtopicTab] = useState<'CONTENT' | 'ATTACHMENTS' | 'PRACTICE' | 'QUIZ'>('CONTENT');
@@ -266,7 +291,20 @@ export default function CourseCurriculumBuilderPage() {
                   explanation: q.explanation || '',
                 }))
               : [],
-            codingQuestions: s.codingQuestions || [],
+            codingQuestions: Array.isArray(s.codingQuestions)
+              ? s.codingQuestions.map((q: any, i: number) => ({
+                  id: q.id || `code_${i}`,
+                  title: q.title || 'Practice Challenge',
+                  platform: q.platform || (q.leetcodeUrl ? 'LeetCode' : 'Self-created'),
+                  customPlatformName: q.customPlatformName || '',
+                  problemUrl: q.problemUrl || q.leetcodeUrl || '',
+                  leetcodeUrl: q.leetcodeUrl || q.problemUrl || '',
+                  difficulty: q.difficulty || 'MEDIUM',
+                  description: q.description || '',
+                  starterCode: q.starterCode || '',
+                  examples: Array.isArray(q.examples) ? q.examples : [],
+                }))
+              : [],
             isPublished: true,
           });
           setActiveSubtopicTab('CONTENT');
@@ -323,7 +361,66 @@ export default function CourseCurriculumBuilderPage() {
     }
   };
 
-  // Attachment helpers
+  // Cloudinary Attachment Upload & Insertion
+  const handleUploadAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toastError('Please choose an image file (PNG, JPG, WebP, SVG, GIF).');
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      toastError('Image size must be under 15MB.');
+      return;
+    }
+
+    setUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetchApi('/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.success && res.data?.url) {
+        setSubtopicForm((prev) => ({
+          ...prev,
+          attachments: [...prev.attachments, res.data.url],
+        }));
+        success('Diagram / Photo uploaded to Cloudinary successfully!');
+      } else {
+        toastError(res.message || 'Failed to upload photo to Cloudinary.');
+      }
+    } catch (err: any) {
+      toastError(err?.message || 'Error uploading photo to Cloudinary.');
+    } finally {
+      setUploadingAttachment(false);
+      if (attachmentFileInputRef.current) {
+        attachmentFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleInsertAttachmentIntoContent = (url: string) => {
+    const markdownImage = `\n\n![Diagram / Screenshot](${url})\n`;
+    setSubtopicForm((prev) => ({
+      ...prev,
+      content: prev.content ? `${prev.content.trimEnd()}${markdownImage}` : markdownImage,
+    }));
+    success('Inserted photo markdown into lesson editor!');
+  };
+
+  const handleCopyAttachmentUrl = (url: string, idx: number) => {
+    navigator.clipboard.writeText(url);
+    setCopiedAttachmentIdx(idx);
+    success('Copied Cloudinary URL to clipboard!');
+    setTimeout(() => setCopiedAttachmentIdx(null), 2500);
+  };
+
   const handleAddAttachment = () => {
     if (!newAttachmentUrl.trim()) return;
     setSubtopicForm({
@@ -344,12 +441,15 @@ export default function CourseCurriculumBuilderPage() {
   const handleAddCodingQuestion = () => {
     const newQ: CodingQuestionForm = {
       id: `code_${Date.now()}`,
-      title: 'New Practice Challenge',
+      title: 'New Coding Challenge',
+      platform: 'Self-created',
+      customPlatformName: '',
+      problemUrl: '',
+      leetcodeUrl: '',
       difficulty: 'MEDIUM',
-      description: 'Write an algorithm to solve...',
-      leetcodeUrl: 'https://leetcode.com/problems/...',
-      starterCode: '#include <iostream>\nusing namespace std;\n\nint main() {\n    return 0;\n}',
-      examples: [{ input: 'x = 2.00000, n = 10', output: '1024.00000' }],
+      description: '### Problem Statement\n\nExplain the task, input format, constraints, and requirements here like a Practice Sheet.\n\n### Constraints\n- `1 <= N <= 10^5`\n',
+      starterCode: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your solution here\n    return 0;\n}',
+      examples: [{ input: 'nums = [2, 7, 11, 15], target = 9', output: '[0, 1]', explanation: 'Because nums[0] + nums[1] == 9, we return [0, 1].' }],
     };
     setSubtopicForm({
       ...subtopicForm,
@@ -362,6 +462,22 @@ export default function CourseCurriculumBuilderPage() {
       ...subtopicForm,
       codingQuestions: subtopicForm.codingQuestions.filter((_, i) => i !== idx),
     });
+  };
+
+  const handleAddExampleToChallenge = (cqIdx: number) => {
+    const updated = [...subtopicForm.codingQuestions];
+    const existingExamples = updated[cqIdx].examples || [];
+    updated[cqIdx].examples = [
+      ...existingExamples,
+      { input: '', output: '', explanation: '' },
+    ];
+    setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+  };
+
+  const handleRemoveExampleFromChallenge = (cqIdx: number, exIdx: number) => {
+    const updated = [...subtopicForm.codingQuestions];
+    updated[cqIdx].examples = (updated[cqIdx].examples || []).filter((_, i) => i !== exIdx);
+    setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
   };
 
   // Quiz helpers
@@ -389,12 +505,7 @@ export default function CourseCurriculumBuilderPage() {
   };
 
   if (loading) {
-    return (
-      <div className="py-20 text-center text-xs text-gray-400 space-y-3">
-        <Layers className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
-        <p>Loading Course Curriculum Builder...</p>
-      </div>
-    );
+    return <AdminCurriculumBuilderSkeleton />;
   }
 
   if (!course) {
@@ -776,143 +887,482 @@ export default function CourseCurriculumBuilderPage() {
                 </div>
               )}
 
-              {/* TAB 2: PHOTO ATTACHMENTS */}
+              {/* TAB 2: PHOTO ATTACHMENTS (CLOUDINARY) */}
               {activeSubtopicTab === 'ATTACHMENTS' && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                <div className="space-y-5">
+                  {/* Hidden file input */}
+                  <input
+                    ref={attachmentFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleUploadAttachment}
+                  />
+
+                  {/* Primary Upload Dropzone / Button */}
+                  <div
+                    onClick={() => !uploadingAttachment && attachmentFileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
+                      uploadingAttachment
+                        ? 'border-amber-500/50 bg-amber-500/5 cursor-wait'
+                        : 'border-white/15 hover:border-amber-500/60 bg-white/[0.02] hover:bg-amber-500/[0.03]'
+                    }`}
+                  >
+                    <div className="max-w-md mx-auto space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-amber-600/30 text-amber-400 mx-auto flex items-center justify-center border border-amber-500/30 shadow-lg shadow-amber-500/10">
+                        {uploadingAttachment ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+                        ) : (
+                          <UploadCloud className="w-6 h-6" />
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">
+                          {uploadingAttachment ? 'Uploading Photo to Cloudinary CDN...' : 'Upload Screenshot or Diagram'}
+                        </h4>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Click to browse image or diagram from your device. Auto-optimized &amp; stored on Cloudinary CDN.
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={uploadingAttachment}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {uploadingAttachment ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              <span>Choose Image from Device</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <span className="inline-block text-[10px] text-gray-500 font-mono">
+                        PNG, JPG, WEBP, SVG, GIF up to 15MB
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Secondary Manual External URL input */}
+                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
                     <label className="block text-xs font-bold text-gray-300">
-                      Attach Screenshot or Diagram URL
+                      Or Attach via External Image URL
                     </label>
                     <div className="flex gap-2">
                       <input
                         type="url"
                         value={newAttachmentUrl}
                         onChange={(e) => setNewAttachmentUrl(e.target.value)}
-                        placeholder="https://images.unsplash.com/... or screenshot image URL"
-                        className="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white"
+                        placeholder="https://images.unsplash.com/... or CDN image URL"
+                        className="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
                       />
                       <button
                         type="button"
                         onClick={handleAddAttachment}
-                        className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shrink-0"
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs shrink-0 transition-colors"
                       >
-                        Add Photo
+                        Add URL
                       </button>
                     </div>
                   </div>
 
+                  {/* Photos Grid */}
                   {subtopicForm.attachments.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-gray-500">
-                      No screenshots or diagrams attached. Add image URLs above.
+                    <div className="p-8 text-center text-xs text-gray-500 border border-white/5 rounded-2xl">
+                      No screenshots or diagrams attached yet. Upload images above to include diagrams in this lesson.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      {subtopicForm.attachments.map((url, idx) => (
-                        <div
-                          key={idx}
-                          className="relative rounded-xl overflow-hidden border border-white/10 group"
-                        >
-                          <img src={url} alt="Attached Diagram" className="w-full h-40 object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveAttachment(idx)}
-                            className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs text-gray-400 px-1">
+                        <span>Attached Photos ({subtopicForm.attachments.length})</span>
+                        <span className="text-[11px] text-amber-400">Click &ldquo;Insert&rdquo; to add into lesson content</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        {subtopicForm.attachments.map((url, idx) => {
+                          const isCloudinary = url.includes('cloudinary.com');
+                          return (
+                            <div
+                              key={idx}
+                              className="relative rounded-2xl overflow-hidden border border-white/10 bg-slate-950 group shadow-md"
+                            >
+                              <div className="relative h-44 w-full bg-slate-900 overflow-hidden">
+                                <img
+                                  src={url}
+                                  alt={`Attached Diagram ${idx + 1}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                {/* Badge */}
+                                <span className={`absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                                  isCloudinary
+                                    ? 'bg-blue-600/90 text-white shadow-sm'
+                                    : 'bg-black/70 text-gray-300 backdrop-blur-sm'
+                                }`}>
+                                  {isCloudinary ? 'Cloudinary CDN' : 'External Asset'}
+                                </span>
+                              </div>
+
+                              {/* Card Footer with Actions */}
+                              <div className="p-2.5 bg-slate-900/90 border-t border-white/10 flex items-center justify-between gap-2">
+                                <span className="text-[11px] text-gray-400 truncate max-w-[130px] font-mono">
+                                  {url.split('/').pop() || `Photo #${idx + 1}`}
+                                </span>
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleInsertAttachmentIntoContent(url)}
+                                    title="Insert markdown code into lesson editor"
+                                    className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    <span>Insert</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyAttachmentUrl(url, idx)}
+                                    title="Copy URL"
+                                    className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 text-xs transition-colors"
+                                  >
+                                    {copiedAttachmentIdx === idx ? (
+                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveAttachment(idx)}
+                                    title="Remove attachment"
+                                    className="p-1 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* TAB 3: CODING CHALLENGES */}
+              {/* TAB 3: CODING CHALLENGES & PRACTICE ASSIGNMENTS */}
               {activeSubtopicTab === 'PRACTICE' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">
-                      Embed LeetCode or custom hands-on challenges into this lesson.
-                    </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-white">Coding Practice Challenges</h4>
+                      <p className="text-[11px] text-gray-400">
+                        Embed self-created practice sheet problems (with Readme &amp; test cases) or external challenges from LeetCode, Codeforces, CodeChef, InterviewBit, Hello Interview, or any other platform.
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={handleAddCodingQuestion}
-                      className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1"
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-md shadow-amber-500/20"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add Challenge
                     </button>
                   </div>
 
-                  {subtopicForm.codingQuestions.map((cq, cqIdx) => (
-                    <div
-                      key={cq.id || cqIdx}
-                      className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-amber-300">
-                          Challenge #{cqIdx + 1}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCodingQuestion(cqIdx)}
-                          className="text-red-400 hover:text-red-300 text-xs"
-                        >
-                          Remove
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2">
-                        <input
-                          type="text"
-                          value={cq.title}
-                          onChange={(e) => {
-                            const updated = [...subtopicForm.codingQuestions];
-                            updated[cqIdx].title = e.target.value;
-                            setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
-                          }}
-                          placeholder="Challenge Title (e.g. Reverse Linked List)"
-                          className="col-span-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white"
-                        />
-                        <select
-                          value={cq.difficulty}
-                          onChange={(e) => {
-                            const updated = [...subtopicForm.codingQuestions];
-                            updated[cqIdx].difficulty = e.target.value as any;
-                            setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
-                          }}
-                          className="px-2 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white"
-                        >
-                          <option value="EASY">EASY</option>
-                          <option value="MEDIUM">MEDIUM</option>
-                          <option value="HARD">HARD</option>
-                        </select>
-                      </div>
-
-                      <input
-                        type="url"
-                        value={cq.leetcodeUrl}
-                        onChange={(e) => {
-                          const updated = [...subtopicForm.codingQuestions];
-                          updated[cqIdx].leetcodeUrl = e.target.value;
-                          setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
-                        }}
-                        placeholder="LeetCode Question Link (e.g. https://leetcode.com/problems/...)"
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white font-mono"
-                      />
-
-                      <textarea
-                        rows={2}
-                        value={cq.description}
-                        onChange={(e) => {
-                          const updated = [...subtopicForm.codingQuestions];
-                          updated[cqIdx].description = e.target.value;
-                          setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
-                        }}
-                        placeholder="Problem description and algorithmic requirements..."
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white"
-                      />
+                  {subtopicForm.codingQuestions.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-gray-500 border border-white/5 rounded-2xl space-y-2">
+                      <Code2 className="w-8 h-8 text-gray-600 mx-auto" />
+                      <p>No coding practice assignments added to this lesson yet.</p>
+                      <button
+                        type="button"
+                        onClick={handleAddCodingQuestion}
+                        className="text-amber-400 hover:underline text-xs font-medium"
+                      >
+                        + Add your first practice challenge
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    subtopicForm.codingQuestions.map((cq, cqIdx) => {
+                      const platform = cq.platform || (cq.leetcodeUrl ? 'LeetCode' : 'Self-created');
+                      const isSelfCreated = platform === 'Self-created';
+                      const isOther = platform === 'Other';
+
+                      return (
+                        <div
+                          key={cq.id || cqIdx}
+                          className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4 shadow-lg"
+                        >
+                          {/* Header: Title & Remove */}
+                          <div className="flex items-center justify-between pb-3 border-b border-white/5">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 font-mono font-bold text-xs flex items-center justify-center">
+                                #{cqIdx + 1}
+                              </span>
+                              <span className="text-xs font-bold text-white">
+                                {cq.title || `Challenge #${cqIdx + 1}`}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 text-gray-300">
+                                {isOther ? (cq.customPlatformName || 'Custom Platform') : platform}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCodingQuestion(cqIdx)}
+                              className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" /> Remove
+                            </button>
+                          </div>
+
+                          {/* Platform & Difficulty Row */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {/* Platform Selector */}
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-300 mb-1">
+                                Assignment Platform *
+                              </label>
+                              <select
+                                value={platform}
+                                onChange={(e) => {
+                                  const newPlatform = e.target.value;
+                                  const updated = [...subtopicForm.codingQuestions];
+                                  updated[cqIdx].platform = newPlatform;
+                                  setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                                }}
+                                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-amber-500"
+                              >
+                                <option value="Self-created">Self-created (Readme like Practice Sheet)</option>
+                                <option value="LeetCode">LeetCode</option>
+                                <option value="Codeforces">Codeforces</option>
+                                <option value="CodeChef">CodeChef</option>
+                                <option value="InterviewBit">InterviewBit</option>
+                                <option value="Hello Interview">Hello Interview</option>
+                                <option value="Other">Other (Custom Website Name)</option>
+                              </select>
+                            </div>
+
+                            {/* If Other -> Custom Website Name Input */}
+                            {isOther && (
+                              <div>
+                                <label className="block text-[11px] font-bold text-amber-300 mb-1">
+                                  Website / Platform Name *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={cq.customPlatformName || ''}
+                                  onChange={(e) => {
+                                    const updated = [...subtopicForm.codingQuestions];
+                                    updated[cqIdx].customPlatformName = e.target.value;
+                                    setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                                  }}
+                                  placeholder="e.g. GeeksforGeeks, HackerRank, AtCoder"
+                                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-400"
+                                />
+                              </div>
+                            )}
+
+                            {/* Difficulty */}
+                            <div className={isOther ? '' : 'sm:col-span-1'}>
+                              <label className="block text-[11px] font-bold text-gray-300 mb-1">
+                                Difficulty
+                              </label>
+                              <select
+                                value={cq.difficulty}
+                                onChange={(e) => {
+                                  const updated = [...subtopicForm.codingQuestions];
+                                  updated[cqIdx].difficulty = e.target.value as any;
+                                  setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                                }}
+                                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-amber-500"
+                              >
+                                <option value="EASY">EASY</option>
+                                <option value="MEDIUM">MEDIUM</option>
+                                <option value="HARD">HARD</option>
+                              </select>
+                            </div>
+
+                            {/* Problem Title */}
+                            <div className={isOther ? 'sm:col-span-3' : 'sm:col-span-1'}>
+                              <label className="block text-[11px] font-bold text-gray-300 mb-1">
+                                Problem Title *
+                              </label>
+                              <input
+                                type="text"
+                                value={cq.title}
+                                onChange={(e) => {
+                                  const updated = [...subtopicForm.codingQuestions];
+                                  updated[cqIdx].title = e.target.value;
+                                  setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                                }}
+                                placeholder="e.g. Invert Binary Tree"
+                                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+                          </div>
+
+                          {/* If Not Self-created -> External Problem URL */}
+                          {!isSelfCreated && (
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-300 mb-1 flex items-center justify-between">
+                                <span>
+                                  Problem URL on {isOther ? (cq.customPlatformName || 'Platform') : platform} *
+                                </span>
+                                <span className="text-[10px] text-amber-400 font-mono">
+                                  Direct solve link for students
+                                </span>
+                              </label>
+                              <div className="relative">
+                                <ExternalLink className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                <input
+                                  type="url"
+                                  value={cq.problemUrl || cq.leetcodeUrl || ''}
+                                  onChange={(e) => {
+                                    const updated = [...subtopicForm.codingQuestions];
+                                    updated[cqIdx].problemUrl = e.target.value;
+                                    updated[cqIdx].leetcodeUrl = e.target.value;
+                                    setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                                  }}
+                                  placeholder={`https://${platform.toLowerCase().replace(/\s+/g, '')}.com/problems/...`}
+                                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white font-mono placeholder-gray-600 focus:outline-none focus:border-amber-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Description / Readme textarea */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-300 mb-1 flex items-center justify-between">
+                              <span>
+                                {isSelfCreated ? 'Readme / Problem Statement (Markdown Supported) *' : 'Problem Notes, Hints & Requirements (Optional)'}
+                              </span>
+                              <span className="text-[10px] text-gray-500 font-mono">Supports GFM &amp; Codeblocks</span>
+                            </label>
+                            <textarea
+                              rows={isSelfCreated ? 6 : 3}
+                              value={cq.description}
+                              onChange={(e) => {
+                                const updated = [...subtopicForm.codingQuestions];
+                                updated[cqIdx].description = e.target.value;
+                                setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                              }}
+                              placeholder={
+                                isSelfCreated
+                                  ? '### Problem Statement\n\nGiven an array of integers...\n\n### Constraints\n- `1 <= nums.length <= 10^5`'
+                                  : 'Add brief hints, algorithmic complexity requirements, or key edge cases for this external problem...'
+                              }
+                              className="w-full p-3 rounded-xl bg-slate-950 border border-white/10 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          {/* Starter Code (Especially prominent for Self-created) */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-300 mb-1 flex items-center justify-between">
+                              <span>Starter Code Template {isSelfCreated && '(Sandbox)'}</span>
+                              <span className="text-[10px] text-gray-500 font-mono">C++, Java, Python, or JS template</span>
+                            </label>
+                            <textarea
+                              rows={isSelfCreated ? 5 : 3}
+                              value={cq.starterCode || ''}
+                              onChange={(e) => {
+                                const updated = [...subtopicForm.codingQuestions];
+                                updated[cqIdx].starterCode = e.target.value;
+                                setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                              }}
+                              placeholder="// Starter boilerplate code provided to students&#10;#include <vector>&#10;using namespace std;&#10;&#10;class Solution { ... };"
+                              className="w-full p-3 rounded-xl bg-slate-950 border border-white/10 text-xs text-emerald-400 font-mono focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          {/* Input / Output Examples */}
+                          <div className="space-y-2 pt-1 border-t border-white/5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-gray-300">
+                                Input / Output Examples &amp; Test Cases ({cq.examples?.length || 0})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleAddExampleToChallenge(cqIdx)}
+                                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium flex items-center gap-1 transition-colors"
+                              >
+                                <Plus className="w-3 h-3" /> Add Example
+                              </button>
+                            </div>
+
+                            {cq.examples && cq.examples.length > 0 && (
+                              <div className="space-y-2">
+                                {cq.examples.map((ex, exIdx) => (
+                                  <div
+                                    key={exIdx}
+                                    className="p-3 rounded-xl bg-slate-900/80 border border-white/5 space-y-2"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[10px] font-mono font-bold text-amber-400">
+                                        Example #{exIdx + 1}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveExampleFromChallenge(cqIdx, exIdx)}
+                                        className="text-red-400 hover:text-red-300 text-[10px]"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      <input
+                                        type="text"
+                                        value={ex.input}
+                                        onChange={(e) => {
+                                          const updated = [...subtopicForm.codingQuestions];
+                                          if (updated[cqIdx].examples) {
+                                            updated[cqIdx].examples[exIdx].input = e.target.value;
+                                            setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                                          }
+                                        }}
+                                        placeholder="Input: nums = [2,7,11,15], target = 9"
+                                        className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-white/10 text-xs text-white font-mono"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={ex.output}
+                                        onChange={(e) => {
+                                          const updated = [...subtopicForm.codingQuestions];
+                                          if (updated[cqIdx].examples) {
+                                            updated[cqIdx].examples[exIdx].output = e.target.value;
+                                            setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                                          }
+                                        }}
+                                        placeholder="Output: [0, 1]"
+                                        className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-white/10 text-xs text-white font-mono"
+                                      />
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={ex.explanation || ''}
+                                      onChange={(e) => {
+                                        const updated = [...subtopicForm.codingQuestions];
+                                        if (updated[cqIdx].examples) {
+                                          updated[cqIdx].examples[exIdx].explanation = e.target.value;
+                                          setSubtopicForm({ ...subtopicForm, codingQuestions: updated });
+                                        }
+                                      }}
+                                      placeholder="Explanation (Optional): Because nums[0] + nums[1] == 9, we return [0, 1]."
+                                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-white/10 text-xs text-gray-300"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               )}
 
