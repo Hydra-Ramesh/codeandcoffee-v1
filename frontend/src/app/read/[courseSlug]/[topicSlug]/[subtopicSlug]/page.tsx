@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import {
   BookOpen,
   CheckCircle2,
@@ -30,6 +30,9 @@ import {
   Maximize2,
   Minimize2,
   Coffee,
+  LogIn,
+  UserPlus,
+  ShieldCheck,
 } from 'lucide-react';
 import { fetchApi } from '../../../../../lib/api';
 import { useAuth } from '../../../../../context/AuthContext';
@@ -96,6 +99,10 @@ export default function SubtopicReaderPage() {
   const courseSlug = params.courseSlug as string;
   const topicSlug = params.topicSlug as string;
   const subtopicSlug = params.subtopicSlug as string;
+  const pathname = usePathname();
+
+  // Authentication Required Modal State
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Sidebar Syllabus State
   const [syllabus, setSyllabus] = useState<{
@@ -210,12 +217,29 @@ export default function SubtopicReaderPage() {
       if (res.data.userProgress) {
         setUserProgress(res.data.userProgress);
       }
+
+      // Restore any drafted quiz answers saved before authentication redirect
+      if (typeof window !== 'undefined' && res.data.subtopic?.id) {
+        const savedDraft = sessionStorage.getItem(`cnc_saved_quiz_${res.data.subtopic.id}`);
+        if (savedDraft) {
+          try {
+            setQuizAnswers(JSON.parse(savedDraft));
+            sessionStorage.removeItem(`cnc_saved_quiz_${res.data.subtopic.id}`);
+          } catch (e) {}
+        }
+      }
     } else {
       if ((res as any).isLocked || res.message?.toLowerCase().includes('lock')) {
         setLockedError(res.message || 'This module is locked. Please complete the preceding lesson.');
       }
     }
     setLoading(false);
+  };
+
+  const saveAnswersToStorage = () => {
+    if (typeof window !== 'undefined' && lesson?.id) {
+      sessionStorage.setItem(`cnc_saved_quiz_${lesson.id}`, JSON.stringify(quizAnswers));
+    }
   };
 
   const toggleTopicExpand = (tId: string) => {
@@ -252,6 +276,13 @@ export default function SubtopicReaderPage() {
 
   const handleSubmitQuiz = async () => {
     if (!lesson) return;
+
+    // Production-ready Authentication Guard: Require signed-in account to grade and save progression
+    if (!user) {
+      saveAnswersToStorage();
+      setAuthModalOpen(true);
+      return;
+    }
 
     // Check that all questions have an answer
     const questions = lesson.quiz || [];
@@ -293,7 +324,12 @@ export default function SubtopicReaderPage() {
         }));
       }
     } else {
-      alert(res.message || 'Failed to submit quiz.');
+      if ((res as any).status === 401 || res.message?.toLowerCase().includes('auth')) {
+        saveAnswersToStorage();
+        setAuthModalOpen(true);
+      } else {
+        alert(res.message || 'Failed to submit quiz.');
+      }
     }
     setSubmittingQuiz(false);
   };
@@ -305,6 +341,13 @@ export default function SubtopicReaderPage() {
 
   const handleMarkAsDone = async () => {
     if (!lesson) return;
+
+    // Production-ready Authentication Guard
+    if (!user) {
+      setAuthModalOpen(true);
+      return;
+    }
+
     setMarkingDone(true);
     const res = await fetchApi(`/courses/${courseSlug}/subtopics/${lesson.id}/complete`, {
       method: 'POST',
@@ -957,14 +1000,29 @@ export default function SubtopicReaderPage() {
               {/* Quiz Submit Button */}
               {(!quizResult || !quizResult.passed) && (
                 <div className="flex justify-end pt-2">
-                  <button
-                    type="button"
-                    onClick={handleSubmitQuiz}
-                    disabled={submittingQuiz}
-                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-xl shadow-amber-500/20 disabled:opacity-50 cursor-pointer transition-all"
-                  >
-                    {submittingQuiz ? 'Evaluating Answers...' : 'Submit Quiz & Check Score'}
-                  </button>
+                  {!user ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        saveAnswersToStorage();
+                        setAuthModalOpen(true);
+                      }}
+                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-xl shadow-amber-500/20 cursor-pointer transition-all flex items-center gap-2"
+                    >
+                      <Lock className="w-4 h-4" />
+                      <span>Sign in to Submit Quiz &amp; Save Progress</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSubmitQuiz}
+                      disabled={submittingQuiz}
+                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-xl shadow-amber-500/20 disabled:opacity-50 cursor-pointer transition-all flex items-center gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{submittingQuiz ? 'Evaluating Answers...' : 'Submit Quiz & Check Score'}</span>
+                    </button>
+                  )}
                 </div>
               )}
             </section>
@@ -1078,6 +1136,77 @@ export default function SubtopicReaderPage() {
             >
               Got it!
             </button>
+          </div>
+        </div>
+      )}
+      {/* Production-Ready Authentication Modal */}
+      {authModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="max-w-md w-full glass-card rounded-3xl border border-amber-500/30 p-6 sm:p-8 space-y-6 text-center shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setAuthModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-xl hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-amber-500/20 via-purple-500/10 to-transparent border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-xl shadow-amber-500/10">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>AUTHENTICATION REQUIRED</span>
+              </div>
+              <h3 className="text-xl font-extrabold text-white">
+                Sign In to Submit Quiz &amp; Save Progress
+              </h3>
+              <p className="text-xs text-gray-300 leading-relaxed max-w-sm mx-auto">
+                Quiz grading, score threshold validation (&ge; 25%), and sequential module unlocking require an authenticated developer account.
+              </p>
+            </div>
+
+            {/* Benefits Checklist */}
+            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-left text-xs space-y-2.5">
+              <div className="flex items-center gap-2.5 text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Save your quiz attempts and official score</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Sequentially unlock subsequent topics and coding arenas</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-gray-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Preserve your progress on your developer profile</span>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <Link
+                href={`/auth/login?redirect=${encodeURIComponent(pathname || '')}`}
+                onClick={saveAnswersToStorage}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In to Continue</span>
+              </Link>
+
+              <Link
+                href={`/auth/register?redirect=${encodeURIComponent(pathname || '')}`}
+                onClick={saveAnswersToStorage}
+                className="w-full py-3 rounded-xl glass-card hover:bg-white/10 text-white font-semibold text-xs border border-white/10 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4 text-amber-400" />
+                <span>Create Free Account</span>
+              </Link>
+            </div>
+
+            <p className="text-[11px] text-gray-500">
+              Your selected quiz answers are saved and will be restored automatically upon sign in.
+            </p>
           </div>
         </div>
       )}
