@@ -52,23 +52,39 @@ interface TelemetryData {
     id: string;
     title: string;
     slug: string;
+    category?: string;
+    totalLessons?: number;
   };
-  stats: {
+  metrics?: {
     totalEnrolled: number;
-    averageProgressPercent: number;
+    completedStudents: number;
     totalQuizAttempts: number;
-    totalPassedQuizzes: number;
+    averageQuizScore: number;
+    averageProgressPercent?: number;
+    totalPassedQuizzes?: number;
+  };
+  stats?: {
+    totalEnrolled: number;
+    averageProgressPercent?: number;
+    totalQuizAttempts: number;
+    totalPassedQuizzes?: number;
+    completedStudents?: number;
+    averageQuizScore?: number;
   };
   students: Array<{
-    id: string;
+    id?: string;
+    userId?: string;
     name: string;
     email: string;
     avatar: string | null;
-    completedLessons: number;
-    totalLessons: number;
+    completedLessons?: number;
+    completedLessonsCount?: number;
+    totalLessons?: number;
+    totalLessonsCount?: number;
     progressPercent: number;
-    lastAccessedSubtopicTitle: string | null;
-    lastActivityAt: string;
+    lastAccessedSubtopicTitle?: string | null;
+    lastActivityAt?: string;
+    updatedAt?: string;
   }>;
 }
 
@@ -456,7 +472,7 @@ export default function AdminCoursesPage() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">Student Telemetry &amp; Progression</h3>
-                  <p className="text-xs text-gray-400">{telemetryData?.course.title}</p>
+                  <p className="text-xs text-gray-400">{telemetryData?.course?.title || 'Course Telemetry'}</p>
                 </div>
               </div>
               <button
@@ -477,98 +493,126 @@ export default function AdminCoursesPage() {
               <div className="py-8 text-center text-xs text-gray-400">
                 Failed to load telemetry data.
               </div>
-            ) : (
-              <div className="space-y-6 overflow-y-auto pr-1 custom-scrollbar">
-                {/* Cohort Stats Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                  <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
-                    <span className="text-[10px] font-mono uppercase text-gray-400 block">
-                      Enrolled Learners
-                    </span>
-                    <span className="text-xl font-black text-white">
-                      {telemetryData.stats.totalEnrolled}
-                    </span>
+            ) : (() => {
+              const metrics = telemetryData.metrics || telemetryData.stats;
+              const students = telemetryData.students || [];
+              const totalEnrolled = metrics?.totalEnrolled ?? students.length ?? 0;
+              const avgProgress =
+                metrics?.averageProgressPercent ??
+                (students.length > 0
+                  ? Math.round(
+                      students.reduce((acc, s) => acc + (s.progressPercent || 0), 0) /
+                        students.length
+                    )
+                  : 0);
+              const quizAttempts = metrics?.totalQuizAttempts ?? 0;
+              const completedOrPassed =
+                metrics?.completedStudents ?? metrics?.totalPassedQuizzes ?? 0;
+
+              return (
+                <div className="space-y-6 overflow-y-auto pr-1 custom-scrollbar">
+                  {/* Cohort Stats Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                    <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-gray-400 block">
+                        Enrolled Learners
+                      </span>
+                      <span className="text-xl font-black text-white">
+                        {totalEnrolled}
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-gray-400 block">
+                        Avg Completion
+                      </span>
+                      <span className="text-xl font-black text-amber-300 font-mono">
+                        {avgProgress}%
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-gray-400 block">
+                        Quiz Attempts
+                      </span>
+                      <span className="text-xl font-black text-cyan-300 font-mono">
+                        {quizAttempts}
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-gray-400 block">
+                        Completed Course
+                      </span>
+                      <span className="text-xl font-black text-emerald-300 font-mono">
+                        {completedOrPassed}
+                      </span>
+                    </div>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
-                    <span className="text-[10px] font-mono uppercase text-gray-400 block">
-                      Avg Completion
-                    </span>
-                    <span className="text-xl font-black text-amber-300 font-mono">
-                      {telemetryData.stats.averageProgressPercent}%
-                    </span>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
-                    <span className="text-[10px] font-mono uppercase text-gray-400 block">
-                      Quiz Attempts
-                    </span>
-                    <span className="text-xl font-black text-cyan-300 font-mono">
-                      {telemetryData.stats.totalQuizAttempts}
-                    </span>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
-                    <span className="text-[10px] font-mono uppercase text-gray-400 block">
-                      Quizzes Passed
-                    </span>
-                    <span className="text-xl font-black text-emerald-300 font-mono">
-                      {telemetryData.stats.totalPassedQuizzes}
-                    </span>
+
+                  {/* Learners Roster Table */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-amber-400" />
+                      <span>Active Learners Roster ({students.length})</span>
+                    </h4>
+
+                    {students.length === 0 ? (
+                      <div className="p-6 rounded-xl bg-white/[0.02] border border-white/5 text-center text-xs text-gray-400">
+                        No learners have enrolled in this course track yet.
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-white/10 overflow-hidden divide-y divide-white/5">
+                        {students.map((st) => {
+                          const studentKey = st.userId || st.id || st.email;
+                          const completed = st.completedLessonsCount ?? st.completedLessons ?? 0;
+                          const total =
+                            st.totalLessonsCount ??
+                            st.totalLessons ??
+                            telemetryData.course?.totalLessons ??
+                            0;
+                          const progress = Math.min(100, Math.max(0, st.progressPercent || 0));
+
+                          return (
+                            <div
+                              key={studentKey}
+                              className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02]"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <img
+                                  src={
+                                    optimizeImageUrl(st.avatar, { width: 36, height: 36, crop: 'fill' }) ||
+                                    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(st.name)}`
+                                  }
+                                  alt={st.name}
+                                  className="w-8 h-8 rounded-full border border-white/10 bg-slate-800 shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-white truncate">{st.name}</p>
+                                  <p className="text-[11px] text-gray-400 truncate">{st.email}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 text-xs font-mono shrink-0">
+                                <div className="text-right">
+                                  <span className="text-amber-300 font-bold">{progress}%</span>
+                                  <span className="text-[10px] text-gray-400 block">
+                                    {completed}/{total} Lessons
+                                  </span>
+                                </div>
+                                <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden hidden sm:block">
+                                  <div
+                                    className="h-full bg-amber-400 rounded-full"
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Learners Roster Table */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-amber-400" />
-                    <span>Active Learners Roster ({telemetryData.students.length})</span>
-                  </h4>
-
-                  {telemetryData.students.length === 0 ? (
-                    <div className="p-6 rounded-xl bg-white/[0.02] border border-white/5 text-center text-xs text-gray-400">
-                      No learners have enrolled in this course track yet.
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-white/10 overflow-hidden divide-y divide-white/5">
-                      {telemetryData.students.map((st) => (
-                        <div
-                          key={st.id}
-                          className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02]"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <img
-                              src={
-                                optimizeImageUrl(st.avatar, { width: 36, height: 36, crop: 'fill' }) ||
-                                `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(st.name)}`
-                              }
-                              alt={st.name}
-                              className="w-8 h-8 rounded-full border border-white/10 bg-slate-800 shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-white truncate">{st.name}</p>
-                              <p className="text-[11px] text-gray-400 truncate">{st.email}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-4 text-xs font-mono shrink-0">
-                            <div className="text-right">
-                              <span className="text-amber-300 font-bold">{st.progressPercent}%</span>
-                              <span className="text-[10px] text-gray-400 block">
-                                {st.completedLessons}/{st.totalLessons} Lessons
-                              </span>
-                            </div>
-                            <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden hidden sm:block">
-                              <div
-                                className="h-full bg-amber-400 rounded-full"
-                                style={{ width: `${st.progressPercent}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}

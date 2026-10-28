@@ -1267,6 +1267,22 @@ export async function getCourseTelemetry(req: AuthenticatedRequest, res: Respons
 
     const averageQuizScore = scoredAttempts > 0 ? Math.round(sumScore / scoredAttempts) : 0;
     const completedStudents = enrollments.filter((e) => e.progressPercent >= 100).length;
+    const totalPassedQuizzes = allProgress.filter((p) => p.quizPassed).length;
+    const averageProgressPercent =
+      enrollments.length > 0
+        ? Math.round(
+            enrollments.reduce((sum, e) => sum + (e.progressPercent || 0), 0) / enrollments.length
+          )
+        : 0;
+
+    const cohortMetrics = {
+      totalEnrolled: enrollments.length,
+      completedStudents,
+      totalQuizAttempts: totalAttempts,
+      averageQuizScore,
+      averageProgressPercent,
+      totalPassedQuizzes,
+    };
 
     res.json({
       success: true,
@@ -1278,18 +1294,17 @@ export async function getCourseTelemetry(req: AuthenticatedRequest, res: Respons
           category: course.category,
           totalLessons,
         },
-        metrics: {
-          totalEnrolled: enrollments.length,
-          completedStudents,
-          totalQuizAttempts: totalAttempts,
-          averageQuizScore,
-        },
+        metrics: cohortMetrics,
+        stats: cohortMetrics,
         students: enrollments.map((e) => ({
+          id: e.userId,
           userId: e.userId,
           name: e.user.name,
           email: e.user.email,
           avatar: e.user.avatar,
+          completedLessons: e.completedLessonsCount,
           completedLessonsCount: e.completedLessonsCount,
+          totalLessons,
           totalLessonsCount: totalLessons,
           progressPercent: Math.round(e.progressPercent),
           updatedAt: e.updatedAt,
