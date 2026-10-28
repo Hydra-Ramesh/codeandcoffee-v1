@@ -36,6 +36,7 @@ router.get('/:slug', optionalAuth, getCourseBySlug);
 
 // Get individual subtopic/lesson content (Readme, screenshots, practice question, quiz)
 router.get('/:courseSlug/topics/:topicSlug/subtopics/:subtopicSlug', optionalAuth, getSubtopicDetail);
+router.get('/:courseSlug/subtopics/:topicSlug/:subtopicSlug', optionalAuth, getSubtopicDetail);
 
 // Submit interactive quiz (Score >= 25% unlocks next topic/section)
 router.post('/:courseSlug/subtopics/:subtopicId/quiz/submit', authenticate, submitQuiz);
@@ -67,6 +68,7 @@ router.delete('/topics/:topicId', authenticate, requireContributorOrAdmin, delet
 
 // Add subtopic (lesson) to topic
 router.post('/topics/:topicId/subtopics', authenticate, requireContributorOrAdmin, createSubtopic);
+router.post('/:topicId/subtopics', authenticate, requireContributorOrAdmin, createSubtopic);
 
 // Update subtopic
 router.put('/subtopics/:subtopicId', authenticate, requireContributorOrAdmin, updateSubtopic);
@@ -75,6 +77,7 @@ router.put('/subtopics/:subtopicId', authenticate, requireContributorOrAdmin, up
 router.delete('/subtopics/:subtopicId', authenticate, requireContributorOrAdmin, deleteSubtopic);
 
 // Student progress monitoring & quiz telemetry
+router.get('/admin/telemetry/:courseId', authenticate, requireContributorOrAdmin, getCourseTelemetry);
 router.get('/:courseId/telemetry', authenticate, requireContributorOrAdmin, getCourseTelemetry);
 
 export default router;
