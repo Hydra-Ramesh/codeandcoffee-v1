@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Mail, MapPin, Heart } from 'lucide-react';
+import { Mail, MapPin, Heart, Sparkles, ArrowRight, BookOpen } from 'lucide-react';
 
 export default function Footer() {
   const pathname = usePathname();
@@ -19,15 +19,56 @@ export default function Footer() {
 
   return (
     <footer className="w-full bg-[#060911] border-t border-white/10 py-12 mt-20 text-gray-400">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        {/* Prominent Highlighted "What's Coming" Roadmap Showcase Banner */}
+        <div className="relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-cyan-500/10 p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-2 max-w-2xl">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  Platform Roadmap
+                </span>
+                <span className="text-xs text-purple-300 font-semibold">• Live Engineering Vision</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+                What's Coming to <span className="gradient-text-amber">Code &amp; Coffee</span>?
+              </h3>
+              <p className="text-sm text-gray-300 leading-relaxed">
+                Explore upcoming real-time coding rooms, Judge0 sandbox compilation, live telemetry leaderboards, and peer architecture challenge rooms in active development.
+              </p>
+            </div>
+
+            <Link
+              href="/whats-coming"
+              className="shrink-0 flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-xl shadow-amber-500/20 hover:scale-102 transition-all cursor-pointer"
+            >
+              <span>Explore Roadmap</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+
         {/* Links & Contact Info Section */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pb-12 border-b border-white/10 text-sm">
           {/* Engineering Tracks */}
           <div>
             <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-4">
-              Engineering Tracks
+              Curriculum &amp; Tracks
             </h4>
             <ul className="space-y-2.5">
+              <li>
+                <Link href="/read" className="text-amber-400 hover:text-amber-300 font-bold transition-colors flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Read Courses (Curriculum)</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/practice" className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors flex items-center gap-1.5">
+                  <span>Practice Arena (Sheets)</span>
+                </Link>
+              </li>
               <li>
                 <Link href="/blogs?category=System+Design" className="hover:text-amber-400 transition-colors">
                   System Design &amp; Scale
@@ -39,18 +80,8 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/blogs?category=Security+%26+DevOps" className="hover:text-amber-400 transition-colors">
-                  Security &amp; Zero-Trust
-                </Link>
-              </li>
-              <li>
                 <Link href="/blogs?category=Backend" className="hover:text-amber-400 transition-colors">
                   PostgreSQL &amp; Redis
-                </Link>
-              </li>
-              <li>
-                <Link href="/practice" className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors flex items-center gap-1.5">
-                  <span>Practice Arena (Sheets)</span>
                 </Link>
               </li>
             </ul>

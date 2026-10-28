@@ -66,15 +66,15 @@ const TOUR_STEPS: TourStep[] = [
     accentColor: 'cyan',
   },
   {
-    id: 'roadmap',
-    selector: '[data-tour="tour-nav-roadmap"]',
-    badge: 'WHAT\'S COMING',
-    title: 'Platform Roadmap & Live Features',
+    id: 'read',
+    selector: '[data-tour="tour-nav-read"]',
+    badge: 'READ CURRICULUM',
+    title: 'Interactive Courses & Reading Arena',
     description:
-      'Discover upcoming contest rooms, live reader telemetry, verified coding badges, and real-time community challenges in active development.',
-    proTip: 'Vote on upcoming architecture case studies and feature requests.',
-    icon: Sparkles,
-    accentColor: 'purple',
+      'Step-by-step masterclasses like GeeksforGeeks: rich markdown notes, screenshots, LeetCode coding challenges, and interactive quizzes.',
+    proTip: 'Score >= 25% on lesson quizzes or mark lessons complete to unlock sequential modules!',
+    icon: BookOpen,
+    accentColor: 'amber',
   },
   {
     id: 'theme',

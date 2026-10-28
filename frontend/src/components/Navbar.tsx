@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { Coffee, ShieldAlert, User, LogOut, Menu, X, Sparkles, PenTool, Code2, Compass } from 'lucide-react';
+import { Coffee, ShieldAlert, User, LogOut, Menu, X, Sparkles, PenTool, Code2, Compass, BookOpen } from 'lucide-react';
 import { optimizeImageUrl } from '../lib/image';
 import { startProductTour } from './ProductTour';
 
@@ -14,11 +14,12 @@ export default function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const isStaff = Boolean(user && (user.role === 'ADMIN' || user.role === 'CONTRIBUTOR'));
 
   const navLinks = [
     { name: 'Explore Blogs', href: '/blogs', dataTour: 'tour-nav-blogs' },
+    { name: 'Read', href: '/read', isRead: true, dataTour: 'tour-nav-read' },
     { name: 'Practice', href: '/practice', isPractice: true, dataTour: 'tour-nav-practice' },
-    { name: "What's Coming?", href: '/whats-coming', isHighlight: true, dataTour: 'tour-nav-roadmap' },
     { name: 'Contact', href: '/contact' },
   ];
 
@@ -39,10 +40,31 @@ export default function Navbar() {
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1.5">
           {navLinks.map((link) => {
-            const isActive = pathname === link.href;
-            const isHighlight = (link as any).isHighlight;
+            const isActive = pathname === link.href || pathname?.startsWith(link.href + '/');
+            const isRead = (link as any).isRead;
             const isPractice = (link as any).isPractice;
             const dataTour = (link as any).dataTour;
+
+            if (isRead) {
+              return (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  data-tour={dataTour}
+                  className={`group relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                    isActive
+                      ? 'text-amber-300 bg-amber-500/15 border border-amber-500/40 shadow-sm shadow-amber-500/25'
+                      : 'text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/30 hover:border-amber-400/50'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-6 transition-transform duration-300" />
+                  <span>{link.name}</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 shadow-xs shadow-amber-500/30">
+                    Learn
+                  </span>
+                </Link>
+              );
+            }
 
             if (isPractice) {
               return (
@@ -60,27 +82,6 @@ export default function Navbar() {
                   <span>{link.name}</span>
                   <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-xs shadow-cyan-500/30">
                     Sheets
-                  </span>
-                </Link>
-              );
-            }
-
-            if (isHighlight) {
-              return (
-                <Link
-                  key={link.name}
-                  href={link.href}
-                  data-tour={dataTour}
-                  className={`group relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
-                    isActive
-                      ? 'text-amber-300 bg-amber-500/15 border border-amber-500/40 shadow-sm shadow-amber-500/25'
-                      : 'text-amber-400 hover:text-amber-300 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-amber-500/10 hover:from-amber-500/20 hover:to-amber-500/20 border border-amber-500/30 hover:border-amber-400/50'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform duration-300" />
-                  <span>{link.name}</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-xs shadow-amber-500/30">
-                    Roadmap
                   </span>
                 </Link>
               );
@@ -109,15 +110,17 @@ export default function Navbar() {
             <ThemeToggle />
           </div>
 
-          {/* Interactive Tour Launcher */}
-          <button
-            onClick={startProductTour}
-            type="button"
-            title="Interactive Tour Guide"
-            className="p-2 rounded-xl text-amber-400/80 hover:text-amber-300 hover:bg-amber-500/10 transition-colors border border-amber-500/20 cursor-pointer"
-          >
-            <Compass className="w-5 h-5 animate-spin-slow" />
-          </button>
+          {/* Interactive Tour Launcher (hidden for Admin or Contributor per requirement) */}
+          {!isStaff && (
+            <button
+              onClick={startProductTour}
+              type="button"
+              title="Interactive Tour Guide"
+              className="p-2 rounded-xl text-amber-400/80 hover:text-amber-300 hover:bg-amber-500/10 transition-colors border border-amber-500/20 cursor-pointer"
+            >
+              <Compass className="w-5 h-5 animate-spin-slow" />
+            </button>
+          )}
 
           {user ? (
             <div data-tour="tour-nav-user" className="flex items-center gap-3">
@@ -202,16 +205,16 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden glass-card border-b border-white/10 px-4 pt-3 pb-6 space-y-3">
           {navLinks.map((link) => {
-            const isHighlight = (link as any).isHighlight;
+            const isRead = (link as any).isRead;
             const isPractice = (link as any).isPractice;
-            const isActive = pathname === link.href;
+            const isActive = pathname === link.href || pathname?.startsWith(link.href + '/');
             return (
               <Link
                 key={link.name}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                  isHighlight
+                  isRead
                     ? 'text-amber-300 bg-amber-500/15 border border-amber-500/30'
                     : isPractice
                     ? 'text-cyan-300 bg-cyan-500/15 border border-cyan-500/30'
@@ -221,13 +224,13 @@ export default function Navbar() {
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  {isHighlight && <Sparkles className="w-4 h-4 text-amber-400" />}
+                  {isRead && <BookOpen className="w-4 h-4 text-amber-400" />}
                   {isPractice && <Code2 className="w-4 h-4 text-cyan-400" />}
                   {link.name}
                 </span>
-                {isHighlight && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950">
-                    Roadmap
+                {isRead && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950">
+                    Learn
                   </span>
                 )}
                 {isPractice && (
@@ -317,24 +320,26 @@ export default function Navbar() {
             </div>
           )}
 
-          <div className="pt-3 border-t border-white/10 space-y-2">
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                startProductTour();
-              }}
-              type="button"
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-colors cursor-pointer"
-            >
-              <span className="flex items-center gap-2">
-                <Compass className="w-4 h-4 text-amber-400" />
-                Interactive Feature Tour
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-300">
-                Explore
-              </span>
-            </button>
-          </div>
+          {!isStaff && (
+            <div className="pt-3 border-t border-white/10 space-y-2">
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  startProductTour();
+                }}
+                type="button"
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-colors cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Compass className="w-4 h-4 text-amber-400" />
+                  Interactive Feature Tour
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-300">
+                  Explore
+                </span>
+              </button>
+            </div>
+          )}
 
           <div className="pt-3 border-t border-white/10 flex items-center justify-between px-3 py-2">
             <span className="text-sm font-medium text-gray-400">Appearance</span>

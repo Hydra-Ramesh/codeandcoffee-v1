@@ -421,15 +421,17 @@ export default function UserProfilePage() {
               </div>
 
               <div className="flex items-center justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={startProductTour}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold transition-all cursor-pointer shadow-sm hover:scale-102"
-                  title="Replay Interactive Feature Tour"
-                >
-                  <Compass className="w-3.5 h-3.5 text-amber-400 animate-spin-slow" />
-                  <span>Platform Tour</span>
-                </button>
+                {user.role !== 'ADMIN' && user.role !== 'CONTRIBUTOR' && (
+                  <button
+                    type="button"
+                    onClick={startProductTour}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold transition-all cursor-pointer shadow-sm hover:scale-102"
+                    title="Replay Interactive Feature Tour"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-amber-400 animate-spin-slow" />
+                    <span>Platform Tour</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setIsEditing(!isEditing)}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl glass-card hover:bg-white/10 text-xs font-semibold text-gray-200 transition-colors cursor-pointer"

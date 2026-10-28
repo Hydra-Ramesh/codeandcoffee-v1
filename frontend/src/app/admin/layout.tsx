@@ -19,6 +19,7 @@ import {
   Mail,
   Rocket,
   Code2,
+  Layers,
 } from 'lucide-react';
 import AdminLayoutSkeleton from '../../components/skeletons/AdminLayoutSkeleton';
 
@@ -195,6 +196,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     },
     { name: 'Write New Article', href: '/admin/blogs/new', icon: FilePlus },
     { name: 'Manage Articles', href: '/admin/blogs', icon: BookOpen },
+    { name: 'Read Courses (Syllabus)', href: '/admin/courses', icon: Layers },
     { name: 'Practice Arena', href: '/admin/practice', icon: Code2 },
     { name: 'User Governance', href: '/admin/users', icon: Users },
   ];
@@ -202,6 +204,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const contributorMenuItems: MenuItem[] = [
     { name: 'Write New Article', href: '/admin/blogs/new', icon: FilePlus },
     { name: 'My Articles & Drafts', href: '/admin/blogs', icon: BookOpen },
+    { name: 'Read Courses (Syllabus)', href: '/admin/courses', icon: Layers },
     { name: 'Practice Arena', href: '/admin/practice', icon: Code2 },
   ];
 

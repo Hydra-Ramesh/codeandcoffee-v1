@@ -51,6 +51,9 @@ model User {
   waitlistEntries WaitlistEntry[]
   practiceQuestions PracticeQuestion[]
   practiceProgress  UserPracticeProgress[]
+  coursesCreated    Course[]
+  lessonProgress    UserLessonProgress[]
+  courseEnrollments UserCourseEnrollment[]
 
   @@index([email])
 }
@@ -266,3 +269,113 @@ model UserPracticeProgress {
   @@index([questionId])
   @@index([userId, isCompleted])
 }
+
+// ==============================================================================
+// READ / INTERACTIVE COURSE & CURRICULUM PLATFORM
+// ==============================================================================
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String
+  category    String   @default("Programming Languages") // e.g. "C++", "System Design", "Backend", "DSA"
+  bannerImage String?
+  level       String   @default("BEGINNER") // "BEGINNER" | "INTERMEDIATE" | "ADVANCED"
+  order       Int      @default(0)
+  isPublished Boolean  @default(true)
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  topics      CourseTopic[]
+  enrollments UserCourseEnrollment[]
+
+  @@index([slug])
+  @@index([isPublished])
+  @@index([category])
+  @@index([order])
+}
+
+model CourseTopic {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String   // e.g. "Basics", "Pointers & Memory Management"
+  slug        String
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subtopics   CourseSubtopic[]
+
+  @@unique([courseId, slug])
+  @@index([courseId])
+  @@index([courseId, order])
+}
+
+model CourseSubtopic {
+  id               String   @id @default(cuid())
+  topicId          String
+  topic            CourseTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  title            String   // e.g. "Variables, Memory Layout & Pointers"
+  slug             String
+  order            Int      @default(0)
+  content          String   @default("") // Rich Markdown / Readme with syntax-highlighted codeblocks
+  attachments      String[] @default([]) // Uploaded photo / screenshot URLs
+  hasQuiz          Boolean  @default(false)
+  quizPassingScore Int      @default(25) // 25% passing score threshold per user specification!
+  quizData         Json?    // Array of { id, questionText, type: "MCQ"|"MMQ"|"CODE_OUTPUT", codeSnippet, options: string[], correctAnswers: number[], explanation: string }
+  codingQuestions  Json?    // Array of { id, title, description, difficulty: "EASY"|"MEDIUM"|"HARD", leetcodeUrl, sampleInput, sampleOutput, starterCode, isJudge0ComingSoon: true }
+  isPublished      Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  progressRecords  UserLessonProgress[]
+
+  @@unique([topicId, slug])
+  @@index([topicId])
+  @@index([topicId, order])
+}
+
+model UserLessonProgress {
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subtopicId   String
+  subtopic     CourseSubtopic @relation(fields: [subtopicId], references: [id], onDelete: Cascade)
+  isUnlocked   Boolean        @default(false)
+  isCompleted  Boolean        @default(false)
+  quizAttempts Int            @default(0)
+  quizScore    Float?         // Score in percent (0 - 100)
+  quizPassed   Boolean        @default(false) // true if quizScore >= 25%
+  completedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([userId, subtopicId])
+  @@index([userId])
+  @@index([subtopicId])
+  @@index([userId, isCompleted])
+}
+
+model UserCourseEnrollment {
+  id                     String    @id @default(cuid())
+  userId                 String
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId               String
+  course                 Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  completedLessonsCount  Int       @default(0)
+  totalLessonsCount      Int       @default(0)
+  progressPercent        Float     @default(0)
+  lastAccessedSubtopicId String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+}
+
