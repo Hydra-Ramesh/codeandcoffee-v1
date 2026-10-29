@@ -162,10 +162,12 @@ function fallbackOnQuota(err: any): boolean {
     msg.includes('limit exceeded') ||
     msg.includes('max requests') ||
     msg.includes('daily limit') ||
-    msg.includes('quota')
+    msg.includes('quota') ||
+    msg.includes('fetch failed') ||
+    msg.includes('ENOTFOUND')
   ) {
     if (!hasLoggedQuotaExceeded) {
-      console.warn('⚠️ [Redis Failover] Upstash command quota reached. Seamlessly engaging in-memory Redis fallback so all features stay 100% online.');
+      console.warn('⚠️ [Redis Failover] Remote Redis connectivity drop or quota reached. Seamlessly engaging in-memory Redis fallback so all features stay 100% online.');
       hasLoggedQuotaExceeded = true;
     }
     // Permanently switch client to memory for this process session to avoid wasted HTTP network calls
@@ -175,7 +177,10 @@ function fallbackOnQuota(err: any): boolean {
   return false;
 }
 
-if (config.upstashRedisRestUrl && config.upstashRedisRestToken) {
+if (config.nodeEnv === 'test') {
+  console.log('🧪 Test environment detected: Using fast high-performance in-memory cache.');
+  redisClient = memoryFallback;
+} else if (config.upstashRedisRestUrl && config.upstashRedisRestToken) {
   try {
     const upstash = new UpstashRedis({
       url: config.upstashRedisRestUrl,
