@@ -178,6 +178,18 @@ export default function CourseOverviewPage() {
 
       {/* Hero Banner Card */}
       <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm dark:shadow-2xl">
+        {/* Ambient Course Banner Image Backdrop (if available) */}
+        {course.bannerImage && (
+          <div className="absolute inset-0 -z-10 overflow-hidden opacity-10 dark:opacity-20 pointer-events-none">
+            <img
+              src={optimizeImageUrl(course.bannerImage, { width: 1200, height: 600, crop: 'fill' }) || course.bannerImage}
+              alt={course.title}
+              className="w-full h-full object-cover blur-sm scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/70 to-transparent dark:from-slate-950 dark:via-slate-950/70" />
+          </div>
+        )}
+
         {/* Background glow & art */}
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-purple-500/10 dark:bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />

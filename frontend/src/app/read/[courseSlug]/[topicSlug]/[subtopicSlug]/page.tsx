@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { fetchApi } from '../../../../../lib/api';
 import { useAuth } from '../../../../../context/AuthContext';
+import { useToast } from '../../../../../context/ToastContext';
 import { getSocket, joinLessonRoom, leaveLessonRoom } from '../../../../../lib/socket';
 import MarkdownViewer from '../../../../../components/MarkdownViewer';
 import ReadStudioSkeleton from '../../../../../components/skeletons/ReadStudioSkeleton';
@@ -103,6 +104,7 @@ export default function SubtopicReaderPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
 
   const courseSlug = params.courseSlug as string;
   const topicSlug = params.topicSlug as string;
@@ -338,7 +340,7 @@ export default function SubtopicReaderPage() {
       const q = questions[i];
       const ans = quizAnswers[q.id];
       if (ans === undefined || (Array.isArray(ans) && ans.length === 0)) {
-        alert(`Please answer question #${i + 1} before submitting.`);
+        toastWarning(`Please answer question #${i + 1} before submitting.`);
         return;
       }
     }
@@ -352,6 +354,7 @@ export default function SubtopicReaderPage() {
     if (res.success && res.data) {
       setQuizResult(res.data);
       if (res.data.passed) {
+        toastSuccess(`🎉 Passed! Score: ${res.data.scorePercent}%. Next section unlocked.`);
         setUserProgress((prev) => ({
           ...prev,
           isCompleted: true,
@@ -365,6 +368,7 @@ export default function SubtopicReaderPage() {
           setSyllabus(sylRes.data.course);
         }
       } else {
+        toastWarning(`Score: ${res.data.scorePercent}%. Minimum passing threshold is >= ${res.data.passingThreshold}%.`);
         setUserProgress((prev) => ({
           ...prev,
           quizAttempts: prev.quizAttempts + 1,
@@ -376,7 +380,7 @@ export default function SubtopicReaderPage() {
         saveAnswersToStorage();
         setAuthModalOpen(true);
       } else {
-        alert(res.message || 'Failed to submit quiz.');
+        toastError(res.message || 'Failed to submit quiz.');
       }
     }
     setSubmittingQuiz(false);
@@ -401,6 +405,7 @@ export default function SubtopicReaderPage() {
       method: 'POST',
     });
     if (res.success) {
+      toastSuccess('Lesson marked as completed! Unlocking next section...');
       setUserProgress((prev) => ({
         ...prev,
         isCompleted: true,
@@ -414,7 +419,7 @@ export default function SubtopicReaderPage() {
         router.push(`/read/${courseSlug}/${navigation.next.topicSlug}/${navigation.next.slug}`);
       }
     } else {
-      alert(res.message || 'Failed to complete lesson.');
+      toastError(res.message || 'Failed to complete lesson.');
     }
     setMarkingDone(false);
   };
@@ -1050,6 +1055,8 @@ export default function SubtopicReaderPage() {
                             <button
                               key={optIdx}
                               type="button"
+                              role={isMMQ ? 'checkbox' : 'radio'}
+                              aria-checked={isSelected}
                               onClick={() => handleOptionSelect(q.id, optIdx, q.type)}
                               className={`w-full p-3.5 rounded-xl border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
                                 isAnswerCorrectKey

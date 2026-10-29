@@ -53,13 +53,20 @@ export default function ReadCatalogPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const categories = [
+  const defaultCategories = [
     'All',
     'Programming Languages',
     'System Design',
     'Backend',
     'Algorithms & DSA',
   ];
+
+  const categories = Array.from(
+    new Set([
+      ...defaultCategories,
+      ...courses.map((c) => c.category).filter(Boolean),
+    ])
+  );
 
   useEffect(() => {
     loadCourses();
@@ -265,9 +272,10 @@ export default function ReadCatalogPage() {
                   <div className="relative h-44 w-full bg-slate-100 dark:bg-slate-900 overflow-hidden">
                     {course.bannerImage ? (
                       <img
-                        src={course.bannerImage}
+                        src={optimizeImageUrl(course.bannerImage, { width: 600, height: 350, crop: 'fill' }) || course.bannerImage}
                         alt={course.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-amber-500/15 via-purple-500/10 to-slate-200 dark:to-slate-900 flex items-center justify-center">
