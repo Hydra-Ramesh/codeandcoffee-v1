@@ -168,8 +168,10 @@ export class BlogController {
 
       if (!blog) {
         isFromCache = false;
-        blog = await prisma.post.findUnique({
-          where: { slug },
+        blog = await prisma.post.findFirst({
+          where: {
+            OR: [{ slug }, { id: slug }],
+          },
           include: {
             author: { select: { id: true, name: true, avatar: true, bio: true, role: true } },
             _count: { select: { likes: true, dislikes: true, comments: true } },

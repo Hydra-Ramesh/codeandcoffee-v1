@@ -66,16 +66,20 @@ export default function MarkdownEditor({
   const [uploadingInline, setUploadingInline] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const safeContent = typeof content === 'string' ? content : '';
+  const safeTitle = typeof title === 'string' ? title : '';
+
   const insertText = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const selection = content.substring(start, end) || 'text';
+    const current = typeof content === 'string' ? content : '';
+    const selection = current.substring(start, end) || 'text';
     const replacement = `${before}${selection}${after}`;
 
-    const newContent = content.substring(0, start) + replacement + content.substring(end);
+    const newContent = current.substring(0, start) + replacement + current.substring(end);
     setContent(newContent);
 
     setTimeout(() => {
@@ -128,7 +132,7 @@ export default function MarkdownEditor({
     setUploadingInline(false);
   };
 
-  const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const words = safeContent.trim() ? safeContent.trim().split(/\s+/).length : 0;
   const readingTime = Math.max(1, Math.ceil(words / 200));
 
   return (
@@ -414,7 +418,7 @@ export default function MarkdownEditor({
             <div className={`p-4 bg-white dark:bg-transparent ${viewMode === 'edit' ? 'col-span-2' : ''}`}>
               <textarea
                 ref={textareaRef}
-                value={content}
+                value={content || ''}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Write your article in rich Markdown format... Use headers, code blocks, lists, blockquotes, and tables."
                 rows={22}
@@ -430,8 +434,8 @@ export default function MarkdownEditor({
               <div className="text-xs uppercase font-mono font-bold tracking-wider text-amber-600 dark:text-amber-400 mb-4 pb-2 border-b border-slate-200 dark:border-white/10">
                 Live Markdown Preview
               </div>
-              {content.trim() ? (
-                <MarkdownViewer content={content} />
+              {safeContent.trim() ? (
+                <MarkdownViewer content={safeContent} />
               ) : (
                 <div className="text-slate-500 dark:text-gray-500 text-sm italic">
                   Live formatted preview will appear here as you type in Markdown...
@@ -446,7 +450,7 @@ export default function MarkdownEditor({
           <div className="flex items-center gap-4">
             <span><strong>{words}</strong> words</span>
             <span>•</span>
-            <span><strong>{content.length}</strong> characters</span>
+            <span><strong>{safeContent.length}</strong> characters</span>
             <span>•</span>
             <span>~<strong>{readingTime}</strong> min reading time</span>
           </div>
@@ -454,7 +458,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={onSave}
-            disabled={saving || !title.trim() || !content.trim()}
+            disabled={saving || !safeTitle.trim() || !safeContent.trim()}
             className="px-6 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm transition-all disabled:opacity-50 shadow-lg shadow-amber-500/20"
           >
             {saving ? 'Saving Article...' : isPublished ? 'Publish Article' : 'Save as Draft'}

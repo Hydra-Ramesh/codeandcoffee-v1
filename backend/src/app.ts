@@ -102,6 +102,8 @@ export function createApp() {
         'Accept',
         'Cache-Control',
         'X-Requested-With',
+        'x-client-warmup',
+        'X-Client-Warmup',
       ],
       exposedHeaders: [
         'X-Request-Id',

@@ -44,25 +44,59 @@ export default function EditBlogPage() {
 
   const loadBlog = async () => {
     setLoading(true);
-    // Find in blogs list
-    const res = await fetchApi('/blogs?includeDrafts=true&limit=100');
-    if (res.success && res.data?.blogs) {
-      const match = res.data.blogs.find((b: any) => b.id === id);
-      if (match) {
-        setTitle(match.title);
-        setExcerpt(match.excerpt);
-        setContent(match.content);
-        setBannerImage(match.bannerImage || '');
-        setCategory(match.category);
-        setTags(Array.isArray(match.tags) ? match.tags.join(', ') : '');
-        setIsPublished(match.isPublished);
+
+    try {
+      let blogData: any = null;
+
+      // 1. First attempt direct fetch by ID (returns complete blog content)
+      const directRes = await fetchApi(`/blogs/${id}`);
+      if (directRes.success && directRes.data?.blog) {
+        blogData = directRes.data.blog;
+      } else {
+        // 2. Fallback: Search in blogs list, then fetch full post by slug if content was stripped
+        const listRes = await fetchApi('/blogs?includeDrafts=true&limit=100');
+        if (listRes.success && listRes.data?.blogs) {
+          const match = listRes.data.blogs.find((b: any) => b.id === id);
+          if (match) {
+            if (match.content) {
+              blogData = match;
+            } else if (match.slug) {
+              const slugRes = await fetchApi(`/blogs/${match.slug}`);
+              if (slugRes.success && slugRes.data?.blog) {
+                blogData = slugRes.data.blog;
+              } else {
+                blogData = match;
+              }
+            } else {
+              blogData = match;
+            }
+          }
+        }
       }
+
+      if (blogData) {
+        setTitle(blogData.title || '');
+        setExcerpt(blogData.excerpt || '');
+        setContent(blogData.content || '');
+        setBannerImage(blogData.bannerImage || '');
+        setCategory(blogData.category || 'System Design');
+        setTags(Array.isArray(blogData.tags) ? blogData.tags.join(', ') : '');
+        setIsPublished(Boolean(blogData.isPublished));
+      } else {
+        toast.error('Blog post could not be loaded.');
+      }
+    } catch {
+      toast.error('An error occurred while loading this article.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSave = async () => {
-    if (!title.trim() || !content.trim()) {
+    const safeTitle = (title || '').trim();
+    const safeContent = (content || '').trim();
+
+    if (!safeTitle || !safeContent) {
       toast.warning('Title and content are required to save an article.');
       return;
     }

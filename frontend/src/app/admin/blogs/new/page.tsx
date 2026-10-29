@@ -46,13 +46,17 @@ await redis.setex(cacheKey, 60, JSON.stringify({ status: "processed" }));
   const [notification, setNotification] = useState<string | null>(null);
 
   const handleSave = async () => {
-    if (!title.trim() || !content.trim() || !excerpt.trim()) {
+    const safeTitle = (title || '').trim();
+    const safeContent = (content || '').trim();
+    const safeExcerpt = (excerpt || '').trim();
+
+    if (!safeTitle || !safeContent || !safeExcerpt) {
       toast.warning('Please fill out the title, excerpt, and markdown content.');
       return;
     }
 
     setSaving(true);
-    const tagArray = tags.split(',').map((t) => t.trim()).filter(Boolean);
+    const tagArray = (tags || '').split(',').map((t) => t.trim()).filter(Boolean);
 
     const res = await fetchApi('/blogs', {
       method: 'POST',

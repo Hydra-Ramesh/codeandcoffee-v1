@@ -34,9 +34,6 @@ export default function BackendWarmup() {
 
         await fetch(healthUrl, {
           method: 'GET',
-          headers: {
-            'x-client-warmup': 'true',
-          },
           cache: 'no-store',
           keepalive: true,
         });
