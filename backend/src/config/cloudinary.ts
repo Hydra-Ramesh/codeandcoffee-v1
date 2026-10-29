@@ -41,19 +41,25 @@ export function uploadBufferToCloudinary(
     folder?: string;
     publicId?: string;
     filename?: string;
+    resourceType?: 'image' | 'raw' | 'video' | 'auto';
   }
 ): Promise<UploadApiResponse> {
   return new Promise((resolve, reject) => {
+    const resourceType = options?.resourceType || 'auto';
+    const isImage = resourceType === 'image' || resourceType === 'auto';
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: options?.folder || 'code_and_coffee/blogs',
         public_id: options?.publicId,
-        resource_type: 'image',
-        // Automatically optimize quality and format (webp/avif where supported)
-        transformation: [
-          { quality: 'auto:good' },
-          { fetch_format: 'auto' },
-        ],
+        resource_type: resourceType,
+        // Automatically optimize quality and format (webp/avif where supported) for images
+        transformation: isImage
+          ? [
+              { quality: 'auto:good' },
+              { fetch_format: 'auto' },
+            ]
+          : undefined,
       },
       (error: UploadApiErrorResponse | undefined, result: UploadApiResponse | undefined) => {
         if (error) {

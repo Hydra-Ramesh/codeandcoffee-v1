@@ -70,6 +70,7 @@ export class UploadController {
           const cloudinaryResult = await uploadBufferToCloudinary(req.file.buffer, {
             folder: 'code_and_coffee/resumes',
             filename: req.file.originalname,
+            resourceType: 'raw',
           });
 
           res.status(200).json({
@@ -84,12 +85,27 @@ export class UploadController {
             },
           });
           return;
-        } catch (cloudinaryErr) {
-          console.error('⚠️ Cloudinary resume upload failed, falling back to disk storage:', cloudinaryErr);
+        } catch (cloudinaryErr: any) {
+          console.error('⚠️ Cloudinary resume upload failed:', cloudinaryErr);
+          if (process.env.NODE_ENV === 'production') {
+            res.status(500).json({
+              success: false,
+              message: `Cloudinary resume upload failed: ${cloudinaryErr?.message || 'Unknown error'}. Check Cloudinary configuration.`,
+            });
+            return;
+          }
         }
+      } else if (process.env.NODE_ENV === 'production') {
+        res.status(500).json({
+          success: false,
+          message:
+            'Cloudinary object storage is required in production, but credentials (CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET) are not configured.',
+        });
+        return;
       }
 
-      // Fallback: Local disk storage
+      // Development-only fallback: Local disk storage
+      console.warn('⚠️ Cloudinary not configured or in development mode; writing resume to local uploads disk.');
       const ext = path.extname(req.file.originalname) || '.pdf';
       const uniqueName = `resume_${Date.now()}_${Math.round(Math.random() * 1e9)}${ext}`;
       const filePath = path.join(uploadsDir, uniqueName);
@@ -102,7 +118,7 @@ export class UploadController {
 
       res.status(200).json({
         success: true,
-        message: 'Resume stored in local uploads directory.',
+        message: 'Resume stored in local uploads directory (dev fallback).',
         data: {
           url: fileUrl,
           filename: req.file.originalname,
@@ -115,7 +131,7 @@ export class UploadController {
     }
   }
   /**
-   * Upload an image to Cloudinary v2 object storage (with local fallback if unconfigured)
+   * Upload an image to Cloudinary v2 object storage (enforced in production)
    */
   static async uploadImage(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -130,6 +146,7 @@ export class UploadController {
           const cloudinaryResult = await uploadBufferToCloudinary(req.file.buffer, {
             folder: 'code_and_coffee/blogs',
             filename: req.file.originalname,
+            resourceType: 'image',
           });
 
           res.status(200).json({
@@ -146,13 +163,27 @@ export class UploadController {
             },
           });
           return;
-        } catch (cloudinaryErr) {
-          console.error('⚠️ Cloudinary v2 upload failed, falling back to disk storage:', cloudinaryErr);
-          // Fall through to local fallback
+        } catch (cloudinaryErr: any) {
+          console.error('⚠️ Cloudinary v2 upload failed:', cloudinaryErr);
+          if (process.env.NODE_ENV === 'production') {
+            res.status(500).json({
+              success: false,
+              message: `Cloudinary upload failed: ${cloudinaryErr?.message || 'Unknown error'}. Please verify Cloudinary credentials and account limits on Render.`,
+            });
+            return;
+          }
         }
+      } else if (process.env.NODE_ENV === 'production') {
+        res.status(500).json({
+          success: false,
+          message:
+            'Cloudinary storage is required in production, but credentials (CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET) are not configured on Render.',
+        });
+        return;
       }
 
-      // Fallback: Local disk storage
+      // Development-only fallback: Local disk storage
+      console.warn('⚠️ Cloudinary not configured or in development mode; writing image to local uploads disk.');
       const ext = path.extname(req.file.originalname) || '.jpg';
       const uniqueName = `image_${Date.now()}_${Math.round(Math.random() * 1e9)}${ext}`;
       const filePath = path.join(uploadsDir, uniqueName);
@@ -165,7 +196,7 @@ export class UploadController {
 
       res.status(200).json({
         success: true,
-        message: 'Image stored in local uploads directory.',
+        message: 'Image stored in local uploads directory (dev fallback).',
         data: {
           url: fileUrl,
           filename: uniqueName,

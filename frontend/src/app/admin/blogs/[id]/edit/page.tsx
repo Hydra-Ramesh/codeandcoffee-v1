@@ -48,25 +48,24 @@ export default function EditBlogPage() {
     try {
       let blogData: any = null;
 
-      // 1. First attempt direct fetch by ID (returns complete blog content)
+      // 1. Direct fetch by ID (returns complete blog including markdown content)
       const directRes = await fetchApi(`/blogs/${id}`);
-      if (directRes.success && directRes.data?.blog) {
-        blogData = directRes.data.blog;
+      const directItem = directRes.data?.blog || (directRes.data?.id ? directRes.data : null);
+
+      if (directRes.success && directItem) {
+        blogData = directItem;
       } else {
-        // 2. Fallback: Search in blogs list, then fetch full post by slug if content was stripped
+        // 2. Fallback: Search in blogs list, then fetch full post by slug or id
         const listRes = await fetchApi('/blogs?includeDrafts=true&limit=100');
         if (listRes.success && listRes.data?.blogs) {
           const match = listRes.data.blogs.find((b: any) => b.id === id);
           if (match) {
             if (match.content) {
               blogData = match;
-            } else if (match.slug) {
-              const slugRes = await fetchApi(`/blogs/${match.slug}`);
-              if (slugRes.success && slugRes.data?.blog) {
-                blogData = slugRes.data.blog;
-              } else {
-                blogData = match;
-              }
+            } else if (match.slug || match.id) {
+              const fullRes = await fetchApi(`/blogs/${match.slug || match.id}`);
+              const fullItem = fullRes.data?.blog || (fullRes.data?.id ? fullRes.data : null);
+              blogData = fullItem || match;
             } else {
               blogData = match;
             }
@@ -80,7 +79,7 @@ export default function EditBlogPage() {
         setContent(blogData.content || '');
         setBannerImage(blogData.bannerImage || '');
         setCategory(blogData.category || 'System Design');
-        setTags(Array.isArray(blogData.tags) ? blogData.tags.join(', ') : '');
+        setTags(Array.isArray(blogData.tags) ? blogData.tags.join(', ') : (blogData.tags || ''));
         setIsPublished(Boolean(blogData.isPublished));
       } else {
         toast.error('Blog post could not be loaded.');
