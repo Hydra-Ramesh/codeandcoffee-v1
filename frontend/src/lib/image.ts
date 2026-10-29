@@ -24,6 +24,14 @@ export function optimizeImageUrl(
     }
   }
 
+  if (url.startsWith('image_')) {
+    url = `/uploads/${url}`;
+  }
+  if (url.startsWith('/uploads/')) {
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'https://codeandcoffee-v1.onrender.com';
+    url = `${backendUrl}${url}`;
+  }
+
   const { width, height, crop = 'limit' } = options;
 
   // Cloudinary Optimization

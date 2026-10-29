@@ -227,6 +227,12 @@ export default function BlogDetailPage() {
             src={optimizeImageUrl(blog.bannerImage, { width: 1200 })}
             alt={blog.title}
             className="w-full h-full object-cover"
+            onError={(e) => {
+              const fallback = 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80';
+              if (e.currentTarget.src !== fallback) {
+                e.currentTarget.src = fallback;
+              }
+            }}
           />
         </div>
       )}
