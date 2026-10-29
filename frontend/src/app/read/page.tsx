@@ -153,6 +153,9 @@ export default function ReadCatalogPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-gray-400" />
                 <input
                   type="text"
+                  id="search-tracks-input"
+                  name="searchQuery"
+                  aria-label="Filter tracks by keyword"
                   placeholder="Filter tracks by keyword..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -160,7 +163,9 @@ export default function ReadCatalogPage() {
                 />
                 {searchQuery && (
                   <button
+                    type="button"
                     onClick={() => setSearchQuery('')}
+                    aria-label="Clear search input"
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300 text-xs cursor-pointer"
                   >
                     ×

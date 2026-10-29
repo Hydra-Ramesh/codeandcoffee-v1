@@ -35,6 +35,9 @@ export interface FetchApiOptions extends RequestInit {
   cacheTtlMs?: number; // default 15000 (15 seconds) for GET requests
   idempotencyKey?: string;
   _isRetry?: boolean;
+  timeoutMs?: number; // default 15000ms (15 seconds)
+  retries?: number; // default 2 retries for GET requests on transient network/5xx errors
+  _retryCount?: number;
 }
 
 export async function fetchApi<T = any>(
@@ -51,6 +54,9 @@ export async function fetchApi<T = any>(
   const method = (options.method || 'GET').toUpperCase();
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const isGet = method === 'GET';
+  const timeoutMs = options.timeoutMs ?? 15000;
+  const maxRetries = options.retries ?? (isGet ? 2 : 0);
+  const currentRetry = options._retryCount ?? 0;
 
   // Client memory cache check for GET requests
   const cacheKey = `${endpoint}:${token || 'anon'}`;
@@ -88,14 +94,42 @@ export async function fetchApi<T = any>(
     delete headers['Content-Type'];
   }
 
+  // Request timeout handling with AbortController
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => {
+    timeoutController.abort(new Error(`Request timed out after ${timeoutMs}ms`));
+  }, timeoutMs);
+
+  // Link caller signal if provided
+  if (options.signal) {
+    options.signal.addEventListener('abort', () => {
+      timeoutController.abort(options.signal?.reason);
+    });
+  }
+
   try {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       credentials: 'include',
       ...options,
+      signal: timeoutController.signal,
       headers,
     });
 
-    const data = await res.json();
+    clearTimeout(timeoutId);
+
+    // Response validation: safely parse JSON or handle plain text/HTML errors
+    const contentType = res.headers.get('content-type') || '';
+    let data: any = {};
+    if (contentType.includes('application/json')) {
+      data = await res.json().catch(() => ({ success: false, message: 'Invalid JSON response from server' }));
+    } else {
+      const text = await res.text().catch(() => '');
+      data = {
+        success: res.ok,
+        message: text.slice(0, 200) || `Server responded with status ${res.status}`,
+      };
+    }
+
     const serverRequestId = res.headers.get('x-request-id') || data.requestId;
 
     // Automatic Refresh Token Rotation: on 401, attempt silent rotation and replay once
@@ -135,6 +169,16 @@ export async function fetchApi<T = any>(
       }
     }
 
+    // Exponential Backoff Retry Policy for transient server errors (502, 503, 504) on GET requests
+    if (isGet && (res.status === 502 || res.status === 503 || res.status === 504) && currentRetry < maxRetries) {
+      const delay = Math.min(800 * Math.pow(2, currentRetry), 4000) + Math.random() * 200;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return fetchApi<T>(endpoint, {
+        ...options,
+        _retryCount: currentRetry + 1,
+      });
+    }
+
     if (!res.ok) {
       return {
         success: false,
@@ -163,13 +207,27 @@ export async function fetchApi<T = any>(
       requestId: serverRequestId,
     };
   } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    // Exponential Backoff Retry Policy on transient network / fetch failures for GET requests
+    if (isGet && currentRetry < maxRetries && error?.name !== 'AbortError') {
+      const delay = Math.min(800 * Math.pow(2, currentRetry), 4000) + Math.random() * 200;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return fetchApi<T>(endpoint, {
+        ...options,
+        _retryCount: currentRetry + 1,
+      });
+    }
+
     if (error?.name === 'AbortError') {
+      const isTimeout = error.message?.includes('timed out');
       return {
         success: false,
-        message: 'Request was cancelled',
+        message: isTimeout ? `Request timed out after ${timeoutMs}ms.` : 'Request was cancelled.',
         isAborted: true,
       };
     }
+
     console.error(`API Fetch Error on ${endpoint}:`, error);
     const message = error instanceof Error ? error.message : 'Unable to communicate with Code & Coffee API server.';
     return {

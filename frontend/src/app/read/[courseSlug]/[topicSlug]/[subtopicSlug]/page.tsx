@@ -36,13 +36,26 @@ import {
   FileText,
   Users,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { fetchApi } from '../../../../../lib/api';
 import { useAuth } from '../../../../../context/AuthContext';
 import { useToast } from '../../../../../context/ToastContext';
 import { getSocket, joinLessonRoom, leaveLessonRoom } from '../../../../../lib/socket';
-import MarkdownViewer from '../../../../../components/MarkdownViewer';
 import ReadStudioSkeleton from '../../../../../components/skeletons/ReadStudioSkeleton';
 import ThemeToggle from '../../../../../components/ThemeToggle';
+
+// Dynamic Import: Code split heavy markdown & syntax-highlighting engine
+const MarkdownViewer = dynamic(() => import('../../../../../components/MarkdownViewer'), {
+  ssr: true,
+  loading: () => (
+    <div className="space-y-4 animate-pulse py-4">
+      <div className="h-6 w-3/4 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+      <div className="h-4 w-full bg-slate-200 dark:bg-slate-800/80 rounded" />
+      <div className="h-4 w-5/6 bg-slate-200 dark:bg-slate-800/80 rounded" />
+      <div className="h-28 w-full bg-slate-200 dark:bg-slate-800/60 rounded-2xl" />
+    </div>
+  ),
+});
 
 interface QuizQuestion {
   id: string;
