@@ -38,7 +38,7 @@ export default function Footer() {
                 <span className="text-xs text-purple-300 font-semibold">• Live Engineering Vision</span>
               </div>
               <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-                What's Coming to <span className="gradient-text-amber">Code &amp; Coffee</span>?
+                What&apos;s Coming to <span className="gradient-text-amber">Code &amp; Coffee</span>?
               </h3>
               <p className="text-sm text-gray-300 leading-relaxed">
                 Explore upcoming real-time coding rooms, Judge0 sandbox compilation, live telemetry leaderboards, and peer architecture challenge rooms in active development.
@@ -110,7 +110,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/whats-coming" className="text-amber-400 font-semibold hover:text-amber-300 transition-colors flex items-center gap-1.5">
-                  <span>What's Coming?</span>
+                  <span>What&apos;s Coming?</span>
                   <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30">Roadmap</span>
                 </Link>
               </li>

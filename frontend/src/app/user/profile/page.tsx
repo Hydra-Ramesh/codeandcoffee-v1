@@ -1100,7 +1100,7 @@ export default function UserProfilePage() {
                 </div>
                 <div className="flex items-start gap-2 text-emerald-700 dark:text-emerald-300">
                   <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
-                  <span><strong>Full Recovery Rights:</strong> If you change your mind, simply log back into Code &amp; Coffee anytime during these 15 days and click <em>"Restore My Account"</em>.</span>
+                  <span><strong>Full Recovery Rights:</strong> If you change your mind, simply log back into Code &amp; Coffee anytime during these 15 days and click <em>&quot;Restore My Account&quot;</em>.</span>
                 </div>
                 <div className="flex items-start gap-2 text-cyan-700 dark:text-cyan-300">
                   <Mail className="w-4 h-4 shrink-0 mt-0.5 text-cyan-600 dark:text-cyan-400" />

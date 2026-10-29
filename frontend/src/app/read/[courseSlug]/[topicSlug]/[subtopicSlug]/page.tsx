@@ -904,7 +904,7 @@ export default function SubtopicReaderPage() {
                       </div>
 
                       <div className="p-3 rounded-xl bg-[#0b0f19] border border-slate-800 font-mono text-xs text-gray-300 space-y-1 max-h-36 overflow-y-auto">
-                        <p className="text-gray-500">// Starter template:</p>
+                        <p className="text-gray-500">{"// Starter template:"}</p>
                         <pre className="text-amber-200/90 whitespace-pre-wrap">
                           {q.starterCode || '// Write your solution here...'}
                         </pre>
