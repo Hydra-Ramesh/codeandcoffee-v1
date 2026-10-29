@@ -83,8 +83,10 @@ export default function ReadCatalogPage() {
   };
 
   const filteredCourses = courses.filter((c) => {
-    const q = searchQuery.toLowerCase();
-    return c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q);
+    const q = (searchQuery || '').toLowerCase();
+    const title = (c.title || '').toLowerCase();
+    const desc = (c.description || '').toLowerCase();
+    return title.includes(q) || desc.includes(q);
   });
 
   if (loading && courses.length === 0) {

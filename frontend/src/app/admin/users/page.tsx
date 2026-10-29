@@ -33,7 +33,7 @@ function GithubIcon({ className = 'w-3 h-3' }: { className?: string }) {
 }
 
 function extractHandle(url: string | null | undefined, type: 'gh' | 'lc' | 'cf' | 'cc'): string {
-  if (!url) return '';
+  if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
   if (!trimmed.startsWith('http')) return trimmed;
   try {
@@ -48,7 +48,8 @@ function extractHandle(url: string | null | undefined, type: 'gh' | 'lc' | 'cf' 
   }
 }
 
-function normalizeUrl(handleOrUrl: string, type: 'gh' | 'lc' | 'cf' | 'cc'): string {
+function normalizeUrl(handleOrUrl: string | null | undefined, type: 'gh' | 'lc' | 'cf' | 'cc'): string {
+  if (!handleOrUrl || typeof handleOrUrl !== 'string') return '';
   const trimmed = handleOrUrl.trim();
   if (!trimmed) return '';
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
@@ -280,10 +281,10 @@ export default function AdminUserGovernancePage() {
             u.id === profileModal.user.id
               ? {
                   ...u,
-                  githubUrl: profileModal.githubUrl.trim() || null,
-                  leetcodeUrl: profileModal.leetcodeUrl.trim() || null,
-                  codeforcesUrl: profileModal.codeforcesUrl.trim() || null,
-                  codechefUrl: profileModal.codechefUrl.trim() || null,
+                  githubUrl: profileModal.githubUrl?.trim() || null,
+                  leetcodeUrl: profileModal.leetcodeUrl?.trim() || null,
+                  codeforcesUrl: profileModal.codeforcesUrl?.trim() || null,
+                  codechefUrl: profileModal.codechefUrl?.trim() || null,
                 }
               : u
           )

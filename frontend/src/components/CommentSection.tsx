@@ -67,7 +67,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
               (c) =>
                 c.id.startsWith('optimistic-') &&
                 c.author.id === data.comment.author.id &&
-                c.content.trim() === data.comment.content.trim()
+                (c.content || '').trim() === (data.comment?.content || '').trim()
             );
 
             if (optimisticIndex !== -1) {

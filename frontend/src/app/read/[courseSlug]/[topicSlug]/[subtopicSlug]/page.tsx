@@ -720,7 +720,7 @@ export default function SubtopicReaderPage() {
 
           {/* Markdown Readme Content Body */}
           <article className="prose dark:prose-invert max-w-none text-slate-800 dark:text-gray-200">
-            <MarkdownViewer content={lesson.content} />
+            <MarkdownViewer content={lesson?.content || ''} />
           </article>
 
           {/* Photo & Screenshot Attachments Gallery (if any) */}
@@ -854,9 +854,11 @@ export default function SubtopicReaderPage() {
                         ) : null}
                       </div>
 
-                    <div className="text-xs text-slate-700 dark:text-gray-300 leading-relaxed">
-                      <MarkdownViewer content={q.description} />
-                    </div>
+                    {q.description ? (
+                      <div className="text-xs text-slate-700 dark:text-gray-300 leading-relaxed">
+                        <MarkdownViewer content={q.description} />
+                      </div>
+                    ) : null}
 
                     {/* Input/Output Examples */}
                     {q.examples && q.examples.length > 0 && (

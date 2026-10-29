@@ -6,10 +6,15 @@ import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 
 interface MarkdownViewerProps {
-  content: string;
+  content?: string | null;
 }
 
 export default function MarkdownViewer({ content }: MarkdownViewerProps) {
+  const safeContent = typeof content === 'string' ? content : '';
+  if (!safeContent.trim()) {
+    return null;
+  }
+
   return (
     <div className="markdown-content max-w-none text-slate-800 dark:text-gray-200">
       <ReactMarkdown
@@ -159,9 +164,10 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
             );
           },
           a({ href, children, ...props }) {
+            const hrefStr = typeof href === 'string' ? href : '';
             // Strict XSS Prevention: Disallow javascript: schemes
-            const isSafe = href && !href.toLowerCase().trim().startsWith('javascript:');
-            const safeHref = isSafe ? href : '#';
+            const isSafe = hrefStr && !hrefStr.toLowerCase().trim().startsWith('javascript:');
+            const safeHref = isSafe ? hrefStr : '#';
             const isExternal = safeHref.startsWith('http');
             return (
               <a
@@ -176,19 +182,33 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
             );
           },
           img({ src, alt, ...props }) {
+            let safeSrc = typeof src === 'string' ? src.trim() : '';
+            if (!safeSrc) return null;
+            // Handle local uploads or raw filenames without protocol
+            if (safeSrc.startsWith('image_')) {
+              safeSrc = `/uploads/${safeSrc}`;
+            }
+            if (safeSrc.startsWith('/uploads/')) {
+              const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:5000';
+              safeSrc = `${backendUrl}${safeSrc}`;
+            }
             return (
               <img
-                src={src}
+                src={safeSrc}
                 alt={alt || 'Visual'}
                 className="rounded-2xl border border-slate-200 dark:border-white/10 my-6 max-h-[500px] w-full object-cover shadow-xl"
                 loading="lazy"
+                onError={(e) => {
+                  // Gracefully hide broken 404 images without breaking page layout
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
                 {...props}
               />
             );
           },
         }}
       >
-        {content}
+        {safeContent}
       </ReactMarkdown>
     </div>
   );
