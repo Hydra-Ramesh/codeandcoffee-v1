@@ -9,7 +9,9 @@ import { authenticate } from '../../middleware/auth.middleware.js';
 const router = Router();
 
 router.get('/', authenticate, getUserNotifications);
-router.put('/:id/read', authenticate, markNotificationRead);
+router.patch('/read-all', authenticate, markAllNotificationsRead);
 router.put('/read-all', authenticate, markAllNotificationsRead);
+router.patch('/:id/read', authenticate, markNotificationRead);
+router.put('/:id/read', authenticate, markNotificationRead);
 
 export default router;

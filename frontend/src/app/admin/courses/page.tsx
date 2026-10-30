@@ -24,6 +24,7 @@ import {
   EyeOff,
   AlertCircle,
   GraduationCap,
+  UploadCloud,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
 import { getSocket } from '../../../lib/socket';
@@ -96,7 +97,7 @@ interface TelemetryData {
 
 export default function AdminCoursesPage() {
   const { user, isAdmin } = useAuth();
-  const { success, error: toastError } = useToast();
+  const { toast, success, error: toastError } = useToast();
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,6 +119,35 @@ export default function AdminCoursesPage() {
   const [selectedCourseForTelemetry, setSelectedCourseForTelemetry] = useState<string | null>(null);
   const [telemetryData, setTelemetryData] = useState<TelemetryData | null>(null);
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
+  const [uploadingCourseBanner, setUploadingCourseBanner] = useState(false);
+
+  const handleCourseBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingCourseBanner(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetchApi('/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.success && res.data?.url) {
+        setNewCourse((prev) => ({ ...prev, bannerImage: res.data.url }));
+        toast.success('Course banner uploaded to Cloudinary successfully!');
+      } else {
+        toast.error(res.message || 'Image upload failed.');
+      }
+    } catch {
+      toast.error('Network error uploading banner.');
+    } finally {
+      e.target.value = '';
+      setUploadingCourseBanner(false);
+    }
+  };
 
   useEffect(() => {
     loadCourses();
@@ -499,16 +529,49 @@ export default function AdminCoursesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
-                  Banner Image URL (Optional)
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-300">
+                    Banner Cover Image (Cloudinary)
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 cursor-pointer font-medium">
+                    <UploadCloud className="w-3.5 h-3.5" />
+                    <span>{uploadingCourseBanner ? 'Uploading...' : 'Upload Photo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCourseBannerUpload}
+                      disabled={uploadingCourseBanner}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
                 <input
                   type="url"
                   value={newCourse.bannerImage}
                   onChange={(e) => setNewCourse({ ...newCourse, bannerImage: e.target.value })}
-                  placeholder="https://images.unsplash.com/..."
+                  placeholder="https://res.cloudinary.com/... or click Upload Photo"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
                 />
+                {newCourse.bannerImage && (
+                  <div className="mt-2 relative h-28 w-full rounded-xl overflow-hidden border border-white/10 bg-slate-950">
+                    <img
+                      src={newCourse.bannerImage}
+                      alt="Banner Preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src =
+                          'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNewCourse({ ...newCourse, bannerImage: '' })}
+                      className="absolute top-2 right-2 px-2 py-0.5 rounded bg-red-500/80 hover:bg-red-500 text-[10px] text-white font-bold"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2 pt-1">

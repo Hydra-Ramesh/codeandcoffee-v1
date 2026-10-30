@@ -13,7 +13,7 @@ import {
   CheckCircle2, 
   ExternalLink 
 } from 'lucide-react';
-import { fetchApi } from '../lib/api';
+import { fetchApi, clearApiCache } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -50,7 +50,7 @@ export function NotificationBell() {
     let isMounted = true;
     setIsLoading(true);
 
-    fetchApi('/notifications')
+    fetchApi('/notifications', { skipCache: true })
       .then((res) => {
         if (!isMounted) return;
         if (res.success && res.data) {
@@ -81,6 +81,7 @@ export function NotificationBell() {
       const newNotif = data.notification;
       setNotifications((prev) => [newNotif, ...prev]);
       setUnreadCount((prev) => prev + 1);
+      clearApiCache('/notifications');
 
       // Trigger modern toast banner
       if (newNotif.type === 'ACHIEVEMENT') {
@@ -115,11 +116,14 @@ export function NotificationBell() {
   // Mark single as read
   const handleMarkRead = async (id: string, link?: string | null) => {
     try {
-      await fetchApi(`/notifications/${id}/read`, { method: 'PATCH' });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      const res = await fetchApi(`/notifications/${id}/read`, { method: 'PATCH' });
+      if (res.success) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+        clearApiCache('/notifications');
+      }
     } catch (err) {
       console.warn('Failed marking notification read:', err);
     }
@@ -134,10 +138,15 @@ export function NotificationBell() {
   const handleMarkAllRead = async () => {
     if (unreadCount === 0) return;
     try {
-      await fetchApi('/notifications/read-all', { method: 'PATCH' });
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-      toast.success('All notifications marked as read.');
+      const res = await fetchApi('/notifications/read-all', { method: 'PATCH' });
+      if (res.success) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+        clearApiCache('/notifications');
+        toast.success('All notifications marked as read.');
+      } else {
+        toast.error(res.message || 'Could not mark all as read.');
+      }
     } catch (err) {
       toast.error('Could not mark all as read.');
     }

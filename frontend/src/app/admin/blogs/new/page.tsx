@@ -38,7 +38,7 @@ await redis.setex(cacheKey, 60, JSON.stringify({ status: "processed" }));
 - **Fault-Tolerance**: Decouple hot state from disk.
 - **Observability**: Live active reader heartbeats and metrics.
 `);
-  const [bannerImage, setBannerImage] = useState('https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80');
+  const [bannerImage, setBannerImage] = useState('');
   const [category, setCategory] = useState('System Design');
   const [tags, setTags] = useState('Architecture, Redis, Performance, Scale');
   const [isPublished, setIsPublished] = useState(true);

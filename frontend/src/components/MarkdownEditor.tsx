@@ -18,6 +18,10 @@ import {
   Eye,
   Edit3,
   SplitSquareVertical,
+  Trash2,
+  RefreshCw,
+  CheckCircle2,
+  ExternalLink,
 } from 'lucide-react';
 import MarkdownViewer from './MarkdownViewer';
 import { fetchApi } from '../lib/api';
@@ -64,7 +68,10 @@ export default function MarkdownEditor({
   const [viewMode, setViewMode] = useState<'split' | 'edit' | 'preview'>('split');
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [uploadingInline, setUploadingInline] = useState(false);
+  const [isDraggingBanner, setIsDraggingBanner] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
 
   const safeContent = typeof content === 'string' ? content : '';
   const safeTitle = typeof title === 'string' ? title : '';
@@ -88,26 +95,57 @@ export default function MarkdownEditor({
     }, 0);
   };
 
-  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const uploadBannerFile = async (file: File) => {
     if (!file) return;
 
-    setUploadingBanner(true);
-    const formData = new FormData();
-    formData.append('image', file);
-
-    const res = await fetchApi('/upload/image', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (res.success && res.data?.url) {
-      setBannerImage(res.data.url);
-      toast.success('Hero banner uploaded successfully!');
-    } else {
-      toast.error(res.message || 'Image upload failed.');
+    if (!file.type.startsWith('image/')) {
+      toast.warning('Please select an image file (JPG, PNG, WEBP, GIF, SVG).');
+      return;
     }
-    setUploadingBanner(false);
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.warning('Image exceeds the 10MB maximum limit.');
+      return;
+    }
+
+    setUploadingBanner(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetchApi('/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.success && res.data?.url) {
+        setBannerImage(res.data.url);
+        toast.success('Hero banner uploaded to Cloudinary successfully!');
+      } else {
+        toast.error(res.message || 'Image upload failed. Please verify Cloudinary credentials.');
+      }
+    } catch {
+      toast.error('Network error during image upload.');
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await uploadBannerFile(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleBannerDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingBanner(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await uploadBannerFile(file);
+    }
   };
 
   const handleInlineImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,21 +153,27 @@ export default function MarkdownEditor({
     if (!file) return;
 
     setUploadingInline(true);
-    const formData = new FormData();
-    formData.append('image', file);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
 
-    const res = await fetchApi('/upload/image', {
-      method: 'POST',
-      body: formData,
-    });
+      const res = await fetchApi('/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
 
-    if (res.success && res.data?.url) {
-      insertText(`\n![${file.name.replace(/\.[^/.]+$/, '')}](${res.data.url})\n`);
-      toast.success('Inline figure uploaded and inserted into article!');
-    } else {
-      toast.error(res.message || 'Inline image upload failed.');
+      if (res.success && res.data?.url) {
+        insertText(`\n![${file.name.replace(/\.[^/.]+$/, '')}](${res.data.url})\n`);
+        toast.success('Inline figure uploaded to Cloudinary and inserted!');
+      } else {
+        toast.error(res.message || 'Inline image upload failed.');
+      }
+    } catch {
+      toast.error('Network error during inline image upload.');
+    } finally {
+      e.target.value = '';
+      setUploadingInline(false);
     }
-    setUploadingInline(false);
   };
 
   const words = safeContent.trim() ? safeContent.trim().split(/\s+/).length : 0;
@@ -217,36 +261,141 @@ export default function MarkdownEditor({
         </div>
 
         {/* Banner Image Uploader & Preview */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
-            Banner Photo (Cover Image)
-          </label>
-          <div className="flex flex-col sm:flex-row gap-3 items-center">
-            <input
-              type="text"
-              value={bannerImage}
-              onChange={(e) => setBannerImage(e.target.value)}
-              placeholder="https://images.unsplash.com/... or upload image"
-              className="flex-1 w-full px-4 py-2.5 text-sm rounded-xl glass-input text-white placeholder-gray-500"
-            />
-            <label className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl glass-card hover:bg-white/10 text-amber-400 cursor-pointer border border-amber-500/30 text-sm font-semibold transition-all">
-              <UploadCloud className="w-4 h-4" />
-              <span>{uploadingBanner ? 'Uploading...' : 'Upload Cover'}</span>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              Cover Banner Photo
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowUrlInput(!showUrlInput)}
+              className="text-xs text-amber-400 hover:text-amber-300 underline font-medium cursor-pointer"
+            >
+              {showUrlInput ? '← Switch to Photo Upload' : 'Or paste direct URL'}
+            </button>
+          </div>
+
+          {showUrlInput ? (
+            <div className="flex flex-col sm:flex-row gap-2 items-center">
               <input
+                type="text"
+                value={bannerImage}
+                onChange={(e) => setBannerImage(e.target.value)}
+                placeholder="https://res.cloudinary.com/... or https://images.unsplash.com/..."
+                className="flex-1 w-full px-4 py-2.5 text-sm rounded-xl glass-input text-white placeholder-gray-500"
+              />
+              <button
+                type="button"
+                onClick={() => bannerFileInputRef.current?.click()}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl glass-card hover:bg-white/10 text-amber-400 border border-amber-500/30 text-xs font-semibold cursor-pointer"
+              >
+                <UploadCloud className="w-4 h-4" />
+                Upload Photo Instead
+              </button>
+            </div>
+          ) : !bannerImage ? (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDraggingBanner(true);
+              }}
+              onDragLeave={() => setIsDraggingBanner(false)}
+              onDrop={handleBannerDrop}
+              onClick={() => bannerFileInputRef.current?.click()}
+              className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
+                isDraggingBanner
+                  ? 'border-amber-400 bg-amber-500/10 shadow-lg shadow-amber-500/20'
+                  : 'border-white/15 hover:border-amber-500/50 hover:bg-white/5 bg-slate-950/40'
+              }`}
+            >
+              <input
+                ref={bannerFileInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleBannerUpload}
                 disabled={uploadingBanner}
                 className="hidden"
               />
-            </label>
-          </div>
 
-          {bannerImage && (
-            <div className="mt-3 relative h-40 w-full max-w-lg rounded-xl overflow-hidden border border-white/10 bg-slate-900">
-              <img src={bannerImage} alt="Banner Preview" className="w-full h-full object-cover" />
-              <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-gray-300">
-                Cover Photo Preview
+              <div className="flex flex-col items-center justify-center gap-2">
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                  <UploadCloud className={`w-6 h-6 ${uploadingBanner ? 'animate-bounce' : ''}`} />
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-white">
+                    {uploadingBanner ? 'Uploading directly to Cloudinary...' : 'Click to Upload Banner Image or Drag & Drop'}
+                  </h4>
+                  <p className="text-xs text-gray-400 mt-1">
+                    JPG, PNG, WEBP, GIF up to 10MB • Fast delivery via Cloudinary CDN
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={uploadingBanner}
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>{uploadingBanner ? 'Uploading...' : 'Choose Image File'}</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <input
+                ref={bannerFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleBannerUpload}
+                disabled={uploadingBanner}
+                className="hidden"
+              />
+
+              <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-slate-950 group">
+                <div className="relative h-48 w-full">
+                  <img
+                    src={bannerImage}
+                    alt="Banner Preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src =
+                        'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+                </div>
+
+                <div className="absolute top-3 right-3 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Cover Active
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setBannerImage('')}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-rose-300 hover:bg-rose-500/20 bg-rose-500/10 border border-rose-500/30 backdrop-blur-md transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Remove
+                  </button>
+                </div>
+
+                <div className="absolute bottom-3 left-3 right-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <p className="text-[11px] font-mono text-gray-300 truncate max-w-full sm:max-w-[70%] bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10">
+                    {bannerImage}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => bannerFileInputRef.current?.click()}
+                    disabled={uploadingBanner}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-lg shadow-amber-500/30 cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    <UploadCloud className="w-3.5 h-3.5" />
+                    <span>{uploadingBanner ? 'Uploading...' : 'Replace Photo'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

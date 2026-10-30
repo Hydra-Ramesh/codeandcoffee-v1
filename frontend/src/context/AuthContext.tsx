@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { fetchApi } from '../lib/api';
+import { fetchApi, clearApiCache } from '../lib/api';
 import { getSocket, joinUserRoom, leaveUserRoom, joinAdminRoom, leaveAdminRoom } from '../lib/socket';
 
 export interface User {
@@ -132,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (res.success && res.data) {
+      clearApiCache();
       localStorage.setItem('token', res.data.accessToken);
       setToken(res.data.accessToken);
       setUser(res.data.user);
@@ -147,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (res.success && res.data) {
+      clearApiCache();
       localStorage.setItem('token', res.data.accessToken);
       setToken(res.data.accessToken);
       setUser(res.data.user);
@@ -162,6 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (res.success && res.data) {
+      clearApiCache();
       localStorage.setItem('token', res.data.accessToken);
       setToken(res.data.accessToken);
       setUser(res.data.user);
@@ -176,6 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Non-fatal
     }
+    clearApiCache();
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
@@ -189,6 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setSessionFromToken = async (newToken: string) => {
+    clearApiCache();
     localStorage.setItem('token', newToken);
     setToken(newToken);
     const res = await fetchApi('/auth/me', {
