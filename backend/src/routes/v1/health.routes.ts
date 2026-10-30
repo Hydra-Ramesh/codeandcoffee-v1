@@ -52,9 +52,9 @@ router.get('/deep', async (req: Request, res: Response) => {
     };
   }
 
-  // 2. Redis Cache Ping (Throttled to at most once per 60s, using a single non-destructive command)
+  // 2. Redis Cache Ping (Throttled to at most once per 300s / 5min, using a single non-destructive command)
   const now = Date.now();
-  if (cachedRedisCheck && now - cachedRedisCheck.timestamp < 60000) {
+  if (cachedRedisCheck && now - cachedRedisCheck.timestamp < 300000) {
     checks.redis = cachedRedisCheck.result;
   } else {
     try {

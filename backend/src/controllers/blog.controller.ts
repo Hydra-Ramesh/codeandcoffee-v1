@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, BlogRevision } from '../config/database.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
-import { redisClient } from '../config/redis.js';
 import { queueNewBlogBroadcast } from '../config/queues.js';
 import { CacheService } from '../services/cache.service.js';
 import { ViewBufferService } from '../services/viewBuffer.service.js';
@@ -209,11 +208,9 @@ export class BlogController {
         console.warn('[ViewBuffer] Buffer error:', e.message)
       );
 
-      // Fetch live buffered count and active readers count
-      const [bufferedViews, activeReadersCount] = await Promise.all([
-        ViewBufferService.getBufferedViews(blog.id),
-        redisClient.scard(`blog:readers:${blog.id}`).catch(() => 0),
-      ]);
+      // Fetch live buffered count and active readers count (0 Redis commands consumed)
+      const bufferedViews = await ViewBufferService.getBufferedViews(blog.id);
+      const activeReadersCount = getActiveBlogReadersCount(blog.id);
 
       const totalViews = (blog.views || 0) + bufferedViews;
 
