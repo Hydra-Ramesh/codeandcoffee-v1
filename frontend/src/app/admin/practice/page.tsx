@@ -6,6 +6,8 @@ import { fetchApi } from '../../../lib/api';
 import AdminPracticeSkeleton from '../../../components/skeletons/AdminPracticeSkeleton';
 import AdminActivitySkeleton from '../../../components/skeletons/AdminActivitySkeleton';
 import Pagination from '../../../components/Pagination';
+import { useToast } from '../../../context/ToastContext';
+import WarningCardModal, { WarningDetail } from '../../../components/WarningCardModal';
 import {
   Code2,
   Plus,
@@ -145,6 +147,8 @@ export default function AdminPracticePage() {
   const [activityData, setActivityData] = useState<UserActivityData | null>(null);
   const [loadingActivity, setLoadingActivity] = useState(false);
 
+  const { toast } = useToast();
+
   // Add / Edit Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<PracticeQuestion | null>(null);
@@ -152,9 +156,23 @@ export default function AdminPracticePage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Delete confirmation
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  // Warning Confirmation Modal State
+  const [warningModal, setWarningModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    actionVerb?: string;
+    badgeText?: string;
+    variant?: 'danger' | 'warning' | 'success';
+    details?: WarningDetail[];
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: async () => {},
+  });
+  const [warningModalLoading, setWarningModalLoading] = useState(false);
 
   // Pagination State for Curriculum Management Table
   const [curriculumPage, setCurriculumPage] = useState(1);
@@ -263,89 +281,147 @@ export default function AdminPracticePage() {
 
     if (!formTitle.trim()) {
       setErrorMessage('Please enter a problem title.');
+      toast.warning('Please enter a problem title.');
       return;
     }
 
     if ((formSheetType === 'CRACK_THE_INTERVIEW' || formSheetType === 'SDE_SHEET') && !formTopic.trim()) {
       setErrorMessage('Topic is required for Crack the Interview & SDE Sheet.');
+      toast.warning('Topic is required for Crack the Interview & SDE Sheet.');
       return;
     }
 
     if (formSheetType === 'CP_SHEET' && (!formRating || isNaN(parseInt(formRating, 10)))) {
       setErrorMessage('A valid numerical rating (e.g. 800, 1000, 1200) is required for CP Sheet.');
+      toast.warning('A valid numerical rating is required for CP Sheet.');
       return;
     }
 
     if (formSheetType === 'CRACK_THE_INTERVIEW' && !formContent.trim() && !formExternalUrl.trim()) {
       setErrorMessage('Please provide either a Readme problem statement or a LeetCode / external URL (or both).');
+      toast.warning('Please provide a problem statement or external URL.');
+      return;
+    }
+
+    const payload = {
+      sheetType: formSheetType,
+      topic: formSheetType === 'CP_SHEET' ? null : (formTopic.trim() || 'General Practice'),
+      rating: formSheetType === 'CP_SHEET' ? parseInt(formRating, 10) : null,
+      platform: formPlatform === 'Other' ? (formCustomPlatform.trim() || 'Other') : formPlatform,
+      title: formTitle.trim(),
+      difficulty: formDifficulty,
+      content: formContent.trim() || null,
+      externalUrl: formExternalUrl.trim() || null,
+      order: parseInt(formOrder, 10) || 0,
+      isPublished: formIsPublished,
+    };
+
+    if (editingQuestion) {
+      setWarningModal({
+        isOpen: true,
+        title: 'Update Practice Question',
+        description: `Are you sure you want to update practice question "${payload.title}"? Changes will be immediately reflected across student practice sheets.`,
+        actionVerb: 'Confirm & Update',
+        variant: 'warning',
+        details: [
+          { label: 'Title', value: payload.title },
+          { label: 'Sheet Type', value: payload.sheetType },
+          { label: 'Difficulty', value: payload.difficulty },
+          { label: 'Platform', value: payload.platform },
+        ],
+        onConfirm: async () => {
+          setWarningModalLoading(true);
+          try {
+            const res = await fetchApi(`/practice/admin/question/${editingQuestion.id}`, {
+              method: 'PUT',
+              body: JSON.stringify(payload),
+            });
+            if (res.success) {
+              toast.success('Question updated successfully!');
+              setSuccessMessage('Question updated successfully!');
+              setIsModalOpen(false);
+              loadAllQuestions();
+              loadActivityData();
+              setTimeout(() => setSuccessMessage(''), 3000);
+              setWarningModal((m) => ({ ...m, isOpen: false }));
+            } else {
+              setErrorMessage(res.message || 'Operation failed');
+              toast.error(res.message || 'Failed to update question.');
+            }
+          } catch (err: any) {
+            setErrorMessage(err.message || 'An unexpected error occurred');
+            toast.error(err.message || 'An unexpected error occurred');
+          } finally {
+            setWarningModalLoading(false);
+          }
+        },
+      });
       return;
     }
 
     setSaving(true);
     try {
-      const payload = {
-        sheetType: formSheetType,
-        topic: formSheetType === 'CP_SHEET' ? null : (formTopic.trim() || 'General Practice'),
-        rating: formSheetType === 'CP_SHEET' ? parseInt(formRating, 10) : null,
-        platform: formPlatform === 'Other' ? (formCustomPlatform.trim() || 'Other') : formPlatform,
-        title: formTitle.trim(),
-        difficulty: formDifficulty,
-        content: formContent.trim() || null,
-        externalUrl: formExternalUrl.trim() || null,
-        order: parseInt(formOrder, 10) || 0,
-        isPublished: formIsPublished,
-      };
-
-      let res;
-      if (editingQuestion) {
-        res = await fetchApi(`/practice/admin/question/${editingQuestion.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
-      } else {
-        res = await fetchApi('/practice/admin/question', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-      }
+      const res = await fetchApi('/practice/admin/question', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
 
       if (res.success) {
-        setSuccessMessage(
-          editingQuestion ? 'Question updated successfully!' : 'New question added successfully!'
-        );
+        toast.success('New question added successfully!');
+        setSuccessMessage('New question added successfully!');
         setIsModalOpen(false);
         loadAllQuestions();
         loadActivityData();
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setErrorMessage(res.message || 'Operation failed');
+        toast.error(res.message || 'Failed to create question.');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'An unexpected error occurred');
+      toast.error(err.message || 'An unexpected error occurred');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!deleteId) return;
-    setDeleting(true);
-    try {
-      const res = await fetchApi(`/practice/admin/question/${deleteId}`, {
-        method: 'DELETE',
-      });
-      if (res.success) {
-        setSuccessMessage('Question deleted successfully');
-        setDeleteId(null);
-        loadAllQuestions();
-        loadActivityData();
-        setTimeout(() => setSuccessMessage(''), 3000);
-      }
-    } catch (err) {
-      console.error('Failed to delete question:', err);
-    } finally {
-      setDeleting(false);
-    }
+  const handleRequestDelete = (q: PracticeQuestion) => {
+    setWarningModal({
+      isOpen: true,
+      title: 'Delete Practice Question',
+      description: `Are you sure you want to permanently delete question "${q.title}"? This action cannot be undone and will remove all student solve logs and telemetry for this question.`,
+      actionVerb: 'Delete Question',
+      badgeText: 'Destructive Action',
+      variant: 'danger',
+      details: [
+        { label: 'Title', value: q.title },
+        { label: 'Sheet Type', value: q.sheetType },
+        { label: 'Difficulty', value: q.difficulty },
+        { label: 'Platform', value: q.platform || 'LeetCode' },
+      ],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        try {
+          const res = await fetchApi(`/practice/admin/question/${q.id}`, {
+            method: 'DELETE',
+          });
+          if (res.success) {
+            toast.success(`Question "${q.title}" deleted successfully.`);
+            setSuccessMessage('Question deleted successfully');
+            loadAllQuestions();
+            loadActivityData();
+            setTimeout(() => setSuccessMessage(''), 3000);
+            setWarningModal((m) => ({ ...m, isOpen: false }));
+          } else {
+            toast.error(res.message || 'Failed to delete question.');
+          }
+        } catch (err: any) {
+          toast.error(err.message || 'Failed to delete question.');
+        } finally {
+          setWarningModalLoading(false);
+        }
+      },
+    });
   };
 
   const formatRelativeTime = (dateStr: string | null) => {
@@ -643,7 +719,7 @@ export default function AdminPracticePage() {
                             </button>
 
                             <button
-                              onClick={() => setDeleteId(q.id)}
+                              onClick={() => handleRequestDelete(q)}
                               className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
                               title="Delete Question"
                             >
@@ -1345,38 +1421,20 @@ export default function AdminPracticePage() {
       )}
 
       {/* ============================================================ */}
-      {/* DELETE CONFIRMATION MODAL */}
+      {/* WARNING / CONFIRMATION MODAL */}
       {/* ============================================================ */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-sm glass-card rounded-2xl border border-red-500/30 p-6 text-center space-y-4 bg-slate-950/95 shadow-2xl">
-            <div className="w-12 h-12 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center mx-auto">
-              <Trash2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white">Delete Practice Question?</h3>
-              <p className="text-xs text-gray-400 mt-1">
-                This action is permanent and will remove user progress records for this question.
-              </p>
-            </div>
-            <div className="flex items-center justify-center gap-3 pt-2">
-              <button
-                onClick={() => setDeleteId(null)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                disabled={deleting}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/30 transition-all"
-              >
-                {deleting ? 'Deleting...' : 'Confirm Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <WarningCardModal
+        isOpen={warningModal.isOpen}
+        onClose={() => setWarningModal((m) => ({ ...m, isOpen: false }))}
+        onConfirm={warningModal.onConfirm}
+        title={warningModal.title}
+        description={warningModal.description}
+        actionVerb={warningModal.actionVerb}
+        badgeText={warningModal.badgeText}
+        variant={warningModal.variant}
+        details={warningModal.details}
+        confirmLoading={warningModalLoading}
+      />
     </div>
   );
 }

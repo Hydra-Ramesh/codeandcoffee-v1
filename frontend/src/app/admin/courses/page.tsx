@@ -32,6 +32,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { optimizeImageUrl } from '../../../lib/image';
 import AdminCoursesSkeleton from '../../../components/skeletons/AdminCoursesSkeleton';
+import WarningCardModal, { WarningDetail } from '../../../components/WarningCardModal';
 
 interface CourseItem {
   id: string;
@@ -121,6 +122,24 @@ export default function AdminCoursesPage() {
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
   const [uploadingCourseBanner, setUploadingCourseBanner] = useState(false);
 
+  // Warning Confirmation Modal State
+  const [warningModal, setWarningModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    actionVerb?: string;
+    badgeText?: string;
+    variant?: 'danger' | 'warning' | 'success';
+    details?: WarningDetail[];
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: async () => {},
+  });
+  const [warningModalLoading, setWarningModalLoading] = useState(false);
+
   const handleCourseBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -190,31 +209,52 @@ export default function AdminCoursesPage() {
 
   const handleTogglePublishCourse = async (course: CourseItem) => {
     const nextState = !course.isPublished;
-    const res = await fetchApi(`/courses/${course.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ isPublished: nextState }),
+    setWarningModal({
+      isOpen: true,
+      title: nextState ? 'Publish Course to Catalog' : 'Unpublish Course',
+      description: nextState
+        ? `Are you sure you want to publish "${course.title}"? It will become visible and accessible to all students in the syllabus catalog.`
+        : `Are you sure you want to unpublish "${course.title}"? It will be hidden from students and saved as a draft.`,
+      actionVerb: nextState ? 'Confirm & Publish' : 'Confirm & Unpublish',
+      variant: nextState ? 'success' : 'warning',
+      badgeText: nextState ? 'Publish Action' : 'Visibility Change',
+      details: [
+        { label: 'Course Title', value: course.title },
+        { label: 'Category', value: course.category },
+        { label: 'Level', value: course.level },
+      ],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        const res = await fetchApi(`/courses/${course.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ isPublished: nextState }),
+        });
+        if (res.success) {
+          setCourses((prev) =>
+            prev.map((c) => (c.id === course.id ? { ...c, isPublished: nextState } : c))
+          );
+          success(
+            nextState
+              ? `Published "${course.title}" to student catalog!`
+              : `Unpublished "${course.title}" (saved as draft).`
+          );
+          setWarningModal((m) => ({ ...m, isOpen: false }));
+        } else {
+          toastError(res.message || 'Failed to update course publication status.');
+        }
+        setWarningModalLoading(false);
+      },
     });
-    if (res.success) {
-      setCourses((prev) =>
-        prev.map((c) => (c.id === course.id ? { ...c, isPublished: nextState } : c))
-      );
-      success(
-        nextState
-          ? `Published "${course.title}" to student catalog!`
-          : `Unpublished "${course.title}" (saved as draft).`
-      );
-    } else {
-      toastError(res.message || 'Failed to update course publication status.');
-    }
   };
 
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourse.title.trim()) {
-      alert('Course title is required.');
+      toastError('Course title is required.');
       return;
     }
     setSavingCourse(true);
+    const courseTitle = newCourse.title.trim();
     const res = await fetchApi('/courses', {
       method: 'POST',
       body: JSON.stringify(newCourse),
@@ -229,25 +269,50 @@ export default function AdminCoursesPage() {
         bannerImage: '',
         isPublished: true,
       });
+      success(`Course "${courseTitle}" created successfully!`);
       loadCourses();
     } else {
-      alert(res.message || 'Failed to create course.');
+      toastError(res.message || 'Failed to create course.');
     }
     setSavingCourse(false);
   };
 
   const handleDeleteCourse = async (courseId: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete course "${title}" and all its topics, subtopics, and quizzes?`)) {
-      return;
-    }
-    const res = await fetchApi(`/courses/${courseId}`, {
-      method: 'DELETE',
+    const course = courses.find((c) => c.id === courseId);
+    setWarningModal({
+      isOpen: true,
+      title: 'Delete Entire Course',
+      description: `Are you sure you want to permanently delete course "${title}"? All its topics, subtopics, lessons, and quizzes will be completely removed. This action cannot be undone.`,
+      actionVerb: 'Delete Course',
+      badgeText: 'Destructive Action',
+      variant: 'danger',
+      details: [
+        { label: 'Course Title', value: title },
+        ...(course
+          ? [
+              { label: 'Category', value: course.category },
+              {
+                label: 'Curriculum Scope',
+                value: `${course.topicsCount} Modules • ${course.lessonsCount} Lessons • ${course.quizzesCount} Quizzes`,
+              },
+            ]
+          : []),
+      ],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        const res = await fetchApi(`/courses/${courseId}`, {
+          method: 'DELETE',
+        });
+        if (res.success) {
+          setCourses((prev) => prev.filter((c) => c.id !== courseId));
+          success(`Course "${title}" has been permanently deleted.`);
+          setWarningModal((m) => ({ ...m, isOpen: false }));
+        } else {
+          toastError(res.message || 'Failed to delete course.');
+        }
+        setWarningModalLoading(false);
+      },
     });
-    if (res.success) {
-      setCourses((prev) => prev.filter((c) => c.id !== courseId));
-    } else {
-      alert(res.message || 'Failed to delete course.');
-    }
   };
 
   const openTelemetry = async (courseId: string) => {
@@ -258,7 +323,7 @@ export default function AdminCoursesPage() {
     if (res.success && res.data) {
       setTelemetryData(res.data);
     } else {
-      alert(res.message || 'Failed to fetch course student telemetry.');
+      toastError(res.message || 'Failed to fetch course student telemetry.');
     }
     setLoadingTelemetry(false);
   };
@@ -763,6 +828,20 @@ export default function AdminCoursesPage() {
           </div>
         </div>
       )}
+
+      {/* Warning Confirmation Modal */}
+      <WarningCardModal
+        isOpen={warningModal.isOpen}
+        onClose={() => setWarningModal((m) => ({ ...m, isOpen: false }))}
+        onConfirm={warningModal.onConfirm}
+        title={warningModal.title}
+        description={warningModal.description}
+        actionVerb={warningModal.actionVerb}
+        badgeText={warningModal.badgeText}
+        variant={warningModal.variant}
+        details={warningModal.details}
+        confirmLoading={warningModalLoading}
+      />
     </div>
   );
 }

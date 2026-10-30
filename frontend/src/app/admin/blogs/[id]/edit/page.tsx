@@ -8,6 +8,7 @@ import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import EditorSkeleton from '../../../../../components/skeletons/EditorSkeleton';
 import { useToast } from '../../../../../context/ToastContext';
+import WarningCardModal from '../../../../../components/WarningCardModal';
 
 const MarkdownEditor = dynamic(() => import('../../../../../components/MarkdownEditor'), {
   ssr: false,
@@ -34,6 +35,7 @@ export default function EditBlogPage() {
   const [isPublished, setIsPublished] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [warningModalOpen, setWarningModalOpen] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export default function EditBlogPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     const safeTitle = (title || '').trim();
     const safeContent = (content || '').trim();
 
@@ -100,6 +102,10 @@ export default function EditBlogPage() {
       return;
     }
 
+    setWarningModalOpen(true);
+  };
+
+  const executeSaveArticle = async () => {
     setSaving(true);
     const tagArray = tags.split(',').map((t) => t.trim()).filter(Boolean);
 
@@ -118,6 +124,7 @@ export default function EditBlogPage() {
 
     if (res.success) {
       toast.success('Article updated successfully!');
+      setWarningModalOpen(false);
       setTimeout(() => {
         router.push('/admin/blogs');
       }, 700);
@@ -172,6 +179,23 @@ export default function EditBlogPage() {
         setIsPublished={setIsPublished}
         onSave={handleSave}
         saving={saving}
+      />
+
+      {/* Warning Confirmation Modal */}
+      <WarningCardModal
+        isOpen={warningModalOpen}
+        onClose={() => setWarningModalOpen(false)}
+        onConfirm={executeSaveArticle}
+        confirmLoading={saving}
+        title="Update Blog Article"
+        description="Are you sure you want to update this article? All modifications and banner updates will be immediately published to live reader feeds."
+        actionVerb="Confirm & Update"
+        variant="warning"
+        details={[
+          { label: 'Article Title', value: title || 'Untitled' },
+          { label: 'Category', value: category },
+          { label: 'Visibility', value: isPublished ? 'Public' : 'Draft' },
+        ]}
       />
     </div>
   );

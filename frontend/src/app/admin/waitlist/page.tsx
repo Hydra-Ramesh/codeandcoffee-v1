@@ -32,6 +32,7 @@ import { fetchApi } from '../../../lib/api';
 import { getSocket } from '../../../lib/socket';
 import { useToast } from '../../../context/ToastContext';
 import AdminTableSkeleton from '../../../components/skeletons/AdminTableSkeleton';
+import WarningCardModal from '../../../components/WarningCardModal';
 
 interface WaitlistEntry {
   id: string;
@@ -74,6 +75,24 @@ export default function AdminWaitlistPage() {
 
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+
+  // Warning Confirmation Modal State
+  const [warningModal, setWarningModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    actionVerb?: string;
+    badgeText?: string;
+    variant?: 'danger' | 'warning' | 'success';
+    details?: { label: string; value: string }[];
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: async () => {},
+  });
+  const [warningModalLoading, setWarningModalLoading] = useState(false);
 
   useEffect(() => {
     loadWaitlistData();
@@ -179,23 +198,35 @@ export default function AdminWaitlistPage() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to remove ${name} from the early access waitlist?`)) {
-      return;
-    }
-
-    try {
-      const res = await fetchApi(`/waitlist/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (res.success) {
-        toast.info(`${name} has been removed from the waitlist.`);
-        loadWaitlistData();
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Could not remove entry.');
-    }
+  const handleDelete = (id: string, name: string) => {
+    setWarningModal({
+      isOpen: true,
+      title: 'Remove from Waitlist',
+      description: `Are you sure you want to remove ${name} from the early access waitlist?`,
+      actionVerb: 'Remove User',
+      badgeText: 'Waitlist Removal',
+      variant: 'danger',
+      details: [{ label: 'Learner Name', value: name }],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        try {
+          const res = await fetchApi(`/waitlist/${id}`, {
+            method: 'DELETE',
+          });
+          if (res.success) {
+            toast.success(`${name} has been removed from the waitlist.`);
+            loadWaitlistData();
+            setWarningModal((m) => ({ ...m, isOpen: false }));
+          } else {
+            toast.error(res.message || 'Could not remove entry.');
+          }
+        } catch (err: any) {
+          toast.error(err.message || 'Could not remove entry.');
+        } finally {
+          setWarningModalLoading(false);
+        }
+      },
+    });
   };
 
   const handleCopyEmail = (email: string) => {
@@ -553,6 +584,20 @@ export default function AdminWaitlistPage() {
           </div>
         )}
       </div>
+
+      {/* Warning Confirmation Modal */}
+      <WarningCardModal
+        isOpen={warningModal.isOpen}
+        onClose={() => setWarningModal((m) => ({ ...m, isOpen: false }))}
+        onConfirm={warningModal.onConfirm}
+        title={warningModal.title}
+        description={warningModal.description}
+        actionVerb={warningModal.actionVerb}
+        badgeText={warningModal.badgeText}
+        variant={warningModal.variant}
+        details={warningModal.details}
+        confirmLoading={warningModalLoading}
+      />
     </div>
   );
 }

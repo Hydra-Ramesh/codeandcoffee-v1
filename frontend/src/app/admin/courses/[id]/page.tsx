@@ -38,6 +38,7 @@ import { getSocket } from '../../../../lib/socket';
 import { useAuth } from '../../../../context/AuthContext';
 import { useToast } from '../../../../context/ToastContext';
 import AdminCurriculumBuilderSkeleton from '../../../../components/skeletons/AdminCurriculumBuilderSkeleton';
+import WarningCardModal, { WarningDetail } from '../../../../components/WarningCardModal';
 
 interface QuizQuestionForm {
   id: string;
@@ -161,6 +162,24 @@ export default function CourseCurriculumBuilderPage() {
   // Active Tab in Subtopic Modal: 'CONTENT' | 'ATTACHMENTS' | 'PRACTICE' | 'QUIZ'
   const [activeSubtopicTab, setActiveSubtopicTab] = useState<'CONTENT' | 'ATTACHMENTS' | 'PRACTICE' | 'QUIZ'>('CONTENT');
 
+  // Warning Confirmation Modal State
+  const [warningModal, setWarningModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    actionVerb?: string;
+    badgeText?: string;
+    variant?: 'danger' | 'warning' | 'success';
+    details?: WarningDetail[];
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: async () => {},
+  });
+  const [warningModalLoading, setWarningModalLoading] = useState(false);
+
   useEffect(() => {
     if (courseId) {
       loadCourse();
@@ -204,79 +223,121 @@ export default function CourseCurriculumBuilderPage() {
   const handleTogglePublishCourse = async () => {
     if (!course) return;
     const nextState = !course.isPublished;
-    const res = await fetchApi(`/courses/${course.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ isPublished: nextState }),
+    setWarningModal({
+      isOpen: true,
+      title: nextState ? 'Publish Course to Catalog' : 'Unpublish Course',
+      description: nextState
+        ? `Are you sure you want to publish "${course.title}"? Students will immediately be able to view and enroll in this course syllabus.`
+        : `Are you sure you want to unpublish "${course.title}"? It will be hidden from students and saved as a draft.`,
+      actionVerb: nextState ? 'Confirm & Publish' : 'Confirm & Unpublish',
+      variant: nextState ? 'success' : 'warning',
+      badgeText: nextState ? 'Publish Action' : 'Visibility Change',
+      details: [{ label: 'Course Title', value: course.title }],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        const res = await fetchApi(`/courses/${course.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ isPublished: nextState }),
+        });
+        if (res.success) {
+          setCourse((prev) => (prev ? { ...prev, isPublished: nextState } : null));
+          success(
+            nextState
+              ? `Published course "${course.title}" to student catalog!`
+              : `Unpublished course "${course.title}" (saved as draft).`
+          );
+          setWarningModal((m) => ({ ...m, isOpen: false }));
+        } else {
+          toastError(res.message || 'Failed to update course publication status.');
+        }
+        setWarningModalLoading(false);
+      },
     });
-    if (res.success) {
-      setCourse((prev) => (prev ? { ...prev, isPublished: nextState } : null));
-      success(
-        nextState
-          ? `Published course "${course.title}" to student catalog!`
-          : `Unpublished course "${course.title}" (saved as draft).`
-      );
-    } else {
-      toastError(res.message || 'Failed to update course publication status.');
-    }
   };
 
   // Topic (Module) Handlers
   const handleTogglePublishTopic = async (topic: TopicView) => {
     const nextState = topic.isPublished === false;
-    const res = await fetchApi(`/courses/topics/${topic.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ isPublished: nextState }),
+    setWarningModal({
+      isOpen: true,
+      title: nextState ? 'Publish Module Topic' : 'Unpublish Module Topic',
+      description: `Are you sure you want to ${nextState ? 'publish' : 'unpublish'} topic "${topic.title}"?`,
+      actionVerb: nextState ? 'Publish Topic' : 'Unpublish Topic',
+      variant: nextState ? 'success' : 'warning',
+      details: [{ label: 'Topic Title', value: topic.title }],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        const res = await fetchApi(`/courses/topics/${topic.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ isPublished: nextState }),
+        });
+        if (res.success) {
+          setCourse((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              topics: prev.topics.map((t) =>
+                t.id === topic.id ? { ...t, isPublished: nextState } : t
+              ),
+            };
+          });
+          success(
+            nextState
+              ? `Published module "${topic.title}"`
+              : `Unpublished module "${topic.title}" (saved as draft)`
+          );
+          setWarningModal((m) => ({ ...m, isOpen: false }));
+        } else {
+          toastError(res.message || 'Failed to update module publication status.');
+        }
+        setWarningModalLoading(false);
+      },
     });
-    if (res.success) {
-      setCourse((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          topics: prev.topics.map((t) =>
-            t.id === topic.id ? { ...t, isPublished: nextState } : t
-          ),
-        };
-      });
-      success(
-        nextState
-          ? `Published module "${topic.title}"`
-          : `Unpublished module "${topic.title}" (saved as draft)`
-      );
-    } else {
-      toastError(res.message || 'Failed to update module publication status.');
-    }
   };
 
   const handleTogglePublishSubtopic = async (topicId: string, sub: SubtopicView) => {
     const nextState = sub.isPublished === false;
-    const res = await fetchApi(`/courses/subtopics/${sub.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ isPublished: nextState }),
-    });
-    if (res.success) {
-      setCourse((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          topics: prev.topics.map((t) => {
-            if (t.id !== topicId) return t;
+    setWarningModal({
+      isOpen: true,
+      title: nextState ? 'Publish Lesson' : 'Unpublish Lesson',
+      description: `Are you sure you want to ${nextState ? 'publish' : 'unpublish'} lesson "${sub.title}"?`,
+      actionVerb: nextState ? 'Publish Lesson' : 'Unpublish Lesson',
+      variant: nextState ? 'success' : 'warning',
+      details: [{ label: 'Lesson Title', value: sub.title }],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        const res = await fetchApi(`/courses/subtopics/${sub.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ isPublished: nextState }),
+        });
+        if (res.success) {
+          setCourse((prev) => {
+            if (!prev) return null;
             return {
-              ...t,
-              subtopics: t.subtopics.map((s) =>
-                s.id === sub.id ? { ...s, isPublished: nextState } : s
-              ),
+              ...prev,
+              topics: prev.topics.map((t) => {
+                if (t.id !== topicId) return t;
+                return {
+                  ...t,
+                  subtopics: t.subtopics.map((s) =>
+                    s.id === sub.id ? { ...s, isPublished: nextState } : s
+                  ),
+                };
+              }),
             };
-          }),
-        };
-      });
-      success(
-        nextState
-          ? `Published lesson "${sub.title}"`
-          : `Unpublished lesson "${sub.title}" (saved as draft)`
-      );
-    } else {
-      toastError(res.message || 'Failed to update lesson publication status.');
-    }
+          });
+          success(
+            nextState
+              ? `Published lesson "${sub.title}"`
+              : `Unpublished lesson "${sub.title}" (saved as draft)`
+          );
+          setWarningModal((m) => ({ ...m, isOpen: false }));
+        } else {
+          toastError(res.message || 'Failed to update lesson publication status.');
+        }
+        setWarningModalLoading(false);
+      },
+    });
   };
 
   const openNewTopicModal = () => {
@@ -297,45 +358,81 @@ export default function CourseCurriculumBuilderPage() {
 
   const handleSaveTopic = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!topicForm.title.trim()) return;
+    if (!topicForm.title.trim()) {
+      toastError('Topic title is required.');
+      return;
+    }
+
+    if (editingTopicId) {
+      setWarningModal({
+        isOpen: true,
+        title: 'Update Topic Curriculum',
+        description: `Are you sure you want to update topic "${topicForm.title}"? Changes will be immediately reflected in the course syllabus.`,
+        actionVerb: 'Confirm & Update',
+        variant: 'warning',
+        details: [
+          { label: 'Topic Title', value: topicForm.title },
+          { label: 'Visibility', value: topicForm.isPublished ? 'Published' : 'Draft' },
+        ],
+        onConfirm: async () => {
+          setWarningModalLoading(true);
+          const res = await fetchApi(`/courses/topics/${editingTopicId}`, {
+            method: 'PUT',
+            body: JSON.stringify(topicForm),
+          });
+          if (res.success) {
+            setTopicModalOpen(false);
+            loadCourse();
+            success(`Topic "${topicForm.title}" updated successfully!`);
+            setWarningModal((m) => ({ ...m, isOpen: false }));
+          } else {
+            toastError(res.message || 'Failed to update topic.');
+          }
+          setWarningModalLoading(false);
+        },
+      });
+      return;
+    }
 
     setSavingTopic(true);
-    if (editingTopicId) {
-      const res = await fetchApi(`/courses/topics/${editingTopicId}`, {
-        method: 'PUT',
-        body: JSON.stringify(topicForm),
-      });
-      if (res.success) {
-        setTopicModalOpen(false);
-        loadCourse();
-      } else {
-        alert(res.message || 'Failed to update topic.');
-      }
+    const res = await fetchApi(`/courses/${courseId}/topics`, {
+      method: 'POST',
+      body: JSON.stringify(topicForm),
+    });
+    if (res.success) {
+      setTopicModalOpen(false);
+      loadCourse();
+      success(`Topic "${topicForm.title}" created successfully!`);
     } else {
-      const res = await fetchApi(`/courses/${courseId}/topics`, {
-        method: 'POST',
-        body: JSON.stringify(topicForm),
-      });
-      if (res.success) {
-        setTopicModalOpen(false);
-        loadCourse();
-      } else {
-        alert(res.message || 'Failed to create topic.');
-      }
+      toastError(res.message || 'Failed to create topic.');
     }
     setSavingTopic(false);
   };
 
   const handleDeleteTopic = async (topicId: string, title: string) => {
-    if (!confirm(`Delete topic "${title}" and all its lessons?`)) return;
-    const res = await fetchApi(`/courses/topics/${topicId}`, {
-      method: 'DELETE',
+    setWarningModal({
+      isOpen: true,
+      title: 'Delete Topic & Lessons',
+      description: `Are you sure you want to permanently delete topic "${title}"? All lessons, quizzes, and coding challenges inside this topic will be permanently deleted.`,
+      actionVerb: 'Delete Topic',
+      badgeText: 'Destructive Action',
+      variant: 'danger',
+      details: [{ label: 'Topic Title', value: title }],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        const res = await fetchApi(`/courses/topics/${topicId}`, {
+          method: 'DELETE',
+        });
+        if (res.success) {
+          loadCourse();
+          success(`Topic "${title}" and all its lessons deleted.`);
+          setWarningModal((m) => ({ ...m, isOpen: false }));
+        } else {
+          toastError(res.message || 'Failed to delete topic.');
+        }
+        setWarningModalLoading(false);
+      },
     });
-    if (res.success) {
-      loadCourse();
-    } else {
-      alert(res.message || 'Failed to delete topic.');
-    }
   };
 
   // Subtopic Handlers
@@ -423,23 +520,51 @@ export default function CourseCurriculumBuilderPage() {
   const handleSaveSubtopic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subtopicForm.title.trim()) {
-      alert('Lesson title is required.');
+      toastError('Lesson title is required.');
       return;
     }
 
-    setSavingSubtopic(true);
     if (editingSubtopicId) {
-      const res = await fetchApi(`/courses/subtopics/${editingSubtopicId}`, {
-        method: 'PUT',
-        body: JSON.stringify(subtopicForm),
+      setWarningModal({
+        isOpen: true,
+        title: 'Update Lesson & Syllabus',
+        description: `Are you sure you want to update lesson "${subtopicForm.title}"? All markdown explanations, quizzes, and practice coding challenges will be saved and visible to students.`,
+        actionVerb: 'Confirm & Update',
+        variant: 'warning',
+        details: [
+          { label: 'Lesson Title', value: subtopicForm.title },
+          {
+            label: 'Quiz Questions',
+            value: `${subtopicForm.quizData.length} Question${subtopicForm.quizData.length === 1 ? '' : 's'}`,
+          },
+          {
+            label: 'Coding Challenges',
+            value: `${subtopicForm.codingQuestions.length} Challenge${subtopicForm.codingQuestions.length === 1 ? '' : 's'}`,
+          },
+          { label: 'Visibility', value: subtopicForm.isPublished ? 'Published' : 'Draft' },
+        ],
+        onConfirm: async () => {
+          setWarningModalLoading(true);
+          const res = await fetchApi(`/courses/subtopics/${editingSubtopicId}`, {
+            method: 'PUT',
+            body: JSON.stringify(subtopicForm),
+          });
+          if (res.success) {
+            setSubtopicModalOpen(false);
+            loadCourse();
+            success(`Lesson "${subtopicForm.title}" updated successfully!`);
+            setWarningModal((m) => ({ ...m, isOpen: false }));
+          } else {
+            toastError(res.message || 'Failed to update lesson.');
+          }
+          setWarningModalLoading(false);
+        },
       });
-      if (res.success) {
-        setSubtopicModalOpen(false);
-        loadCourse();
-      } else {
-        alert(res.message || 'Failed to update lesson.');
-      }
-    } else if (activeTopicId) {
+      return;
+    }
+
+    if (activeTopicId) {
+      setSavingSubtopic(true);
       const res = await fetchApi(`/courses/${activeTopicId}/subtopics`, {
         method: 'POST',
         body: JSON.stringify(subtopicForm),
@@ -447,23 +572,38 @@ export default function CourseCurriculumBuilderPage() {
       if (res.success) {
         setSubtopicModalOpen(false);
         loadCourse();
+        success(`Lesson "${subtopicForm.title}" created successfully!`);
       } else {
-        alert(res.message || 'Failed to create lesson.');
+        toastError(res.message || 'Failed to create lesson.');
       }
+      setSavingSubtopic(false);
     }
-    setSavingSubtopic(false);
   };
 
   const handleDeleteSubtopic = async (subtopicId: string, title: string) => {
-    if (!confirm(`Delete lesson "${title}"?`)) return;
-    const res = await fetchApi(`/courses/subtopics/${subtopicId}`, {
-      method: 'DELETE',
+    setWarningModal({
+      isOpen: true,
+      title: 'Delete Lesson',
+      description: `Are you sure you want to delete lesson "${title}"? All curriculum content, markdown codeblocks, quizzes, and practice challenges will be permanently lost.`,
+      actionVerb: 'Delete Lesson',
+      badgeText: 'Destructive Action',
+      variant: 'danger',
+      details: [{ label: 'Lesson Title', value: title }],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        const res = await fetchApi(`/courses/subtopics/${subtopicId}`, {
+          method: 'DELETE',
+        });
+        if (res.success) {
+          loadCourse();
+          success(`Lesson "${title}" deleted successfully.`);
+          setWarningModal((m) => ({ ...m, isOpen: false }));
+        } else {
+          toastError(res.message || 'Failed to delete lesson.');
+        }
+        setWarningModalLoading(false);
+      },
     });
-    if (res.success) {
-      loadCourse();
-    } else {
-      alert(res.message || 'Failed to delete lesson.');
-    }
   };
 
   // Cloudinary Attachment Upload & Insertion
@@ -560,12 +700,30 @@ export default function CourseCurriculumBuilderPage() {
       ...subtopicForm,
       codingQuestions: [...subtopicForm.codingQuestions, newQ],
     });
+    success('Added new coding challenge.');
   };
 
   const handleRemoveCodingQuestion = (idx: number) => {
-    setSubtopicForm({
-      ...subtopicForm,
-      codingQuestions: subtopicForm.codingQuestions.filter((_, i) => i !== idx),
+    const cq = subtopicForm.codingQuestions[idx];
+    setWarningModal({
+      isOpen: true,
+      title: 'Remove Coding Challenge',
+      description: `Are you sure you want to remove practice challenge "${cq?.title || 'Practice Challenge'}" from this lesson?`,
+      actionVerb: 'Remove Challenge',
+      variant: 'danger',
+      badgeText: 'Challenge Removal',
+      details: [
+        { label: 'Title', value: cq?.title || 'Practice Challenge' },
+        { label: 'Platform', value: cq?.platform || 'Self-created' },
+      ],
+      onConfirm: async () => {
+        setSubtopicForm((prev) => ({
+          ...prev,
+          codingQuestions: prev.codingQuestions.filter((_, i) => i !== idx),
+        }));
+        success('Practice coding challenge removed.');
+        setWarningModal((m) => ({ ...m, isOpen: false }));
+      },
     });
   };
 
@@ -600,12 +758,30 @@ export default function CourseCurriculumBuilderPage() {
       ...subtopicForm,
       quizData: [...subtopicForm.quizData, newQ],
     });
+    success('Added new quiz question.');
   };
 
   const handleRemoveQuizQuestion = (idx: number) => {
-    setSubtopicForm({
-      ...subtopicForm,
-      quizData: subtopicForm.quizData.filter((_, i) => i !== idx),
+    const q = subtopicForm.quizData[idx];
+    setWarningModal({
+      isOpen: true,
+      title: 'Remove Quiz Question',
+      description: `Are you sure you want to remove quiz question #${idx + 1}?`,
+      actionVerb: 'Remove Question',
+      variant: 'danger',
+      badgeText: 'Quiz Removal',
+      details: [
+        { label: 'Question Number', value: `#${idx + 1}` },
+        { label: 'Question Text', value: q?.questionText || 'Quiz Question' },
+      ],
+      onConfirm: async () => {
+        setSubtopicForm((prev) => ({
+          ...prev,
+          quizData: prev.quizData.filter((_, i) => i !== idx),
+        }));
+        success(`Removed quiz question #${idx + 1}.`);
+        setWarningModal((m) => ({ ...m, isOpen: false }));
+      },
     });
   };
 
@@ -1771,6 +1947,20 @@ export default function CourseCurriculumBuilderPage() {
           </div>
         </div>
       )}
+
+      {/* Warning Confirmation Modal */}
+      <WarningCardModal
+        isOpen={warningModal.isOpen}
+        onClose={() => setWarningModal((m) => ({ ...m, isOpen: false }))}
+        onConfirm={warningModal.onConfirm}
+        title={warningModal.title}
+        description={warningModal.description}
+        actionVerb={warningModal.actionVerb}
+        badgeText={warningModal.badgeText}
+        variant={warningModal.variant}
+        details={warningModal.details}
+        confirmLoading={warningModalLoading}
+      />
     </div>
   );
 }
