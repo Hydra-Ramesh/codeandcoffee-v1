@@ -988,10 +988,20 @@ export async function updateCourse(req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
+    let slug = course.slug;
+    if (title && typeof title === 'string' && title.trim() !== course.title) {
+      const baseSlug = slugify(title.trim());
+      const existing = await prisma.course.findFirst({
+        where: { slug: baseSlug, NOT: { id } },
+      });
+      slug = existing ? `${baseSlug}-${Date.now().toString().slice(-4)}` : baseSlug;
+    }
+
     const updated = await prisma.course.update({
       where: { id },
       data: {
         title: title ?? course.title,
+        slug,
         description: description ?? course.description,
         category: category ?? course.category,
         bannerImage: bannerImage !== undefined ? bannerImage : course.bannerImage,

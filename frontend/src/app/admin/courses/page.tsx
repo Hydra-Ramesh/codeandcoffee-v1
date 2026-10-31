@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Layers,
@@ -115,6 +115,21 @@ export default function AdminCoursesPage() {
     isPublished: true,
   });
 
+  // Edit Course Modal State
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
+  const [editCourseForm, setEditCourseForm] = useState({
+    title: '',
+    description: '',
+    category: 'Programming Languages',
+    level: 'INTERMEDIATE',
+    bannerImage: '',
+    isPublished: true,
+  });
+  const [savingEditCourse, setSavingEditCourse] = useState(false);
+  const [uploadingEditBanner, setUploadingEditBanner] = useState(false);
+  const editBannerFileInputRef = useRef<HTMLInputElement>(null);
+
   // Telemetry Modal State
   const [telemetryModalOpen, setTelemetryModalOpen] = useState(false);
   const [selectedCourseForTelemetry, setSelectedCourseForTelemetry] = useState<string | null>(null);
@@ -166,6 +181,88 @@ export default function AdminCoursesPage() {
       e.target.value = '';
       setUploadingCourseBanner(false);
     }
+  };
+
+  const handleEditCourseBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingEditBanner(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetchApi('/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.success && res.data?.url) {
+        setEditCourseForm((prev) => ({ ...prev, bannerImage: res.data.url }));
+        toast.success('Course banner uploaded to Cloudinary successfully!');
+      } else {
+        toast.error(res.message || 'Image upload failed.');
+      }
+    } catch {
+      toast.error('Network error uploading banner.');
+    } finally {
+      e.target.value = '';
+      setUploadingEditBanner(false);
+    }
+  };
+
+  const openEditCourseModal = (course: CourseItem) => {
+    setEditingCourseId(course.id);
+    setEditCourseForm({
+      title: course.title,
+      description: course.description || '',
+      category: course.category || 'Programming Languages',
+      level: course.level || 'INTERMEDIATE',
+      bannerImage: course.bannerImage || '',
+      isPublished: course.isPublished !== false,
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleSaveEditedCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCourseForm.title.trim()) {
+      toastError('Course title is required.');
+      return;
+    }
+    if (!editingCourseId) return;
+
+    setWarningModal({
+      isOpen: true,
+      title: 'Update Course Details',
+      description: `Are you sure you want to update course "${editCourseForm.title}"? Changes will be immediately reflected in the public course catalog.`,
+      actionVerb: 'Confirm & Save Changes',
+      variant: 'warning',
+      badgeText: 'Course Modification',
+      details: [
+        { label: 'Course Title', value: editCourseForm.title },
+        { label: 'Category', value: editCourseForm.category },
+        { label: 'Level', value: editCourseForm.level },
+        { label: 'Cover Banner', value: editCourseForm.bannerImage ? 'Configured' : 'None' },
+        { label: 'Visibility', value: editCourseForm.isPublished ? 'Published' : 'Draft' },
+      ],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        const res = await fetchApi(`/courses/${editingCourseId}`, {
+          method: 'PUT',
+          body: JSON.stringify(editCourseForm),
+        });
+        if (res.success) {
+          setEditModalOpen(false);
+          loadCourses();
+          success(`Course "${editCourseForm.title}" updated successfully!`);
+          setWarningModal((m) => ({ ...m, isOpen: false }));
+        } else {
+          toastError(res.message || 'Failed to update course.');
+        }
+        setWarningModalLoading(false);
+      },
+    });
   };
 
   useEffect(() => {
@@ -666,6 +763,177 @@ export default function AdminCoursesPage() {
                   className="px-5 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 disabled:opacity-50"
                 >
                   {savingCourse ? 'Creating...' : 'Create Course'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Course Details */}
+      {editModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-lg w-full glass-card rounded-3xl border border-white/20 p-6 space-y-5 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Edit className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">Edit Course Details &amp; Banner</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(false)}
+                className="p-1 text-gray-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedCourse} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                  Course Title <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editCourseForm.title}
+                  onChange={(e) => setEditCourseForm({ ...editCourseForm, title: e.target.value })}
+                  placeholder="e.g. Master Modern C++: Low-Level to Architecture"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={editCourseForm.description}
+                  onChange={(e) => setEditCourseForm({ ...editCourseForm, description: e.target.value })}
+                  placeholder="Deep-dive into memory architectures, pointers, RAII, and high-performance algorithms..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                    Category
+                  </label>
+                  <select
+                    value={editCourseForm.category}
+                    onChange={(e) => setEditCourseForm({ ...editCourseForm, category: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Programming Languages">Programming Languages</option>
+                    <option value="System Design">System Design</option>
+                    <option value="Backend">Backend</option>
+                    <option value="Algorithms & DSA">Algorithms &amp; DSA</option>
+                    <option value="Web Engineering">Web Engineering</option>
+                    <option value="DevOps & Cloud">DevOps &amp; Cloud</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                    Proficiency Level
+                  </label>
+                  <select
+                    value={editCourseForm.level}
+                    onChange={(e) => setEditCourseForm({ ...editCourseForm, level: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="BEGINNER">BEGINNER</option>
+                    <option value="INTERMEDIATE">INTERMEDIATE</option>
+                    <option value="ADVANCED">ADVANCED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-300">
+                    Cover Banner Photo (Cloudinary CDN)
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 cursor-pointer font-medium">
+                    <UploadCloud className="w-3.5 h-3.5" />
+                    <span>{uploadingEditBanner ? 'Uploading to Cloudinary...' : 'Upload Photo'}</span>
+                    <input
+                      ref={editBannerFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleEditCourseBannerUpload}
+                      disabled={uploadingEditBanner}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <input
+                  type="url"
+                  value={editCourseForm.bannerImage}
+                  onChange={(e) => setEditCourseForm({ ...editCourseForm, bannerImage: e.target.value })}
+                  placeholder="https://res.cloudinary.com/... or click Upload Photo"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                />
+                {editCourseForm.bannerImage && (
+                  <div className="mt-2 relative h-32 w-full rounded-xl overflow-hidden border border-white/10 bg-slate-950 group">
+                    <img
+                      src={editCourseForm.bannerImage}
+                      alt="Banner Preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src =
+                          'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => editBannerFileInputRef.current?.click()}
+                        className="px-3 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold text-xs cursor-pointer"
+                      >
+                        Change Photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditCourseForm({ ...editCourseForm, bannerImage: '' })}
+                        className="px-3 py-1 rounded-lg bg-red-500 text-white font-bold text-xs cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="editCoursePublished"
+                  checked={editCourseForm.isPublished}
+                  onChange={(e) => setEditCourseForm({ ...editCourseForm, isPublished: e.target.checked })}
+                  className="rounded text-amber-500 focus:ring-amber-500 bg-slate-900 border-white/20"
+                />
+                <label htmlFor="editCoursePublished" className="text-xs text-gray-300 cursor-pointer select-none">
+                  Published (accessible to learners in the Read catalog)
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(false)}
+                  className="px-4 py-2 rounded-xl glass-card text-xs text-gray-300 hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEditCourse}
+                  className="px-5 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
+                >
+                  {savingEditCourse ? 'Saving Changes...' : 'Save Changes'}
                 </button>
               </div>
             </form>

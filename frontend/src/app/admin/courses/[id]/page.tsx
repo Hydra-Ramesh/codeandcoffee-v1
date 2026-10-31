@@ -32,11 +32,27 @@ import {
   Eye,
   EyeOff,
   Globe,
+  Bold,
+  Italic,
+  Heading1,
+  Heading2,
+  Heading3,
+  Quote,
+  Code,
+  List,
+  ListOrdered,
+  Link as LinkIcon,
+  SplitSquareVertical,
+  Settings,
+  Edit3,
+  Minus,
+  Table,
 } from 'lucide-react';
 import { fetchApi } from '../../../../lib/api';
 import { getSocket } from '../../../../lib/socket';
 import { useAuth } from '../../../../context/AuthContext';
 import { useToast } from '../../../../context/ToastContext';
+import MarkdownViewer from '../../../../components/MarkdownViewer';
 import AdminCurriculumBuilderSkeleton from '../../../../components/skeletons/AdminCurriculumBuilderSkeleton';
 import WarningCardModal, { WarningDetail } from '../../../../components/WarningCardModal';
 
@@ -161,6 +177,26 @@ export default function CourseCurriculumBuilderPage() {
 
   // Active Tab in Subtopic Modal: 'CONTENT' | 'ATTACHMENTS' | 'PRACTICE' | 'QUIZ'
   const [activeSubtopicTab, setActiveSubtopicTab] = useState<'CONTENT' | 'ATTACHMENTS' | 'PRACTICE' | 'QUIZ'>('CONTENT');
+
+  // Markdown Editor & Preview Studio State
+  const [markdownViewMode, setMarkdownViewMode] = useState<'split' | 'edit' | 'preview'>('split');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inlineImageInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingInline, setUploadingInline] = useState(false);
+
+  // Edit Course Metadata & Banner Modal State
+  const [courseEditModalOpen, setCourseEditModalOpen] = useState(false);
+  const [courseEditForm, setCourseEditForm] = useState({
+    title: '',
+    description: '',
+    category: 'Programming Languages',
+    level: 'INTERMEDIATE',
+    bannerImage: '',
+    isPublished: true,
+  });
+  const [savingCourseDetails, setSavingCourseDetails] = useState(false);
+  const [uploadingCourseBanner, setUploadingCourseBanner] = useState(false);
+  const courseBannerFileInputRef = useRef<HTMLInputElement>(null);
 
   // Warning Confirmation Modal State
   const [warningModal, setWarningModal] = useState<{
@@ -433,6 +469,326 @@ export default function CourseCurriculumBuilderPage() {
         setWarningModalLoading(false);
       },
     });
+  };
+
+  // Course Metadata & Banner Editing Handlers
+  const openEditCourseModal = () => {
+    if (!course) return;
+    setCourseEditForm({
+      title: course.title,
+      description: course.description || '',
+      category: course.category || 'Programming Languages',
+      level: course.level || 'INTERMEDIATE',
+      bannerImage: course.bannerImage || '',
+      isPublished: course.isPublished !== false,
+    });
+    setCourseEditModalOpen(true);
+  };
+
+  const handleCourseBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toastError('Please choose an image file (PNG, JPG, WebP, SVG, GIF).');
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      toastError('Course banner size must be under 15MB.');
+      return;
+    }
+
+    setUploadingCourseBanner(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetchApi('/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.success && res.data?.url) {
+        setCourseEditForm((prev) => ({ ...prev, bannerImage: res.data.url }));
+        success('Course banner uploaded to Cloudinary successfully!');
+      } else {
+        toastError(res.message || 'Failed to upload banner to Cloudinary.');
+      }
+    } catch (err: any) {
+      toastError(err?.message || 'Error uploading banner.');
+    } finally {
+      e.target.value = '';
+      setUploadingCourseBanner(false);
+    }
+  };
+
+  const handleSaveCourseDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!course) return;
+    if (!courseEditForm.title.trim()) {
+      toastError('Course title is required.');
+      return;
+    }
+
+    setWarningModal({
+      isOpen: true,
+      title: 'Update Course Metadata & Banner',
+      description: `Are you sure you want to save changes to course "${courseEditForm.title}"? Title, description, category, and hero banner will update immediately.`,
+      actionVerb: 'Confirm & Save Changes',
+      variant: 'warning',
+      badgeText: 'Course Details',
+      details: [
+        { label: 'Course Title', value: courseEditForm.title },
+        { label: 'Category', value: courseEditForm.category },
+        { label: 'Level', value: courseEditForm.level },
+        { label: 'Cover Banner', value: courseEditForm.bannerImage ? 'Configured' : 'None' },
+        { label: 'Visibility', value: courseEditForm.isPublished ? 'Published' : 'Draft' },
+      ],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        const res = await fetchApi(`/courses/${course.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(courseEditForm),
+        });
+        if (res.success && res.data?.course) {
+          const updated = res.data.course;
+          setCourse((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  title: updated.title,
+                  slug: updated.slug,
+                  description: updated.description,
+                  category: updated.category,
+                  level: updated.level,
+                  bannerImage: updated.bannerImage,
+                  isPublished: updated.isPublished,
+                }
+              : null
+          );
+          setCourseEditModalOpen(false);
+          success(`Course "${courseEditForm.title}" updated successfully!`);
+          setWarningModal((m) => ({ ...m, isOpen: false }));
+        } else {
+          toastError(res.message || 'Failed to update course details.');
+        }
+        setWarningModalLoading(false);
+      },
+    });
+  };
+
+  // Markdown Formatting Helper
+  const insertMarkdownSyntax = (before: string, after: string = '') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const current = subtopicForm.content || '';
+    const selection = current.substring(start, end) || 'text';
+    const replacement = `${before}${selection}${after}`;
+
+    const newContent = current.substring(0, start) + replacement + current.substring(end);
+    setSubtopicForm({ ...subtopicForm, content: newContent });
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + before.length, start + before.length + selection.length);
+    }, 0);
+  };
+
+  // Paste Picture or Diagram with automatic Cloudinary upload
+  const handlePasteInContent = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        if (file.size > 15 * 1024 * 1024) {
+          toastError('Pasted diagram exceeds 15MB limit.');
+          return;
+        }
+
+        setUploadingInline(true);
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+
+          const res = await fetchApi('/upload/image', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (res.success && res.data?.url) {
+            const imageUrl = res.data.url;
+            const textarea = textareaRef.current;
+            const diagramName = `Diagram-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}`;
+            const markdownToInsert = `\n\n![${diagramName}](${imageUrl})\n\n`;
+
+            if (textarea) {
+              const start = textarea.selectionStart;
+              const end = textarea.selectionEnd;
+              const currentContent = subtopicForm.content || '';
+              const newContent =
+                currentContent.substring(0, start) + markdownToInsert + currentContent.substring(end);
+
+              setSubtopicForm((prev) => ({
+                ...prev,
+                content: newContent,
+                attachments: prev.attachments.includes(imageUrl)
+                  ? prev.attachments
+                  : [...prev.attachments, imageUrl],
+              }));
+
+              setTimeout(() => {
+                textarea.focus();
+                const newPos = start + markdownToInsert.length;
+                textarea.setSelectionRange(newPos, newPos);
+              }, 50);
+            } else {
+              setSubtopicForm((prev) => ({
+                ...prev,
+                content: `${prev.content || ''}${markdownToInsert}`,
+                attachments: prev.attachments.includes(imageUrl)
+                  ? prev.attachments
+                  : [...prev.attachments, imageUrl],
+              }));
+            }
+
+            success('Pasted diagram saved to Cloudinary CDN and inserted into Markdown!');
+          } else {
+            toastError(res.message || 'Failed to upload pasted diagram to Cloudinary.');
+          }
+        } catch (err: any) {
+          toastError(err?.message || 'Error uploading pasted diagram.');
+        } finally {
+          setUploadingInline(false);
+        }
+        break;
+      }
+    }
+  };
+
+  // Drag & Drop Diagram into Markdown Editor
+  const handleDropOnContent = async (e: React.DragEvent<HTMLTextAreaElement>) => {
+    const files = e.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (file.type.startsWith('image/')) {
+      e.preventDefault();
+      if (file.size > 15 * 1024 * 1024) {
+        toastError('Image exceeds 15MB limit.');
+        return;
+      }
+
+      setUploadingInline(true);
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const res = await fetchApi('/upload/image', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (res.success && res.data?.url) {
+          const imageUrl = res.data.url;
+          const cleanName = file.name.replace(/\.[^/.]+$/, '');
+          const markdownToInsert = `\n\n![${cleanName}](${imageUrl})\n\n`;
+
+          setSubtopicForm((prev) => ({
+            ...prev,
+            content: `${prev.content || ''}${markdownToInsert}`,
+            attachments: prev.attachments.includes(imageUrl)
+              ? prev.attachments
+              : [...prev.attachments, imageUrl],
+          }));
+
+          success('Dropped diagram saved to Cloudinary and inserted into Markdown!');
+        } else {
+          toastError(res.message || 'Failed to upload image.');
+        }
+      } catch (err: any) {
+        toastError(err?.message || 'Error uploading image.');
+      } finally {
+        setUploadingInline(false);
+      }
+    }
+  };
+
+  // Direct Diagram File Picker for Markdown Toolbar
+  const handleInlineImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toastError('Please choose an image file (PNG, JPG, WebP, SVG, GIF).');
+      return;
+    }
+
+    setUploadingInline(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetchApi('/upload/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.success && res.data?.url) {
+        const imageUrl = res.data.url;
+        const cleanName = file.name.replace(/\.[^/.]+$/, '');
+        const markdownToInsert = `\n\n![${cleanName}](${imageUrl})\n\n`;
+
+        const textarea = textareaRef.current;
+        if (textarea) {
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const currentContent = subtopicForm.content || '';
+          const newContent =
+            currentContent.substring(0, start) + markdownToInsert + currentContent.substring(end);
+
+          setSubtopicForm((prev) => ({
+            ...prev,
+            content: newContent,
+            attachments: prev.attachments.includes(imageUrl)
+              ? prev.attachments
+              : [...prev.attachments, imageUrl],
+          }));
+
+          setTimeout(() => {
+            textarea.focus();
+            const newPos = start + markdownToInsert.length;
+            textarea.setSelectionRange(newPos, newPos);
+          }, 50);
+        } else {
+          setSubtopicForm((prev) => ({
+            ...prev,
+            content: `${prev.content || ''}${markdownToInsert}`,
+            attachments: prev.attachments.includes(imageUrl)
+              ? prev.attachments
+              : [...prev.attachments, imageUrl],
+          }));
+        }
+
+        success('Photo uploaded to Cloudinary and inserted into Markdown!');
+      } else {
+        toastError(res.message || 'Failed to upload photo.');
+      }
+    } catch (err: any) {
+      toastError(err?.message || 'Error uploading photo.');
+    } finally {
+      e.target.value = '';
+      setUploadingInline(false);
+    }
   };
 
   // Subtopic Handlers
@@ -852,6 +1208,17 @@ export default function CourseCurriculumBuilderPage() {
             <span>{course.isPublished ? 'Unpublish Course' : 'Publish Course'}</span>
           </button>
 
+          {/* Edit Course Details Button */}
+          <button
+            type="button"
+            onClick={openEditCourseModal}
+            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-amber-300 hover:text-amber-200 text-xs font-semibold border border-amber-500/30 flex items-center gap-1.5 cursor-pointer transition-all"
+            title="Edit Course Name, Banner, Category, and Details"
+          >
+            <Edit className="w-3.5 h-3.5" />
+            <span>Edit Course Details</span>
+          </button>
+
           <Link
             href={`/read/${course.slug}`}
             target="_blank"
@@ -868,6 +1235,75 @@ export default function CourseCurriculumBuilderPage() {
             <Plus className="w-4 h-4" />
             <span>Add Module / Topic</span>
           </button>
+        </div>
+      </div>
+
+      {/* Course Hero & Overview Banner Card */}
+      <div className="relative rounded-3xl overflow-hidden border border-white/15 bg-slate-950/60 backdrop-blur-md shadow-2xl">
+        {course.bannerImage && (
+          <div className="absolute inset-0 h-full w-full overflow-hidden opacity-25 pointer-events-none">
+            <img
+              src={course.bannerImage}
+              alt={course.title}
+              className="w-full h-full object-cover blur-sm scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-transparent" />
+          </div>
+        )}
+
+        <div className="relative p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 min-w-0 flex-1">
+            {course.bannerImage ? (
+              <div className="relative w-28 h-20 sm:w-36 sm:h-24 rounded-2xl overflow-hidden border border-white/20 shrink-0 shadow-lg group">
+                <img
+                  src={course.bannerImage}
+                  alt={course.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+            ) : (
+              <div className="w-24 h-20 sm:w-28 sm:h-24 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-amber-600/30 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-lg">
+                <Layers className="w-8 h-8" />
+              </div>
+            )}
+
+            <div className="space-y-2 min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {course.level}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-white/10 text-gray-300 border border-white/10">
+                  {course.category}
+                </span>
+                <span className="text-[11px] font-mono text-gray-400">
+                  Slug: <code className="text-amber-400 font-semibold">{course.slug}</code>
+                </span>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                {course.title}
+              </h2>
+
+              <p className="text-xs text-gray-300 line-clamp-2 max-w-2xl leading-relaxed">
+                {course.description || 'No course overview description provided yet.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex sm:flex-col items-center sm:items-end gap-2.5 shrink-0 pt-4 md:pt-0 border-t md:border-t-0 border-white/10">
+            <button
+              type="button"
+              onClick={openEditCourseModal}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-amber-500/20 cursor-pointer transition-all"
+            >
+              <Edit className="w-3.5 h-3.5" />
+              <span>Edit Name &amp; Banner</span>
+            </button>
+            <span className="text-[11px] font-mono text-gray-400">
+              {course.topics.length} Sections •{' '}
+              {course.topics.reduce((acc, t) => acc + t.subtopics.length, 0)} Total Lessons
+            </span>
+          </div>
         </div>
       </div>
 
@@ -1263,19 +1699,312 @@ export default function CourseCurriculumBuilderPage() {
 
             {/* Tab Body Arena */}
             <div className="flex-1 overflow-y-auto pr-1 space-y-4 custom-scrollbar">
-              {/* TAB 1: MARKDOWN README */}
+              {/* TAB 1: MARKDOWN README (WITH PREVIEW, SPLIT-VIEW & PASTE-IMAGE SUPPORT) */}
               {activeSubtopicTab === 'CONTENT' && (
-                <div className="space-y-2 h-full flex flex-col">
-                  <label className="block text-xs font-semibold text-gray-300">
-                    Readme Content (Supports GFM Markdown, headers, lists, and code blocks)
-                  </label>
-                  <textarea
-                    rows={16}
-                    value={subtopicForm.content}
-                    onChange={(e) => setSubtopicForm({ ...subtopicForm, content: e.target.value })}
-                    className="w-full flex-1 p-4 rounded-xl bg-slate-950 border border-white/10 font-mono text-xs text-gray-200 focus:outline-none focus:border-amber-500 resize-none"
-                    placeholder="Write your comprehensive technical lesson here..."
+                <div className="space-y-3 flex flex-col h-full">
+                  {/* Hidden file input for inline diagram upload */}
+                  <input
+                    ref={inlineImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleInlineImageUpload}
+                    className="hidden"
                   />
+
+                  {/* Studio Control Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/10 shrink-0">
+                    <div>
+                      <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-amber-400" />
+                        <span>Technical Readme (Markdown &amp; Diagrams)</span>
+                      </label>
+                      <p className="text-[11px] text-gray-400">
+                        Write Markdown with live preview, codeblocks, and direct diagram paste (Ctrl+V) saved to Cloudinary.
+                      </p>
+                    </div>
+
+                    {/* View Mode Switcher */}
+                    <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-white/10 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setMarkdownViewMode('edit')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
+                          markdownViewMode === 'edit'
+                            ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                        title="Editor only"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setMarkdownViewMode('split')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
+                          markdownViewMode === 'split'
+                            ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                        title="Side-by-side Editor & Live Preview"
+                      >
+                        <SplitSquareVertical className="w-3.5 h-3.5" />
+                        <span>Split</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setMarkdownViewMode('preview')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
+                          markdownViewMode === 'preview'
+                            ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                        title="Full Live Preview"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Preview</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Markdown Formatting & Diagram Toolbar */}
+                  {markdownViewMode !== 'preview' && (
+                    <div className="flex flex-wrap items-center gap-1 p-2 rounded-2xl bg-white/[0.03] border border-white/10 shrink-0">
+                      <div className="flex items-center gap-0.5 pr-2 border-r border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('**', '**')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer"
+                          title="Bold (**text**)"
+                        >
+                          <Bold className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('*', '*')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer"
+                          title="Italic (*text*)"
+                        >
+                          <Italic className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('`', '`')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer"
+                          title="Inline Code (`code`)"
+                        >
+                          <Code className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-0.5 px-2 border-r border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('# ')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer font-bold"
+                          title="Heading 1 (# Heading)"
+                        >
+                          <Heading1 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('## ')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer font-bold"
+                          title="Heading 2 (## Heading)"
+                        >
+                          <Heading2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('### ')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer font-bold"
+                          title="Heading 3 (### Heading)"
+                        >
+                          <Heading3 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-0.5 px-2 border-r border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('\n\n```cpp\n// Code goes here\n```\n\n')}
+                          className="px-2 py-1 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer font-mono font-bold"
+                          title="Codeblock"
+                        >
+                          {'```'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('> ')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer"
+                          title="Blockquote (> Quote)"
+                        >
+                          <Quote className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('- ')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer"
+                          title="Bullet List (- Item)"
+                        >
+                          <List className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('1. ')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer"
+                          title="Numbered List (1. Item)"
+                        >
+                          <ListOrdered className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('[', '](https://example.com)')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer"
+                          title="Hyperlink [Text](URL)"
+                        >
+                          <LinkIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            insertMarkdownSyntax(
+                              '\n| Column 1 | Column 2 |\n| :--- | :--- |\n| Data 1 | Data 2 |\n'
+                            )
+                          }
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer"
+                          title="Markdown Table"
+                        >
+                          <Table className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertMarkdownSyntax('\n\n---\n\n')}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white text-xs cursor-pointer"
+                          title="Horizontal Divider (---)"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Diagram & Cloudinary Upload Button */}
+                      <button
+                        type="button"
+                        onClick={() => inlineImageInputRef.current?.click()}
+                        disabled={uploadingInline}
+                        className="ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold cursor-pointer transition-colors"
+                        title="Upload diagram or screenshot directly to Cloudinary"
+                      >
+                        {uploadingInline ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Uploading to Cloudinary...</span>
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud className="w-3.5 h-3.5" />
+                            <span>Upload Diagram</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Paste / Drag-and-drop info pill */}
+                  {markdownViewMode !== 'preview' && (
+                    <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 shrink-0">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>
+                          <strong>Paste Diagram Support Active:</strong> Copy any screenshot or diagram image and press{' '}
+                          <kbd className="px-1.5 py-0.5 rounded bg-black/40 border border-amber-500/30 font-mono text-[10px]">
+                            Ctrl + V
+                          </kbd>{' '}
+                          to automatically save it to Cloudinary CDN and insert Markdown!
+                        </span>
+                      </span>
+                      {uploadingInline && (
+                        <span className="flex items-center gap-1 font-bold text-amber-400">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Uploading Diagram...
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Editor Arena: Edit / Split / Preview */}
+                  <div className="flex-1 min-h-[480px] flex flex-col">
+                    {/* Mode 1: Edit only */}
+                    {markdownViewMode === 'edit' && (
+                      <textarea
+                        ref={textareaRef}
+                        rows={18}
+                        value={subtopicForm.content}
+                        onChange={(e) => setSubtopicForm({ ...subtopicForm, content: e.target.value })}
+                        onPaste={handlePasteInContent}
+                        onDrop={handleDropOnContent}
+                        className="w-full flex-1 p-4 rounded-2xl bg-slate-950 border border-white/10 font-mono text-xs text-gray-200 focus:outline-none focus:border-amber-500 resize-none custom-scrollbar"
+                        placeholder="Write your comprehensive technical lesson here or paste any diagram with Ctrl+V..."
+                      />
+                    )}
+
+                    {/* Mode 2: Split View (Side-by-side Editor & Live Preview) */}
+                    {markdownViewMode === 'split' && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 flex-1 min-h-[480px]">
+                        {/* Left: Editor */}
+                        <div className="flex flex-col h-full">
+                          <textarea
+                            ref={textareaRef}
+                            value={subtopicForm.content}
+                            onChange={(e) => setSubtopicForm({ ...subtopicForm, content: e.target.value })}
+                            onPaste={handlePasteInContent}
+                            onDrop={handleDropOnContent}
+                            className="w-full h-full p-4 rounded-2xl bg-slate-950 border border-white/10 font-mono text-xs text-gray-200 focus:outline-none focus:border-amber-500 resize-none custom-scrollbar"
+                            placeholder="Write Markdown on the left, preview live on the right. Paste diagrams anytime with Ctrl+V!"
+                          />
+                        </div>
+
+                        {/* Right: Live Markdown Preview */}
+                        <div className="flex flex-col h-full rounded-2xl bg-slate-950/80 border border-white/10 p-5 overflow-y-auto custom-scrollbar">
+                          <div className="text-[10px] font-mono uppercase tracking-wider text-amber-400 mb-3 pb-2 border-b border-white/10 flex items-center justify-between">
+                            <span>Live Markdown Preview</span>
+                            <span className="text-gray-500">{subtopicForm.content.length} characters</span>
+                          </div>
+                          {subtopicForm.content.trim() ? (
+                            <div className="prose prose-invert max-w-none">
+                              <MarkdownViewer content={subtopicForm.content} />
+                            </div>
+                          ) : (
+                            <div className="py-20 text-center text-xs text-gray-500 space-y-2">
+                              <FileText className="w-8 h-8 text-gray-600 mx-auto" />
+                              <p>Nothing to preview yet. Start typing markdown or paste an image!</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Mode 3: Preview only */}
+                    {markdownViewMode === 'preview' && (
+                      <div className="w-full flex-1 rounded-2xl bg-slate-950/90 border border-white/10 p-6 sm:p-8 overflow-y-auto custom-scrollbar">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-amber-400 mb-4 pb-2 border-b border-white/10 flex items-center justify-between">
+                          <span>Full Lesson Markdown Preview</span>
+                          <span className="text-gray-500">{subtopicForm.content.length} characters</span>
+                        </div>
+                        {subtopicForm.content.trim() ? (
+                          <div className="prose prose-invert max-w-none">
+                            <MarkdownViewer content={subtopicForm.content} />
+                          </div>
+                        ) : (
+                          <div className="py-24 text-center text-xs text-gray-500 space-y-2">
+                            <FileText className="w-10 h-10 text-gray-600 mx-auto" />
+                            <p>No markdown content has been authored for this lesson yet.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1944,6 +2673,177 @@ export default function CourseCurriculumBuilderPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Course Details & Hero Banner */}
+      {courseEditModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-lg w-full glass-card rounded-3xl border border-white/20 p-6 space-y-5 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Edit className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">Edit Course Name, Banner &amp; Metadata</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCourseEditModalOpen(false)}
+                className="p-1 text-gray-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCourseDetails} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                  Course Title <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={courseEditForm.title}
+                  onChange={(e) => setCourseEditForm({ ...courseEditForm, title: e.target.value })}
+                  placeholder="e.g. Master Modern C++: Low-Level to Architecture"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={courseEditForm.description}
+                  onChange={(e) => setCourseEditForm({ ...courseEditForm, description: e.target.value })}
+                  placeholder="Deep-dive into memory architectures, pointers, RAII, and high-performance algorithms..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                    Category
+                  </label>
+                  <select
+                    value={courseEditForm.category}
+                    onChange={(e) => setCourseEditForm({ ...courseEditForm, category: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Programming Languages">Programming Languages</option>
+                    <option value="System Design">System Design</option>
+                    <option value="Backend">Backend</option>
+                    <option value="Algorithms & DSA">Algorithms &amp; DSA</option>
+                    <option value="Web Engineering">Web Engineering</option>
+                    <option value="DevOps & Cloud">DevOps &amp; Cloud</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                    Proficiency Level
+                  </label>
+                  <select
+                    value={courseEditForm.level}
+                    onChange={(e) => setCourseEditForm({ ...courseEditForm, level: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="BEGINNER">BEGINNER</option>
+                    <option value="INTERMEDIATE">INTERMEDIATE</option>
+                    <option value="ADVANCED">ADVANCED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-300">
+                    Cover Banner Photo (Cloudinary CDN)
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 cursor-pointer font-medium">
+                    <UploadCloud className="w-3.5 h-3.5" />
+                    <span>{uploadingCourseBanner ? 'Uploading to Cloudinary...' : 'Upload Photo'}</span>
+                    <input
+                      ref={courseBannerFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCourseBannerUpload}
+                      disabled={uploadingCourseBanner}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <input
+                  type="url"
+                  value={courseEditForm.bannerImage}
+                  onChange={(e) => setCourseEditForm({ ...courseEditForm, bannerImage: e.target.value })}
+                  placeholder="https://res.cloudinary.com/... or click Upload Photo"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                />
+                {courseEditForm.bannerImage && (
+                  <div className="mt-2 relative h-36 w-full rounded-2xl overflow-hidden border border-white/10 bg-slate-950 group">
+                    <img
+                      src={courseEditForm.bannerImage}
+                      alt="Course Banner Preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src =
+                          'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => courseBannerFileInputRef.current?.click()}
+                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs cursor-pointer shadow-md"
+                      >
+                        Change Photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCourseEditForm({ ...courseEditForm, bannerImage: '' })}
+                        className="px-3.5 py-1.5 rounded-xl bg-red-500 text-white font-bold text-xs cursor-pointer shadow-md"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="modalCoursePublished"
+                  checked={courseEditForm.isPublished}
+                  onChange={(e) => setCourseEditForm({ ...courseEditForm, isPublished: e.target.checked })}
+                  className="rounded text-amber-500 focus:ring-amber-500 bg-slate-900 border-white/20"
+                />
+                <label htmlFor="modalCoursePublished" className="text-xs text-gray-300 cursor-pointer select-none">
+                  Published (visible to all students in the public course catalog)
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setCourseEditModalOpen(false)}
+                  className="px-4 py-2 rounded-xl glass-card text-xs text-gray-300 hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingCourseDetails}
+                  className="px-5 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
+                >
+                  {savingCourseDetails ? 'Saving Changes...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
