@@ -318,6 +318,10 @@ html.light .markdown-content pre {
 html.light .markdown-content pre code {
   color: #f8fafc !important;
   background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }
 
 html.light .markdown-content blockquote {
@@ -520,6 +524,10 @@ html.light .gradient-text-hero {
 .markdown-content pre code {
   background: transparent !important;
   color: var(--md-pre-text) !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }
 
 .markdown-content code:not(pre code) {

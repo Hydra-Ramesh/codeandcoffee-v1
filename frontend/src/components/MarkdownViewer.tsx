@@ -1,13 +1,59 @@
 'use client';
 
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
+import { Copy, Check } from 'lucide-react';
 import MermaidBlock from './MermaidBlock';
 
 interface MarkdownViewerProps {
   content?: string | null;
+}
+
+function PreBlock({ children, ...props }: React.HTMLAttributes<HTMLPreElement>) {
+  const [copied, setCopied] = useState(false);
+  const preRef = useRef<HTMLPreElement>(null);
+
+  const handleCopy = () => {
+    if (preRef.current) {
+      const codeText = preRef.current.innerText || '';
+      navigator.clipboard.writeText(codeText.trim());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="relative group my-6">
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="absolute top-3 right-3 z-10 px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 cursor-pointer"
+        title="Copy code"
+      >
+        {copied ? (
+          <>
+            <Check className="w-3 h-3 text-emerald-400" />
+            <span className="text-emerald-400 font-semibold">Copied</span>
+          </>
+        ) : (
+          <>
+            <Copy className="w-3 h-3" />
+            <span>Copy</span>
+          </>
+        )}
+      </button>
+
+      <pre
+        ref={preRef}
+        className="overflow-x-auto p-4 sm:p-5 rounded-2xl bg-[#0b0f19] border border-slate-800 text-[#f8fafc] font-mono text-sm leading-relaxed shadow-xl [&_code]:bg-transparent [&_code]:border-0 [&_code]:border-none [&_code]:p-0 [&_code]:text-inherit [&_code]:shadow-none [&_code]:rounded-none [&_code]:font-normal [&_code]:block [&_code]:w-full"
+        {...props}
+      >
+        {children}
+      </pre>
+    </div>
+  );
 }
 
 export default function MarkdownViewer({ content }: MarkdownViewerProps) {
@@ -120,6 +166,25 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
             if (typeof className === 'string' && className.includes('language-mermaid')) {
               return <MermaidBlock chart={String(children || '').trim()} />;
             }
+
+            // Check if this is a block code element (inside pre, has language-* class, or has newlines)
+            const isBlock = Boolean(
+              (typeof className === 'string' && className.startsWith('language-')) ||
+              (typeof children === 'string' && children.includes('\n'))
+            );
+
+            if (isBlock) {
+              return (
+                <code
+                  className="font-mono text-inherit bg-transparent border-0 p-0 block w-full whitespace-pre"
+                  {...props}
+                >
+                  {children}
+                </code>
+              );
+            }
+
+            // Inline code snippet
             return (
               <code
                 className="px-1.5 py-0.5 rounded-md text-[0.88em] font-mono font-semibold bg-amber-50 dark:bg-slate-800/90 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-white/10"
@@ -140,14 +205,7 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
               const mermaidChart = String((firstChild.props as any).children || '').trim();
               return <MermaidBlock chart={mermaidChart} />;
             }
-            return (
-              <pre
-                className="relative group my-6 overflow-x-auto p-4 sm:p-5 rounded-2xl bg-[#0b0f19] border border-slate-800 text-[#f8fafc] font-mono text-sm leading-relaxed shadow-xl"
-                {...props}
-              >
-                {children}
-              </pre>
-            );
+            return <PreBlock {...props}>{children}</PreBlock>;
           },
           blockquote({ children }) {
             return (
