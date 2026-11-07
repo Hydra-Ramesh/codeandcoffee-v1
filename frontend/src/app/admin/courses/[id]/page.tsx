@@ -161,7 +161,7 @@ export default function CourseCurriculumBuilderPage() {
     content: '',
     attachments: [],
     hasQuiz: true,
-    quizPassingScore: 25,
+    quizPassingScore: 70,
     quizData: [],
     codingQuestions: [],
     isPublished: true,
@@ -800,7 +800,7 @@ export default function CourseCurriculumBuilderPage() {
       content: '# Lesson Title\n\nExplain key concepts here with codeblocks:\n\n```cpp\n// Code goes here\n```\n',
       attachments: [],
       hasQuiz: true,
-      quizPassingScore: 25,
+      quizPassingScore: 70,
       quizData: [
         {
           id: 'q_0',
@@ -837,7 +837,7 @@ export default function CourseCurriculumBuilderPage() {
             content: s.content || '',
             attachments: s.attachments || [],
             hasQuiz: s.hasQuiz,
-            quizPassingScore: s.quizPassingScore || 25,
+            quizPassingScore: s.quizPassingScore || 70,
             quizData: Array.isArray(s.quiz)
               ? s.quiz.map((q: any, i: number) => ({
                   id: q.id || `q_${i}`,
@@ -1443,7 +1443,7 @@ export default function CourseCurriculumBuilderPage() {
                             {sub.hasQuiz && (
                               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/25 flex items-center gap-1">
                                 <HelpCircle className="w-3 h-3" />
-                                Mandatory Quiz (Pass &ge; {sub.quizPassingScore || 25}%)
+                                Mandatory Quiz (Pass &ge; {sub.quizPassingScore || 70}%)
                               </span>
                             )}
                             {sub.attachments && sub.attachments.length > 0 && (
@@ -1634,7 +1634,7 @@ export default function CourseCurriculumBuilderPage() {
                   onChange={(e) =>
                     setSubtopicForm({
                       ...subtopicForm,
-                      quizPassingScore: parseInt(e.target.value) || 25,
+                      quizPassingScore: parseInt(e.target.value) || 70,
                     })
                   }
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white"

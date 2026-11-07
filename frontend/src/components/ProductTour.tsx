@@ -72,7 +72,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Interactive Courses & Reading Arena',
     description:
       'Step-by-step masterclasses like GeeksforGeeks: rich markdown notes, screenshots, LeetCode coding challenges, and interactive quizzes.',
-    proTip: 'Score >= 25% on lesson quizzes or mark lessons complete to unlock sequential modules!',
+    proTip: 'Pass lesson quizzes or mark lessons complete to unlock sequential lessons and modules!',
     icon: BookOpen,
     accentColor: 'amber',
   },

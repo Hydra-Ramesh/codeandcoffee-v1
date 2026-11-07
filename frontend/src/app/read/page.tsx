@@ -121,7 +121,7 @@ export default function ReadCatalogPage() {
             <div className="hidden lg:flex flex-col gap-1.5 shrink-0 text-[11px]">
               <div className="flex items-center gap-2 text-slate-600 dark:text-gray-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
-                <span>Sequential Unlocking (25%+ on Quizzes)</span>
+                <span>Sequential Unlocking (Verified Quizzes &amp; Mark Done)</span>
               </div>
               <div className="flex items-center gap-2 text-slate-600 dark:text-gray-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-green-400" />

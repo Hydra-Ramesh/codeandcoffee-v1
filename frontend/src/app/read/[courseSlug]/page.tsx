@@ -49,6 +49,10 @@ interface TopicSummary {
   slug: string;
   description: string;
   order: number;
+  isLocked?: boolean;
+  isCompleted?: boolean;
+  completedLessons?: number;
+  totalLessons?: number;
   subtopics: SubtopicSummary[];
 }
 
@@ -205,6 +209,12 @@ export default function CourseOverviewPage() {
     0
   );
 
+  const subtopicsWithQuizzes = course.topics.flatMap((t) => t.subtopics).filter((s) => s.hasQuiz);
+  const minPassingScore =
+    subtopicsWithQuizzes.length > 0
+      ? Math.min(...subtopicsWithQuizzes.map((s) => s.quizPassingScore || 70))
+      : null;
+
   return (
     <div className="max-w-5xl mx-auto space-y-10 pb-20 animate-fade-in">
       {/* Navigation Breadcrumb */}
@@ -345,12 +355,14 @@ export default function CourseOverviewPage() {
               </div>
               <div className="p-3 rounded-xl bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 space-y-1">
                 <span className="text-slate-500 dark:text-gray-400 text-[11px] block">Passing Score</span>
-                <span className="text-emerald-700 dark:text-emerald-400 font-bold text-base">&ge; 25%</span>
+                <span className="text-emerald-700 dark:text-emerald-400 font-bold text-base">
+                  {minPassingScore !== null ? `≥ ${minPassingScore}%` : 'Mark Done'}
+                </span>
               </div>
             </div>
 
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-200/90 leading-relaxed">
-              💡 <strong>Sequential Unlocking:</strong> Lessons unlock one-by-one. Each mandatory quiz requires &ge; 25% to proceed.
+              💡 <strong>Sequential Unlocking:</strong> Lessons unlock one-by-one. Lessons without a quiz require clicking &ldquo;Mark as Done&rdquo;, and lessons with a quiz require passing with the setting mark barrier to unlock the next lesson and module.
             </div>
           </div>
         </div>
@@ -378,12 +390,18 @@ export default function CourseOverviewPage() {
           {course.topics.map((topic, tIdx) => {
             const isExpanded = expandedTopics[topic.id] ?? true;
             const completedInTopic = topic.subtopics.filter((s) => s.isCompleted).length;
+            const isLocked = Boolean(topic.isLocked);
+            const isCompleted = Boolean(topic.isCompleted);
 
             return (
               <div
                 key={topic.id}
                 id={`topic-section-${topic.slug}`}
-                className="bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden transition-all shadow-sm dark:shadow-lg"
+                className={`bg-white dark:bg-slate-900/40 rounded-2xl border overflow-hidden transition-all shadow-sm dark:shadow-lg ${
+                  isLocked
+                    ? 'border-slate-200 dark:border-white/5 opacity-85'
+                    : 'border-slate-200 dark:border-white/10'
+                }`}
               >
                 {/* Topic Header Accordion Bar */}
                 <button
@@ -392,16 +410,41 @@ export default function CourseOverviewPage() {
                   className="w-full p-5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer border-b border-slate-200 dark:border-white/5"
                 >
                   <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-4">
-                    <span className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 font-mono font-bold text-xs flex items-center justify-center border border-amber-500/25 shrink-0">
-                      {tIdx + 1}
+                    <span
+                      className={`w-8 h-8 rounded-xl font-mono font-bold text-xs flex items-center justify-center border shrink-0 ${
+                        isLocked
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-gray-500 border-slate-300 dark:border-white/10'
+                          : isCompleted
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+                          : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25'
+                      }`}
+                    >
+                      {isLocked ? <Lock className="w-3.5 h-3.5" /> : tIdx + 1}
                     </span>
                     <div className="truncate">
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
-                        {topic.title}
-                      </h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                          {topic.title}
+                        </h3>
+                        {isLocked && (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-gray-400 border border-slate-300 dark:border-white/10 inline-flex items-center gap-1">
+                            <Lock className="w-3 h-3 text-amber-500/80" /> Locked Module
+                          </span>
+                        )}
+                        {isCompleted && (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Completed
+                          </span>
+                        )}
+                      </div>
                       {topic.description && (
                         <p className="text-xs text-slate-500 dark:text-gray-400 truncate mt-0.5">
                           {topic.description}
+                        </p>
+                      )}
+                      {isLocked && (
+                        <p className="text-[11px] text-amber-600/90 dark:text-amber-400/90 mt-0.5 font-medium">
+                          🔒 Complete previous module to unlock this section
                         </p>
                       )}
                     </div>

@@ -38,7 +38,7 @@ router.get('/:slug', optionalAuth, getCourseBySlug);
 router.get('/:courseSlug/topics/:topicSlug/subtopics/:subtopicSlug', optionalAuth, getSubtopicDetail);
 router.get('/:courseSlug/subtopics/:topicSlug/:subtopicSlug', optionalAuth, getSubtopicDetail);
 
-// Submit interactive quiz (Score >= 25% unlocks next topic/section)
+// Submit interactive quiz (Score >= quizPassingScore barrier unlocks next lesson/topic)
 router.post('/:courseSlug/subtopics/:subtopicId/quiz/submit', authenticate, submitQuiz);
 
 // Mark lesson complete (for lessons without quizzes, or already passed)

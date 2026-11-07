@@ -31,12 +31,30 @@ async function getOrderedSubtopicsForCourse(courseId: string, includeDrafts = fa
       subtopics: {
         where: includeDrafts ? {} : { isPublished: true },
         orderBy: { order: 'asc' },
-        select: { id: true, slug: true, topicId: true, title: true, order: true },
+        select: {
+          id: true,
+          slug: true,
+          topicId: true,
+          title: true,
+          order: true,
+          hasQuiz: true,
+          quizPassingScore: true,
+        },
       },
     },
   });
 
-  const flat: { id: string; slug: string; topicId: string; title: string; topicOrder: number; subtopicOrder: number }[] = [];
+  const flat: {
+    id: string;
+    slug: string;
+    topicId: string;
+    title: string;
+    hasQuiz: boolean;
+    quizPassingScore: number | null;
+    topicOrder: number;
+    subtopicOrder: number;
+  }[] = [];
+
   topics.forEach((t) => {
     t.subtopics.forEach((st) => {
       flat.push({
@@ -44,6 +62,8 @@ async function getOrderedSubtopicsForCourse(courseId: string, includeDrafts = fa
         slug: st.slug,
         topicId: t.id,
         title: st.title,
+        hasQuiz: Boolean(st.hasQuiz),
+        quizPassingScore: st.quizPassingScore,
         topicOrder: t.order,
         subtopicOrder: st.order,
       });
@@ -226,38 +246,52 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
 
     // Sequential lock resolution
     // First lesson of the entire course is ALWAYS unlocked
+    let allPrecedingCompleted = true;
     let hasFoundFirst = false;
-    let previousLessonCompleted = false;
 
     const topicsWithLocks = course.topics.map((topic: any) => {
+      let topicAllLessonsCompleted = true;
+      const topicHasSubtopics = topic.subtopics.length > 0;
+
       const subtopicsWithLocks = topic.subtopics.map((st: any) => {
         let isUnlocked = false;
         let isCompleted = false;
         let quizPassed = false;
         let quizScore = undefined;
 
+        const p = userProgressMap[st.id];
+        const passingThreshold = st.quizPassingScore || 70;
+
+        if (p) {
+          quizPassed = Boolean(p.quizPassed);
+          quizScore = p.quizScore;
+          // Completed only if:
+          // 1. With quiz: passed quiz with score >= setting mark barrier
+          // 2. Without quiz: explicitly marked done
+          if (st.hasQuiz) {
+            isCompleted = Boolean(quizPassed && (quizScore ?? 0) >= passingThreshold);
+          } else {
+            isCompleted = Boolean(p.isCompleted);
+          }
+        }
+
         if (isStaff) {
-          // Staff can review everything
           isUnlocked = true;
-          isCompleted = userProgressMap[st.id]?.isCompleted || false;
-          quizPassed = userProgressMap[st.id]?.quizPassed || false;
-          quizScore = userProgressMap[st.id]?.quizScore;
         } else if (!hasFoundFirst) {
-          // The very first lesson is unconditionally unlocked
+          // The very first lesson of the entire course is unconditionally unlocked
           isUnlocked = true;
           hasFoundFirst = true;
-          isCompleted = userProgressMap[st.id]?.isCompleted || false;
-          quizPassed = userProgressMap[st.id]?.quizPassed || false;
-          quizScore = userProgressMap[st.id]?.quizScore;
-          previousLessonCompleted = isCompleted;
+          allPrecedingCompleted = isCompleted;
         } else {
-          // Subsequent lessons: unlocked if previous was completed or recorded as unlocked in DB
-          const recordedUnlocked = userProgressMap[st.id]?.isUnlocked || false;
-          isCompleted = userProgressMap[st.id]?.isCompleted || false;
-          quizPassed = userProgressMap[st.id]?.quizPassed || false;
-          quizScore = userProgressMap[st.id]?.quizScore;
-          isUnlocked = recordedUnlocked || previousLessonCompleted;
-          previousLessonCompleted = isCompleted;
+          // Subsequent lessons: unlocked IF AND ONLY IF all preceding lessons are completed
+          isUnlocked = allPrecedingCompleted;
+          if (!isCompleted) {
+            allPrecedingCompleted = false;
+          }
+        }
+
+        if (!isCompleted) {
+          topicAllLessonsCompleted = false;
         }
 
         return {
@@ -266,7 +300,7 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
           slug: st.slug,
           order: st.order,
           hasQuiz: st.hasQuiz,
-          quizPassingScore: st.quizPassingScore,
+          quizPassingScore: st.quizPassingScore || 70,
           isPublished: st.isPublished,
           isUnlocked,
           isCompleted,
@@ -275,6 +309,10 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
         };
       });
 
+      const completedInTopic = subtopicsWithLocks.filter((s: any) => s.isCompleted).length;
+      const isTopicCompleted = topicHasSubtopics && completedInTopic === subtopicsWithLocks.length;
+      const isTopicUnlocked = isStaff || (subtopicsWithLocks.length === 0 ? true : subtopicsWithLocks[0].isUnlocked);
+
       return {
         id: topic.id,
         title: topic.title,
@@ -282,13 +320,21 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
         description: topic.description,
         order: topic.order,
         isPublished: topic.isPublished,
+        isLocked: !isTopicUnlocked,
+        isCompleted: isTopicCompleted,
+        completedLessons: completedInTopic,
+        totalLessons: subtopicsWithLocks.length,
         subtopics: subtopicsWithLocks,
       };
     });
 
     let totalLessonsCount = 0;
-    topicsWithLocks.forEach((t: any) => (totalLessonsCount += t.subtopics.length));
-    const progressPercent = totalLessonsCount > 0 ? Math.round((totalCompleted / totalLessonsCount) * 100) : 0;
+    let actualCompletedCount = 0;
+    topicsWithLocks.forEach((t: any) => {
+      totalLessonsCount += t.subtopics.length;
+      actualCompletedCount += t.completedLessons;
+    });
+    const progressPercent = totalLessonsCount > 0 ? Math.round((actualCompletedCount / totalLessonsCount) * 100) : 0;
 
     res.json({
       success: true,
@@ -305,7 +351,7 @@ export async function getCourseBySlug(req: AuthenticatedRequest, res: Response):
           author: course.author,
           topics: topicsWithLocks,
           totalLessons: totalLessonsCount,
-          completedLessons: totalCompleted,
+          completedLessons: actualCompletedCount,
           progressPercent,
           createdAt: course.createdAt,
         },
@@ -367,6 +413,15 @@ export async function getSubtopicDetail(req: AuthenticatedRequest, res: Response
       return;
     }
 
+    // Find all ordered subtopics in sequence for sequential verification
+    const { flat, topics } = await getOrderedSubtopicsForCourse(course.id, isStaff);
+    const currentIndex = flat.findIndex((item) => item.id === subtopic.id);
+
+    if (currentIndex < 0) {
+      res.status(404).json({ success: false, message: 'Lesson not found in course sequence.' });
+      return;
+    }
+
     // Determine lock status for this subtopic
     let isUnlocked = isStaff;
     let userProgress = null;
@@ -380,26 +435,87 @@ export async function getSubtopicDetail(req: AuthenticatedRequest, res: Response
           },
         },
       });
-      if (userProgress?.isUnlocked) {
-        isUnlocked = true;
-      }
     }
 
-    // If it's the very first lesson of the entire course, it's always unlocked
-    if (!isUnlocked) {
-      const { flat } = await getOrderedSubtopicsForCourse(course.id, isStaff);
-      if (flat.length > 0 && flat[0].id === subtopic.id) {
-        isUnlocked = true;
+    // If it's the very first lesson of the entire course or user is staff, it is unlocked
+    if (currentIndex === 0 || isStaff) {
+      isUnlocked = true;
+    } else {
+      // Must be authenticated to access subsequent lessons
+      if (!userId) {
+        res.status(403).json({
+          success: false,
+          message: 'This lesson is currently locked. Sign in to your account to track your progress and unlock lessons sequentially.',
+          isLocked: true,
+        });
+        return;
       }
-    }
 
-    if (!isUnlocked) {
-      res.status(403).json({
-        success: false,
-        message: 'This lesson is currently locked. Complete the previous lesson and quiz (scoring >= 25%) to unlock it.',
-        isLocked: true,
+      // Check all preceding lessons in sequence
+      const precedingSubtopics = flat.slice(0, currentIndex);
+      const precedingIds = precedingSubtopics.map((st) => st.id);
+
+      const precedingProgress = await prisma.userLessonProgress.findMany({
+        where: {
+          userId,
+          subtopicId: { in: precedingIds },
+        },
+        select: {
+          subtopicId: true,
+          isCompleted: true,
+          quizPassed: true,
+          quizScore: true,
+        },
       });
-      return;
+
+      const progMap = new Map(precedingProgress.map((p) => [p.subtopicId, p]));
+
+      // Verify that every single preceding lesson is completed according to its criteria:
+      // If hasQuiz: quizPassed && quizScore >= quizPassingScore (setting mark barrier)
+      // If !hasQuiz: isCompleted === true (marked done)
+      for (const prior of precedingSubtopics) {
+        const p = progMap.get(prior.id);
+        const barrier = prior.quizPassingScore || 70;
+
+        const isDone = prior.hasQuiz
+          ? Boolean(p?.quizPassed && (p?.quizScore ?? 0) >= barrier)
+          : Boolean(p?.isCompleted);
+
+        if (!isDone) {
+          const lockMessage = prior.hasQuiz
+            ? `This lesson is locked. You must complete "${prior.title}" and pass its quiz with score >= ${barrier}% first.`
+            : `This lesson is locked. You must finish reading "${prior.title}" and mark it as done first.`;
+
+          res.status(403).json({
+            success: false,
+            message: lockMessage,
+            isLocked: true,
+          });
+          return;
+        }
+      }
+
+      isUnlocked = true;
+    }
+
+    // Ensure unlock state is recorded for authenticated user
+    if (userId && (!userProgress || !userProgress.isUnlocked)) {
+      userProgress = await prisma.userLessonProgress.upsert({
+        where: {
+          userId_subtopicId: {
+            userId,
+            subtopicId: subtopic.id,
+          },
+        },
+        create: {
+          userId,
+          subtopicId: subtopic.id,
+          isUnlocked: true,
+        },
+        update: {
+          isUnlocked: true,
+        },
+      });
     }
 
     // Sanitize quiz questions so correctAnswers are NEVER leaked to the client!
@@ -416,8 +532,6 @@ export async function getSubtopicDetail(req: AuthenticatedRequest, res: Response
     }
 
     // Find previous and next subtopics in sequence
-    const { flat, topics } = await getOrderedSubtopicsForCourse(course.id, isStaff);
-    const currentIndex = flat.findIndex((item) => item.id === subtopic.id);
     const previousSubtopic = currentIndex > 0 ? flat[currentIndex - 1] : null;
     const nextSubtopic = currentIndex >= 0 && currentIndex + 1 < flat.length ? flat[currentIndex + 1] : null;
 
@@ -461,7 +575,7 @@ export async function getSubtopicDetail(req: AuthenticatedRequest, res: Response
           attachments: subtopic.attachments,
           codingQuestions: subtopic.codingQuestions || [],
           hasQuiz: subtopic.hasQuiz,
-          quizPassingScore: subtopic.quizPassingScore || 25,
+          quizPassingScore: subtopic.quizPassingScore || 70,
           quiz: sanitizedQuiz,
           quizData: isStaff ? subtopic.quizData : undefined,
           isPublished: subtopic.isPublished,
@@ -543,6 +657,44 @@ export async function submitQuiz(req: AuthenticatedRequest, res: Response): Prom
       return;
     }
 
+    // Verify user has unlocked this lesson sequentially
+    const isStaff = req.user?.role === 'ADMIN' || req.user?.role === 'CONTRIBUTOR';
+    if (!isStaff) {
+      const { flat } = await getOrderedSubtopicsForCourse(subtopic.topic.courseId);
+      const currentIndex = flat.findIndex((item) => item.id === subtopic.id);
+      if (currentIndex > 0) {
+        const precedingSubtopics = flat.slice(0, currentIndex);
+        const precedingIds = precedingSubtopics.map((st) => st.id);
+        const precedingProgress = await prisma.userLessonProgress.findMany({
+          where: {
+            userId,
+            subtopicId: { in: precedingIds },
+          },
+          select: {
+            subtopicId: true,
+            isCompleted: true,
+            quizPassed: true,
+            quizScore: true,
+          },
+        });
+        const progMap = new Map(precedingProgress.map((p) => [p.subtopicId, p]));
+        for (const prior of precedingSubtopics) {
+          const p = progMap.get(prior.id);
+          const barrier = prior.quizPassingScore || 70;
+          const isDone = prior.hasQuiz
+            ? Boolean(p?.quizPassed && (p?.quizScore ?? 0) >= barrier)
+            : Boolean(p?.isCompleted);
+          if (!isDone) {
+            res.status(403).json({
+              success: false,
+              message: `Cannot submit quiz. Previous lesson "${prior.title}" is not completed yet.`,
+            });
+            return;
+          }
+        }
+      }
+    }
+
     let correctCount = 0;
     const detailedFeedback: Record<string, { isCorrect: boolean; correctAnswers: number[]; explanation: string }> = {};
 
@@ -580,7 +732,7 @@ export async function submitQuiz(req: AuthenticatedRequest, res: Response): Prom
 
     const totalQuestions = questions.length;
     const scorePercent = Math.round((correctCount / totalQuestions) * 100);
-    const passingThreshold = subtopic.quizPassingScore || 25; // 25% minimum per user requirement
+    const passingThreshold = subtopic.quizPassingScore || 70; // Setting mark barrier configured by author
     const passed = scorePercent >= passingThreshold;
 
     // Find next subtopic in sequence if passed
@@ -765,8 +917,47 @@ export async function markLessonComplete(req: AuthenticatedRequest, res: Respons
       return;
     }
 
+    // Verify user has sequential access
+    const isStaff = req.user?.role === 'ADMIN' || req.user?.role === 'CONTRIBUTOR';
+    if (!isStaff) {
+      const { flat } = await getOrderedSubtopicsForCourse(subtopic.topic.courseId);
+      const currentIndex = flat.findIndex((item) => item.id === subtopic.id);
+      if (currentIndex > 0) {
+        const precedingSubtopics = flat.slice(0, currentIndex);
+        const precedingIds = precedingSubtopics.map((st) => st.id);
+        const precedingProgress = await prisma.userLessonProgress.findMany({
+          where: {
+            userId,
+            subtopicId: { in: precedingIds },
+          },
+          select: {
+            subtopicId: true,
+            isCompleted: true,
+            quizPassed: true,
+            quizScore: true,
+          },
+        });
+        const progMap = new Map(precedingProgress.map((p) => [p.subtopicId, p]));
+        for (const prior of precedingSubtopics) {
+          const p = progMap.get(prior.id);
+          const barrier = prior.quizPassingScore || 70;
+          const isDone = prior.hasQuiz
+            ? Boolean(p?.quizPassed && (p?.quizScore ?? 0) >= barrier)
+            : Boolean(p?.isCompleted);
+          if (!isDone) {
+            res.status(403).json({
+              success: false,
+              message: `Cannot complete lesson. Previous lesson "${prior.title}" is not completed yet.`,
+            });
+            return;
+          }
+        }
+      }
+    }
+
     // If lesson has a mandatory quiz and user hasn't passed it yet, block manual completion
     if (subtopic.hasQuiz) {
+      const passingThreshold = subtopic.quizPassingScore || 70;
       const existing = await prisma.userLessonProgress.findUnique({
         where: {
           userId_subtopicId: {
@@ -776,10 +967,10 @@ export async function markLessonComplete(req: AuthenticatedRequest, res: Respons
         },
       });
 
-      if (!existing || !existing.quizPassed) {
+      if (!existing || !existing.quizPassed || (existing.quizScore ?? 0) < passingThreshold) {
         res.status(400).json({
           success: false,
-          message: 'This section requires passing the interactive quiz (score >= 25%) before it can be completed.',
+          message: `This section requires passing the interactive quiz (score >= ${passingThreshold}%) before it can be marked as complete.`,
         });
         return;
       }
@@ -1204,7 +1395,7 @@ export async function createSubtopic(req: AuthenticatedRequest, res: Response): 
         content: content || '# ' + title + '\n\nAdd lesson markdown content here.',
         attachments: Array.isArray(attachments) ? attachments : [],
         hasQuiz: Boolean(hasQuiz),
-        quizPassingScore: typeof quizPassingScore === 'number' ? quizPassingScore : 25,
+        quizPassingScore: typeof quizPassingScore === 'number' ? quizPassingScore : 70,
         quizData: quizData || [],
         codingQuestions: codingQuestions || [],
         isPublished: isPublished !== undefined ? Boolean(isPublished) : true,

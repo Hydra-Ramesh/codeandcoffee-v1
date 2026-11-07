@@ -101,12 +101,15 @@ interface TopicNav {
   title: string;
   slug: string;
   order: number;
+  isLocked?: boolean;
+  isCompleted?: boolean;
   subtopics: Array<{
     id: string;
     title: string;
     slug: string;
     order: number;
     hasQuiz: boolean;
+    quizPassingScore?: number;
     isUnlocked: boolean;
     isCompleted: boolean;
     quizPassed: boolean;
@@ -473,7 +476,9 @@ export default function SubtopicReaderPage() {
     return <ReadStudioSkeleton />;
   }
 
-  const isCurrentCompleted = userProgress.isCompleted || (lesson.hasQuiz && userProgress.quizPassed);
+  const isCurrentCompleted = lesson.hasQuiz
+    ? Boolean(userProgress.quizPassed && (userProgress.quizScore ?? 0) >= (lesson.quizPassingScore || 70))
+    : Boolean(userProgress.isCompleted);
 
   return (
     <div className="w-full h-screen flex flex-col bg-white dark:bg-slate-950 text-slate-900 dark:text-gray-100 overflow-hidden">
@@ -633,10 +638,23 @@ export default function SubtopicReaderPage() {
                     className="w-full p-3 flex items-center justify-between text-left hover:bg-slate-200/50 dark:hover:bg-white/[0.03] transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                      <span className="w-5 h-5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
-                        {tIdx + 1}
+                      <span
+                        className={`w-5 h-5 rounded text-[10px] font-mono font-bold flex items-center justify-center shrink-0 ${
+                          t.isLocked
+                            ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-gray-500'
+                            : t.isCompleted
+                            ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                        }`}
+                      >
+                        {t.isLocked ? <Lock className="w-3 h-3" /> : tIdx + 1}
                       </span>
                       <span className="text-xs font-bold text-slate-900 dark:text-gray-200 truncate">{t.title}</span>
+                      {t.isLocked && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/5 text-slate-500 dark:text-gray-400 font-semibold shrink-0">
+                          Locked
+                        </span>
+                      )}
                     </div>
                     {isExpanded ? (
                       <ChevronUp className="w-3.5 h-3.5 text-slate-500 dark:text-gray-400 shrink-0" />
@@ -1210,7 +1228,7 @@ export default function SubtopicReaderPage() {
                 {isCurrentCompleted ? (
                   <Link
                     href={`/read/${courseSlug}/${navigation.next.topicSlug}/${navigation.next.slug}`}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-all"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-all cursor-pointer"
                   >
                     <span>Next: {navigation.next.title}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -1220,10 +1238,18 @@ export default function SubtopicReaderPage() {
                     type="button"
                     disabled
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-gray-400 font-semibold text-xs border border-slate-200 dark:border-white/5 cursor-not-allowed opacity-60"
-                    title="Complete current lesson and pass quiz to unlock"
+                    title={
+                      lesson.hasQuiz
+                        ? `Pass quiz with score >= ${lesson.quizPassingScore || 70}% to unlock next lesson`
+                        : 'Click "Mark as Done" above to unlock next lesson'
+                    }
                   >
                     <Lock className="w-3.5 h-3.5" />
-                    <span>Locked (Complete Quiz &ge; 25%)</span>
+                    <span>
+                      {lesson.hasQuiz
+                        ? `Locked (Pass Quiz ≥ ${lesson.quizPassingScore || 70}%)`
+                        : 'Locked (Mark as Done to Unlock)'}
+                    </span>
                   </button>
                 )}
               </div>
@@ -1304,7 +1330,7 @@ export default function SubtopicReaderPage() {
                 Sign In to Submit Quiz &amp; Save Progress
               </h3>
               <p className="text-xs text-slate-600 dark:text-gray-300 leading-relaxed max-w-sm mx-auto">
-                Quiz grading, score threshold validation (&ge; 25%), and sequential module unlocking require an authenticated developer account.
+                Quiz grading, score threshold validation (&ge; {lesson.quizPassingScore || 70}%), and sequential module unlocking require an authenticated developer account.
               </p>
             </div>
 
