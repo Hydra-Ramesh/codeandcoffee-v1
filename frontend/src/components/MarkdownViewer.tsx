@@ -4,6 +4,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
+import MermaidBlock from './MermaidBlock';
 
 interface MarkdownViewerProps {
   content?: string | null;
@@ -116,6 +117,9 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
             return <hr className="my-8 border-slate-200 dark:border-white/10" {...props} />;
           },
           code({ className, children, ...props }) {
+            if (typeof className === 'string' && className.includes('language-mermaid')) {
+              return <MermaidBlock chart={String(children || '').trim()} />;
+            }
             return (
               <code
                 className="px-1.5 py-0.5 rounded-md text-[0.88em] font-mono font-semibold bg-amber-50 dark:bg-slate-800/90 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-white/10"
@@ -126,6 +130,16 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
             );
           },
           pre({ children, ...props }) {
+            const childArray = React.Children.toArray(children);
+            const firstChild = childArray[0];
+            if (
+              React.isValidElement(firstChild) &&
+              typeof (firstChild.props as any)?.className === 'string' &&
+              (firstChild.props as any).className.includes('language-mermaid')
+            ) {
+              const mermaidChart = String((firstChild.props as any).children || '').trim();
+              return <MermaidBlock chart={mermaidChart} />;
+            }
             return (
               <pre
                 className="relative group my-6 overflow-x-auto p-4 sm:p-5 rounded-2xl bg-[#0b0f19] border border-slate-800 text-[#f8fafc] font-mono text-sm leading-relaxed shadow-xl"

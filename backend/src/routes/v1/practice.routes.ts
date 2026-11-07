@@ -47,6 +47,9 @@ router.get('/admin/activity', authenticate, requireAdmin, PracticeController.adm
 // Create new question
 router.post('/admin/question', authenticate, requireContributorOrAdmin, PracticeController.adminCreateQuestion);
 
+// Create multiple questions in batch under same topic/sheet
+router.post('/admin/questions/batch', authenticate, requireContributorOrAdmin, PracticeController.adminCreateBatchQuestions);
+
 // Update existing question
 router.put('/admin/question/:id', authenticate, requireContributorOrAdmin, PracticeController.adminUpdateQuestion);
 

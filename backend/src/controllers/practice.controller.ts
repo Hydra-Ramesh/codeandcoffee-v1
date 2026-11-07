@@ -840,6 +840,128 @@ export class PracticeController {
   }
 
   /**
+   * Admin / Contributor: Create multiple practice questions under the same sheet & topic in a single batch
+   */
+  static async adminCreateBatchQuestions(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Authentication required' });
+        return;
+      }
+
+      const {
+        sheetType,
+        topic,
+        rating,
+        platform: defaultPlatform,
+        questions,
+      } = req.body;
+
+      const validSheets: PracticeSheetType[] = ['CRACK_THE_INTERVIEW', 'SDE_SHEET', 'CP_SHEET', 'KNOWLEDGE_SHEET'];
+      if (!validSheets.includes(sheetType)) {
+        res.status(400).json({ success: false, message: `Invalid sheetType: ${sheetType}` });
+        return;
+      }
+
+      if (!Array.isArray(questions) || questions.length === 0) {
+        res.status(400).json({ success: false, message: 'At least one question is required for batch creation' });
+        return;
+      }
+
+      if (questions.length > 100) {
+        res.status(400).json({ success: false, message: 'Batch size cannot exceed 100 questions per request' });
+        return;
+      }
+
+      // Sheet-specific validations
+      if (sheetType === 'CRACK_THE_INTERVIEW' || sheetType === 'SDE_SHEET') {
+        if (!topic || !topic.trim()) {
+          res.status(400).json({
+            success: false,
+            message: `Topic (e.g. Arrays, Dynamic Programming) is required for ${sheetType === 'CRACK_THE_INTERVIEW' ? 'Crack the Interview' : 'SDE Sheet'}`,
+          });
+          return;
+        }
+      } else if (sheetType === 'CP_SHEET') {
+        if (rating === undefined || rating === null || isNaN(parseInt(rating, 10))) {
+          res.status(400).json({ success: false, message: 'Rating (e.g. 800, 1000, 1200) is required for CP Sheet' });
+          return;
+        }
+      }
+
+      const parsedRating = rating ? parseInt(rating, 10) : null;
+      const cleanTopic = topic ? topic.trim() : (sheetType === 'KNOWLEDGE_SHEET' ? 'General Practice' : null);
+
+      // Validate all items in the array
+      const questionsToCreate: any[] = [];
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        if (!q.title || typeof q.title !== 'string' || !q.title.trim()) {
+          res.status(400).json({ success: false, message: `Question #${i + 1} is missing a title` });
+          return;
+        }
+
+        const diff = (q.difficulty && ['EASY', 'MEDIUM', 'HARD'].includes(q.difficulty))
+          ? (q.difficulty as ProblemDifficulty)
+          : 'MEDIUM';
+
+        const qPlatform = q.platform?.trim() || defaultPlatform?.trim() || (sheetType === 'CP_SHEET' ? 'Codeforces' : 'LeetCode');
+        const qRating = q.rating ? parseInt(q.rating, 10) : parsedRating;
+        const qOrder = q.order !== undefined && q.order !== null && !isNaN(parseInt(q.order, 10))
+          ? parseInt(q.order, 10)
+          : i;
+
+        questionsToCreate.push({
+          sheetType: sheetType as PracticeSheetType,
+          topic: cleanTopic,
+          rating: qRating,
+          platform: qPlatform,
+          title: q.title.trim(),
+          difficulty: diff,
+          content: q.content ? q.content.trim() : null,
+          externalUrl: q.externalUrl ? q.externalUrl.trim() : null,
+          videoUrl: q.videoUrl ? q.videoUrl.trim() : null,
+          solutionNotes: q.solutionNotes ? q.solutionNotes.trim() : null,
+          order: qOrder,
+          isPublished: q.isPublished !== undefined ? Boolean(q.isPublished) : true,
+          authorId: req.user.id,
+        });
+      }
+
+      // Insert all in a transaction
+      const createdQuestions = await prisma.$transaction(
+        questionsToCreate.map((data) =>
+          prisma.practiceQuestion.create({
+            data,
+            include: {
+              author: {
+                select: { id: true, name: true, role: true },
+              },
+            },
+          })
+        )
+      );
+
+      // Invalidate Redis and L1 caches
+      await CacheService.invalidatePracticeCaches(sheetType);
+
+      // Broadcast real-time updates for each question
+      createdQuestions.forEach((q) => {
+        broadcastAdminPracticeUpdated('created', q);
+      });
+
+      res.status(201).json({
+        success: true,
+        message: `Successfully created ${createdQuestions.length} practice questions`,
+        data: createdQuestions,
+      });
+    } catch (error: any) {
+      console.error('Error creating batch practice questions:', error);
+      res.status(500).json({ success: false, message: 'Failed to create batch questions' });
+    }
+  }
+
+  /**
    * Admin / Contributor: Update an existing practice question
    */
   static async adminUpdateQuestion(req: AuthenticatedRequest, res: Response): Promise<void> {

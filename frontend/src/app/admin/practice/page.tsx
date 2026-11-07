@@ -32,6 +32,9 @@ import {
   Flame,
   ArrowUpRight,
   TrendingUp,
+  ListPlus,
+  ClipboardPaste,
+  CopyPlus,
 } from 'lucide-react';
 
 type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET' | 'KNOWLEDGE_SHEET';
@@ -191,6 +194,31 @@ export default function AdminPracticePage() {
   const [formOrder, setFormOrder] = useState('0');
   const [formIsPublished, setFormIsPublished] = useState(true);
 
+  // Batch Add Questions State
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [batchSheetType, setBatchSheetType] = useState<SheetType>('CRACK_THE_INTERVIEW');
+  const [batchTopic, setBatchTopic] = useState('Arrays');
+  const [batchRating, setBatchRating] = useState('800');
+  const [batchDefaultPlatform, setBatchDefaultPlatform] = useState('LeetCode');
+  const [batchQuestions, setBatchQuestions] = useState<
+    Array<{
+      id: string;
+      title: string;
+      difficulty: Difficulty;
+      platform: string;
+      externalUrl: string;
+      rating: string;
+    }>
+  >([
+    { id: '1', title: '', difficulty: 'EASY', platform: 'LeetCode', externalUrl: '', rating: '800' },
+    { id: '2', title: '', difficulty: 'MEDIUM', platform: 'LeetCode', externalUrl: '', rating: '800' },
+    { id: '3', title: '', difficulty: 'MEDIUM', platform: 'LeetCode', externalUrl: '', rating: '800' },
+  ]);
+  const [batchBulkText, setBatchBulkText] = useState('');
+  const [showBulkPasteArea, setShowBulkPasteArea] = useState(false);
+  const [batchSaving, setBatchSaving] = useState(false);
+  const [batchErrorMessage, setBatchErrorMessage] = useState('');
+
   useEffect(() => {
     loadAllQuestions();
     if (isAdmin) {
@@ -275,7 +303,7 @@ export default function AdminPracticePage() {
     setIsModalOpen(true);
   };
 
-  const handleSaveQuestion = async (e: React.FormEvent) => {
+  const handleSaveQuestion = async (e: React.FormEvent, addAnother = false) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -367,12 +395,24 @@ export default function AdminPracticePage() {
       });
 
       if (res.success) {
-        toast.success('New question added successfully!');
-        setSuccessMessage('New question added successfully!');
-        setIsModalOpen(false);
-        loadAllQuestions();
-        loadActivityData();
-        setTimeout(() => setSuccessMessage(''), 3000);
+        if (addAnother) {
+          toast.success(`Question "${payload.title}" added! Topic "${payload.topic || payload.rating}" retained for next question.`);
+          setFormTitle('');
+          setFormExternalUrl('');
+          setFormContent(
+            `# Problem Title\n\n## Problem Statement\nDescribe the problem here...\n\n### Example 1:\n\`\`\`\nInput: \nOutput: \n\`\`\`\n\n### Constraints:\n- \n\n### Optimal Approach:\n1. Step 1\n- **Time Complexity:** O(N)\n- **Space Complexity:** O(1)`
+          );
+          setFormOrder((prev) => (parseInt(prev, 10) + 1).toString());
+          loadAllQuestions();
+          loadActivityData();
+        } else {
+          toast.success('New question added successfully!');
+          setSuccessMessage('New question added successfully!');
+          setIsModalOpen(false);
+          loadAllQuestions();
+          loadActivityData();
+          setTimeout(() => setSuccessMessage(''), 3000);
+        }
       } else {
         setErrorMessage(res.message || 'Operation failed');
         toast.error(res.message || 'Failed to create question.');
@@ -383,6 +423,221 @@ export default function AdminPracticePage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleOpenBatchModal = () => {
+    setBatchSheetType(filterSheet !== 'ALL' ? (filterSheet as SheetType) : 'CRACK_THE_INTERVIEW');
+    setBatchTopic('Arrays');
+    setBatchRating('800');
+    setBatchDefaultPlatform('LeetCode');
+    setBatchBulkText('');
+    setShowBulkPasteArea(false);
+    setBatchErrorMessage('');
+    setBatchQuestions([
+      { id: '1', title: '', difficulty: 'EASY', platform: 'LeetCode', externalUrl: '', rating: '800' },
+      { id: '2', title: '', difficulty: 'MEDIUM', platform: 'LeetCode', externalUrl: '', rating: '800' },
+      { id: '3', title: '', difficulty: 'MEDIUM', platform: 'LeetCode', externalUrl: '', rating: '800' },
+    ]);
+    setIsBatchModalOpen(true);
+  };
+
+  const handleAddBatchRow = () => {
+    setBatchQuestions((prev) => [
+      ...prev,
+      {
+        id: Math.random().toString(36).substring(2, 9),
+        title: '',
+        difficulty: 'MEDIUM',
+        platform: batchDefaultPlatform,
+        externalUrl: '',
+        rating: batchRating,
+      },
+    ]);
+  };
+
+  const handleRemoveBatchRow = (index: number) => {
+    setBatchQuestions((prev) => {
+      if (prev.length <= 1) {
+        toast.warning('At least one question row must remain.');
+        return prev;
+      }
+      return prev.filter((_, idx) => idx !== index);
+    });
+  };
+
+  const handleBatchRowChange = (index: number, field: string, value: any) => {
+    setBatchQuestions((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const handleParseBulkPaste = () => {
+    if (!batchBulkText.trim()) {
+      toast.warning('Please paste some text with question titles or links first.');
+      return;
+    }
+
+    const lines = batchBulkText.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+
+    const parsedRows = lines.map((line, idx) => {
+      // Format 1: Title | Difficulty | URL
+      if (line.includes('|')) {
+        const parts = line.split('|').map((p) => p.trim());
+        const title = parts[0] || `Problem ${idx + 1}`;
+        let difficulty: Difficulty = 'MEDIUM';
+        if (parts[1]) {
+          const dUpper = parts[1].toUpperCase();
+          if (dUpper === 'EASY' || dUpper === 'MEDIUM' || dUpper === 'HARD') {
+            difficulty = dUpper as Difficulty;
+          }
+        }
+        const externalUrl = parts[2] || '';
+        return {
+          id: Math.random().toString(36).substring(2, 9),
+          title,
+          difficulty,
+          platform: batchDefaultPlatform,
+          externalUrl,
+          rating: batchRating,
+        };
+      }
+
+      // Format 2: Direct LeetCode or external link
+      if (line.startsWith('http://') || line.startsWith('https://')) {
+        let extractedTitle = 'Practice Problem';
+        try {
+          const urlObj = new URL(line);
+          const segments = urlObj.pathname.split('/').filter(Boolean);
+          const problemIndex = segments.indexOf('problems');
+          if (problemIndex !== -1 && segments[problemIndex + 1]) {
+            extractedTitle = segments[problemIndex + 1]
+              .replace(/[-_]/g, ' ')
+              .replace(/\b\w/g, (c) => c.toUpperCase());
+          } else {
+            extractedTitle = (segments[segments.length - 1] || 'Practice Problem')
+              .replace(/[-_]/g, ' ')
+              .replace(/\b\w/g, (c) => c.toUpperCase());
+          }
+        } catch {
+          // fallback
+        }
+        return {
+          id: Math.random().toString(36).substring(2, 9),
+          title: extractedTitle,
+          difficulty: 'MEDIUM' as Difficulty,
+          platform: batchDefaultPlatform,
+          externalUrl: line,
+          rating: batchRating,
+        };
+      }
+
+      // Format 3: Plain title string
+      return {
+        id: Math.random().toString(36).substring(2, 9),
+        title: line,
+        difficulty: 'MEDIUM' as Difficulty,
+        platform: batchDefaultPlatform,
+        externalUrl: '',
+        rating: batchRating,
+      };
+    });
+
+    setBatchQuestions(parsedRows);
+    setShowBulkPasteArea(false);
+    toast.success(`Successfully parsed ${parsedRows.length} question rows into the table!`);
+  };
+
+  const handleSaveBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBatchErrorMessage('');
+
+    if (batchSheetType === 'CRACK_THE_INTERVIEW' || batchSheetType === 'SDE_SHEET') {
+      if (!batchTopic.trim()) {
+        setBatchErrorMessage('Topic Name is required for this sheet.');
+        toast.warning('Topic Name is required.');
+        return;
+      }
+    } else if (batchSheetType === 'CP_SHEET') {
+      if (!batchRating || isNaN(parseInt(batchRating, 10))) {
+        setBatchErrorMessage('Numerical Problem Rating is required for CP Sheet.');
+        toast.warning('Numerical Problem Rating is required.');
+        return;
+      }
+    }
+
+    const filledQuestions = batchQuestions.filter((q) => q.title.trim());
+    if (filledQuestions.length === 0) {
+      setBatchErrorMessage('Please provide a title for at least one question.');
+      toast.warning('Please provide at least one question title.');
+      return;
+    }
+
+    // Confirmation modal with summary
+    setWarningModal({
+      isOpen: true,
+      title: `Batch Add ${filledQuestions.length} Questions`,
+      description: `You are about to add ${filledQuestions.length} practice questions under "${
+        batchSheetType === 'CP_SHEET' ? `Rating ${batchRating}` : batchTopic
+      }" in ${batchSheetType.replace(/_/g, ' ')}. They will immediately become live for students.`,
+      actionVerb: `Create All ${filledQuestions.length} Questions`,
+      variant: 'warning',
+      badgeText: 'Bulk Curriculum Creation',
+      details: [
+        { label: 'Target Sheet', value: batchSheetType.replace(/_/g, ' ') },
+        { label: batchSheetType === 'CP_SHEET' ? 'Rating' : 'Common Topic', value: batchSheetType === 'CP_SHEET' ? batchRating : batchTopic },
+        { label: 'Total Questions', value: `${filledQuestions.length} questions` },
+        { label: 'First Problem', value: filledQuestions[0]?.title || '—' },
+        ...(filledQuestions.length > 1 ? [{ label: 'Last Problem', value: filledQuestions[filledQuestions.length - 1]?.title || '—' }] : []),
+      ],
+      onConfirm: async () => {
+        setWarningModalLoading(true);
+        setBatchSaving(true);
+        try {
+          const payload = {
+            sheetType: batchSheetType,
+            topic: batchSheetType === 'CP_SHEET' ? null : (batchTopic.trim() || 'General Practice'),
+            rating: batchSheetType === 'CP_SHEET' ? parseInt(batchRating, 10) : null,
+            platform: batchDefaultPlatform,
+            questions: filledQuestions.map((q, idx) => ({
+              title: q.title.trim(),
+              difficulty: q.difficulty,
+              platform: q.platform || batchDefaultPlatform,
+              externalUrl: q.externalUrl?.trim() || null,
+              rating: q.rating ? parseInt(q.rating, 10) : (batchRating ? parseInt(batchRating, 10) : null),
+              order: idx,
+              isPublished: true,
+            })),
+          };
+
+          const res = await fetchApi('/practice/admin/questions/batch', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+
+          if (res.success) {
+            toast.success(`Successfully added ${filledQuestions.length} questions to ${batchTopic || batchRating}!`);
+            setSuccessMessage(`Successfully added ${filledQuestions.length} questions to ${batchTopic || batchRating}!`);
+            setIsBatchModalOpen(false);
+            loadAllQuestions();
+            loadActivityData();
+            setTimeout(() => setSuccessMessage(''), 3000);
+            setWarningModal((m) => ({ ...m, isOpen: false }));
+          } else {
+            setBatchErrorMessage(res.message || 'Batch creation failed');
+            toast.error(res.message || 'Batch creation failed');
+          }
+        } catch (err: any) {
+          setBatchErrorMessage(err.message || 'An unexpected error occurred');
+          toast.error(err.message || 'An unexpected error occurred');
+        } finally {
+          setWarningModalLoading(false);
+          setBatchSaving(false);
+        }
+      },
+    });
   };
 
   const handleRequestDelete = (q: PracticeQuestion) => {
@@ -479,13 +734,23 @@ export default function AdminPracticePage() {
 
         <div className="flex items-center gap-2">
           {activeTab === 'CURRICULUM' && (
-            <button
-              onClick={handleOpenAddModal}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all scale-100 hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add New Question</span>
-            </button>
+            <>
+              <button
+                onClick={handleOpenBatchModal}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl glass-card border border-amber-500/40 hover:bg-amber-500/10 text-amber-300 hover:text-white font-bold text-xs transition-all scale-100 hover:scale-105 active:scale-95 cursor-pointer shadow-md shadow-amber-500/10"
+              >
+                <ListPlus className="w-4 h-4 text-amber-400" />
+                <span>Batch Add Questions</span>
+              </button>
+
+              <button
+                onClick={handleOpenAddModal}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all scale-100 hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Single Question</span>
+              </button>
+            </>
           )}
           {activeTab === 'ACTIVITY' && isAdmin && (
             <button
@@ -1406,6 +1671,18 @@ export default function AdminPracticePage() {
                   Cancel
                 </button>
 
+                {!editingQuestion && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={(e) => handleSaveQuestion(e, true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Save &amp; Add Next</span>
+                  </button>
+                )}
+
                 <button
                   type="submit"
                   disabled={saving}
@@ -1414,6 +1691,395 @@ export default function AdminPracticePage() {
                   <Save className="w-4 h-4" />
                   <span>{saving ? 'Saving...' : editingQuestion ? 'Update Question' : 'Save Question'}</span>
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* BATCH / MULTI-QUESTION ADD MODAL                              */}
+      {/* ============================================================ */}
+      {isBatchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
+          <div className="relative w-full max-w-4xl my-8 glass-card rounded-3xl border border-white/20 flex flex-col shadow-2xl bg-slate-950/95 max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <ListPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <span>Batch Add Practice Questions</span>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {batchQuestions.filter((q) => q.title.trim()).length} Ready
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-gray-400">
+                    Add multiple questions at once under the same Topic or Rating without repeating form inputs.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsBatchModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSaveBatch} className="p-6 space-y-5 overflow-y-auto flex-1">
+              {batchErrorMessage && (
+                <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{batchErrorMessage}</span>
+                </div>
+              )}
+
+              {/* Target Sheet Type */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                  1. Target Sheet Type
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBatchSheetType('CRACK_THE_INTERVIEW');
+                      setBatchDefaultPlatform('LeetCode');
+                    }}
+                    className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
+                      batchSheetType === 'CRACK_THE_INTERVIEW'
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
+                        : 'glass-card text-gray-300 border-white/10 hover:bg-white/5'
+                    }`}
+                  >
+                    1. Crack Interview
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBatchSheetType('SDE_SHEET');
+                      setBatchDefaultPlatform('LeetCode');
+                    }}
+                    className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
+                      batchSheetType === 'SDE_SHEET'
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
+                        : 'glass-card text-gray-300 border-white/10 hover:bg-white/5'
+                    }`}
+                  >
+                    2. SDE Sheet
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBatchSheetType('CP_SHEET');
+                      setBatchDefaultPlatform('Codeforces');
+                    }}
+                    className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
+                      batchSheetType === 'CP_SHEET'
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
+                        : 'glass-card text-gray-300 border-white/10 hover:bg-white/5'
+                    }`}
+                  >
+                    3. CP Sheet
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBatchSheetType('KNOWLEDGE_SHEET');
+                      setBatchDefaultPlatform('LeetCode');
+                    }}
+                    className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
+                      batchSheetType === 'KNOWLEDGE_SHEET'
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
+                        : 'glass-card text-gray-300 border-white/10 hover:bg-white/5'
+                    }`}
+                  >
+                    4. Knowledge Sheet
+                  </button>
+                </div>
+              </div>
+
+              {/* Shared Topic & Default Platform */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/10">
+                {batchSheetType === 'CP_SHEET' ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                      Problem Rating (Shared) *
+                    </label>
+                    <input
+                      type="number"
+                      value={batchRating}
+                      onChange={(e) => setBatchRating(e.target.value)}
+                      placeholder="e.g. 800, 1000, 1200"
+                      className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400 font-mono"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                      Topic Name (Shared for all questions) *
+                    </label>
+                    <input
+                      type="text"
+                      value={batchTopic}
+                      onChange={(e) => setBatchTopic(e.target.value)}
+                      placeholder="e.g. Arrays, Dynamic Programming, Graphs"
+                      className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400 font-medium"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">Default Platform</label>
+                  <select
+                    value={batchDefaultPlatform}
+                    onChange={(e) => {
+                      const newPlat = e.target.value;
+                      setBatchDefaultPlatform(newPlat);
+                      setBatchQuestions((prev) =>
+                        prev.map((q) => ({
+                          ...q,
+                          platform: newPlat,
+                        }))
+                      );
+                    }}
+                    className="w-full px-3 py-2 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
+                  >
+                    <option value="LeetCode">LeetCode</option>
+                    <option value="Codeforces">Codeforces</option>
+                    <option value="CodeChef">CodeChef</option>
+                    <option value="AtCoder">AtCoder</option>
+                    <option value="InterviewBit">InterviewBit</option>
+                    <option value="Hello Interview">Hello Interview</option>
+                    <option value="Self-Created (Code & Coffee)">Self-Created (Code & Coffee)</option>
+                    <option value="Internal">Internal (Readme)</option>
+                    <option value="GeeksforGeeks">GeeksforGeeks</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkPasteArea(!showBulkPasteArea)}
+                    className="w-full px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ClipboardPaste className="w-3.5 h-3.5" />
+                    <span>{showBulkPasteArea ? 'Hide Bulk Paste' : '⚡ Quick Bulk Paste'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible Bulk Paste Section */}
+              {showBulkPasteArea && (
+                <div className="p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/30 space-y-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Paste Multiple Questions (e.g. 22 problems)</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-400">
+                        Paste titles or URLs, one per line. Formats supported: <code>Title | Difficulty | URL</code> or pure URLs/titles.
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-amber-400 font-mono">Auto-Parser</span>
+                  </div>
+
+                  <textarea
+                    value={batchBulkText}
+                    onChange={(e) => setBatchBulkText(e.target.value)}
+                    rows={6}
+                    placeholder={`Two Sum | Easy | https://leetcode.com/problems/two-sum/\n3Sum | Medium | https://leetcode.com/problems/3sum/\nTrapping Rain Water | Hard | https://leetcode.com/problems/trapping-rain-water/`}
+                    className="w-full p-3 rounded-xl text-xs glass-card border border-white/15 text-white bg-slate-900 font-mono focus:outline-none focus:border-amber-400 resize-none"
+                  />
+
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setBatchBulkText('')}
+                      className="text-[11px] text-gray-400 hover:text-white"
+                    >
+                      Clear text
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleParseBulkPaste}
+                      className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Parse &amp; Populate Table</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Dynamic Questions Table */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Questions List ({batchQuestions.length} Rows)
+                    </h4>
+                    <span className="text-[10px] text-gray-400">
+                      Topic: <strong className="text-amber-400">{batchSheetType === 'CP_SHEET' ? `Rating ${batchRating}` : batchTopic}</strong>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBatchQuestions([
+                          { id: '1', title: '', difficulty: 'EASY', platform: batchDefaultPlatform, externalUrl: '', rating: batchRating },
+                        ]);
+                      }}
+                      className="text-[11px] text-gray-400 hover:text-rose-400 transition-colors cursor-pointer"
+                    >
+                      Reset Rows
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAddBatchRow}
+                      className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-amber-400" />
+                      <span>+ Add Row</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Question Rows Container */}
+                <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                  {batchQuestions.map((q, idx) => (
+                    <div
+                      key={q.id}
+                      className="p-3 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 text-xs"
+                    >
+                      <span className="w-6 font-mono font-bold text-gray-400 text-center shrink-0">
+                        #{idx + 1}
+                      </span>
+
+                      {/* Title */}
+                      <div className="flex-1 min-w-[200px]">
+                        <input
+                          type="text"
+                          value={q.title}
+                          onChange={(e) => handleBatchRowChange(idx, 'title', e.target.value)}
+                          placeholder={`Problem title (e.g. Problem #${idx + 1})`}
+                          required
+                          className="w-full px-3 py-1.5 rounded-xl glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400 font-medium"
+                        />
+                      </div>
+
+                      {/* Difficulty */}
+                      <div className="w-28 shrink-0">
+                        <select
+                          value={q.difficulty}
+                          onChange={(e) => handleBatchRowChange(idx, 'difficulty', e.target.value as Difficulty)}
+                          className="w-full px-2.5 py-1.5 rounded-xl glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400 font-semibold"
+                        >
+                          <option value="EASY">Easy</option>
+                          <option value="MEDIUM">Medium</option>
+                          <option value="HARD">Hard</option>
+                        </select>
+                      </div>
+
+                      {/* Platform */}
+                      <div className="w-32 shrink-0">
+                        <select
+                          value={q.platform}
+                          onChange={(e) => handleBatchRowChange(idx, 'platform', e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-xl glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400"
+                        >
+                          <option value="LeetCode">LeetCode</option>
+                          <option value="Codeforces">Codeforces</option>
+                          <option value="CodeChef">CodeChef</option>
+                          <option value="InterviewBit">InterviewBit</option>
+                          <option value="Self-Created (Code & Coffee)">Self-Created</option>
+                          <option value="Internal">Internal</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      {/* URL */}
+                      <div className="flex-1 min-w-[180px]">
+                        <input
+                          type="url"
+                          value={q.externalUrl}
+                          onChange={(e) => handleBatchRowChange(idx, 'externalUrl', e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddBatchRow();
+                            }
+                          }}
+                          placeholder="Problem link / URL (Press Enter for next row)"
+                          className="w-full px-3 py-1.5 rounded-xl glass-card border border-white/15 text-white bg-slate-900 focus:outline-none focus:border-amber-400 font-mono text-[11px]"
+                        />
+                      </div>
+
+                      {/* Delete Row Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveBatchRow(idx)}
+                        disabled={batchQuestions.length <= 1}
+                        className="p-1.5 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-30 cursor-pointer shrink-0 self-end sm:self-auto"
+                        title="Remove question row"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddBatchRow}
+                  className="w-full py-2.5 rounded-xl border border-dashed border-white/20 hover:border-amber-400/50 hover:bg-amber-500/5 text-gray-400 hover:text-amber-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Another Question Row (or press Enter in URL field)</span>
+                </button>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between shrink-0">
+                <span className="text-xs text-gray-400">
+                  Total problems ready to add: <strong className="text-white">{batchQuestions.filter((q) => q.title.trim()).length}</strong>
+                </span>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsBatchModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={batchSaving || batchQuestions.filter((q) => q.title.trim()).length === 0}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>
+                      {batchSaving
+                        ? 'Creating Batch...'
+                        : `Save All ${batchQuestions.filter((q) => q.title.trim()).length} Questions`}
+                    </span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

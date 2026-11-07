@@ -21,9 +21,12 @@ import {
   ChevronDown,
   ChevronUp,
   Image as ImageIcon,
+  Share2,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
+import { useToast } from '../../../context/ToastContext';
+import { shareLink } from '../../../lib/share';
 import { optimizeImageUrl } from '../../../lib/image';
 import CourseOverviewSkeleton from '../../../components/skeletons/CourseOverviewSkeleton';
 
@@ -108,6 +111,49 @@ export default function CourseOverviewPage() {
       [topicId]: !prev[topicId],
     }));
   };
+
+  const { toast } = useToast();
+
+  const handleShareCourse = () => {
+    if (!course) return;
+    shareLink({
+      title: `${course.title} | Code & Coffee Curriculum`,
+      text: `Master ${course.title} on Code & Coffee!`,
+      url: `/read/${course.slug}`,
+      onSuccess: (msg) => toast.success(msg),
+    });
+  };
+
+  const handleShareTopic = (topic: TopicSummary) => {
+    if (!course) return;
+    shareLink({
+      title: `${topic.title} - ${course.title} | Code & Coffee`,
+      text: `Study ${topic.title} in ${course.title} on Code & Coffee!`,
+      url: `/read/${course.slug}?topic=${topic.slug}`,
+      onSuccess: (msg) => toast.success(msg),
+    });
+  };
+
+  // Deep link auto-scroll & highlight when sharing a topic
+  useEffect(() => {
+    if (typeof window === 'undefined' || !course) return;
+    const params = new URLSearchParams(window.location.search);
+    const targetTopicSlug = params.get('topic');
+    if (targetTopicSlug) {
+      const foundTopic = course.topics.find((t) => t.slug === targetTopicSlug || t.id === targetTopicSlug);
+      if (foundTopic) {
+        setExpandedTopics((prev) => ({ ...prev, [foundTopic.id]: true }));
+        setTimeout(() => {
+          const el = document.getElementById(`topic-section-${foundTopic.slug}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            el.classList.add('ring-2', 'ring-amber-500/50');
+            setTimeout(() => el.classList.remove('ring-2', 'ring-amber-500/50'), 3500);
+          }
+        }, 300);
+      }
+    }
+  }, [course]);
 
   if (loading) {
     return <CourseOverviewSkeleton />;
@@ -234,8 +280,8 @@ export default function CourseOverviewPage() {
               </div>
             </div>
 
-            {/* CTA & Resume */}
-            <div className="pt-4 flex flex-wrap items-center gap-4">
+            {/* CTA & Resume & Share */}
+            <div className="pt-4 flex flex-wrap items-center gap-3">
               <Link
                 href={startOrResumeUrl}
                 className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-500/25 hover:scale-102 transition-all cursor-pointer"
@@ -246,6 +292,15 @@ export default function CourseOverviewPage() {
                 </span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
+
+              <button
+                type="button"
+                onClick={handleShareCourse}
+                className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl glass-card border border-slate-300 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-gray-200 font-bold text-sm transition-all cursor-pointer shadow-sm hover:scale-102"
+              >
+                <Share2 className="w-4 h-4 text-amber-500" />
+                <span>Share Course</span>
+              </button>
             </div>
           </div>
 
@@ -327,6 +382,7 @@ export default function CourseOverviewPage() {
             return (
               <div
                 key={topic.id}
+                id={`topic-section-${topic.slug}`}
                 className="bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden transition-all shadow-sm dark:shadow-lg"
               >
                 {/* Topic Header Accordion Bar */}
@@ -352,6 +408,17 @@ export default function CourseOverviewPage() {
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShareTopic(topic);
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-gray-400 hover:text-amber-500 transition-colors"
+                      title={`Share entire topic "${topic.title}"`}
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                    </button>
                     <span className="text-xs font-mono text-slate-600 dark:text-gray-400 bg-slate-100 dark:bg-white/5 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-white/10">
                       {completedInTopic}/{topic.subtopics.length} Done
                     </span>

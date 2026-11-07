@@ -40,6 +40,7 @@ import dynamic from 'next/dynamic';
 import { fetchApi } from '../../../../../lib/api';
 import { useAuth } from '../../../../../context/AuthContext';
 import { useToast } from '../../../../../context/ToastContext';
+import { shareLink } from '../../../../../lib/share';
 import { getSocket, joinLessonRoom, leaveLessonRoom } from '../../../../../lib/socket';
 import ReadStudioSkeleton from '../../../../../components/skeletons/ReadStudioSkeleton';
 import ThemeToggle from '../../../../../components/ThemeToggle';
@@ -199,6 +200,16 @@ export default function SubtopicReaderPage() {
         setIsFullscreen(false);
       }
     }
+  };
+
+  const handleShareLesson = () => {
+    if (!lesson) return;
+    shareLink({
+      title: `${lesson.title} - ${syllabus?.title || 'Course'} | Code & Coffee`,
+      text: `Learn "${lesson.title}" on Code & Coffee!`,
+      url: `/read/${courseSlug}/${topicSlug}/${subtopicSlug}`,
+      onSuccess: (msg) => toastSuccess(msg),
+    });
   };
 
   useEffect(() => {
@@ -537,6 +548,16 @@ export default function SubtopicReaderPage() {
 
           {/* Theme Toggle Button in Header */}
           <ThemeToggle />
+
+          {/* Share Lesson Button */}
+          <button
+            type="button"
+            onClick={handleShareLesson}
+            className="p-2 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-gray-300 hover:text-amber-500 border border-slate-200 dark:border-white/10 transition-colors cursor-pointer"
+            title="Share Lesson"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
 
           {/* Fullscreen Toggle Button */}
           <button

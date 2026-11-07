@@ -4,8 +4,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { fetchApi } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
+import { shareLink } from '../../lib/share';
 import MarkdownViewer from '../../components/MarkdownViewer';
 import PracticeQuestionsSkeleton from '../../components/skeletons/PracticeQuestionsSkeleton';
 import PracticeLeaderboardSkeleton from '../../components/skeletons/PracticeLeaderboardSkeleton';
@@ -45,6 +47,7 @@ import {
   AlertTriangle,
   Lock,
   Unlock,
+  Share2,
 } from 'lucide-react';
 
 type SheetType = 'CRACK_THE_INTERVIEW' | 'SDE_SHEET' | 'CP_SHEET' | 'KNOWLEDGE_SHEET' | 'LEADERBOARD';
@@ -99,6 +102,7 @@ interface PracticeQuestion {
 export default function PracticePage() {
   const router = useRouter();
   const { user, isLoading, refreshUser } = useAuth();
+  const { toast } = useToast();
   const [activeSheet, setActiveSheet] = useState<SheetType>('CRACK_THE_INTERVIEW');
   const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -320,6 +324,83 @@ export default function PracticePage() {
       socket.off('practice:catalog_updated', handleCatalogUpdated);
     };
   }, [activeSheet]);
+
+  // Share Question handler
+  const handleShareQuestion = (q: PracticeQuestion) => {
+    const sheet = q.sheetType || activeSheet;
+    const path = `/practice?sheet=${sheet}&q=${q.id}`;
+    shareLink({
+      title: `${q.title} - Code & Coffee Practice Arena`,
+      text: `Solve "${q.title}" (${q.difficulty}) on Code & Coffee Practice Arena!`,
+      url: path,
+      onSuccess: (msg) => toast.success(msg),
+    });
+  };
+
+  // Share Entire Topic handler
+  const handleShareTopic = (topicName: string) => {
+    const path = `/practice?sheet=${activeSheet}&topic=${encodeURIComponent(topicName)}`;
+    shareLink({
+      title: `${topicName} - Code & Coffee Practice Sheet`,
+      text: `Practice all ${topicName} algorithmic problems on Code & Coffee!`,
+      url: path,
+      onSuccess: (msg) => toast.success(msg),
+    });
+  };
+
+  // Deep-link auto-scroll and highlight for shared question or topic
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const targetSheet = params.get('sheet') as SheetType | null;
+    const targetQId = params.get('q');
+    const targetTopic = params.get('topic');
+
+    if (
+      targetSheet &&
+      ['CRACK_THE_INTERVIEW', 'SDE_SHEET', 'CP_SHEET', 'KNOWLEDGE_SHEET'].includes(targetSheet) &&
+      activeSheet !== targetSheet
+    ) {
+      setActiveSheet(targetSheet);
+      return;
+    }
+
+    if (targetTopic) {
+      const decodedTopic = decodeURIComponent(targetTopic);
+      setExpandedSections((prev) => ({ ...prev, [decodedTopic]: true }));
+      setTimeout(() => {
+        const el = document.getElementById(`topic-section-${encodeURIComponent(decodedTopic)}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 500);
+    }
+
+    if (targetQId && questions.length > 0) {
+      const targetQuestion = questions.find((q) => q.id === targetQId);
+      if (targetQuestion) {
+        const groupKey =
+          targetQuestion.sheetType === 'CP_SHEET'
+            ? (targetQuestion.rating ? `Rating ${targetQuestion.rating}` : 'Other Rating')
+            : (targetQuestion.topic || 'General Practice');
+        setExpandedSections((prev) => ({ ...prev, [groupKey]: true }));
+
+        setTimeout(() => {
+          const el = document.getElementById(`question-card-${targetQId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-amber-400', 'bg-amber-500/10');
+            setTimeout(() => {
+              el.classList.remove('ring-2', 'ring-amber-400', 'bg-amber-500/10');
+            }, 3500);
+          }
+          if (targetQuestion.content) {
+            setActiveReadmeQuestion(targetQuestion);
+          }
+        }, 500);
+      }
+    }
+  }, [questions, activeSheet]);
 
   // Check profile prerequisites for SDE Sheet (LeetCode) or CP Sheet (Codeforces + CodeChef)
   const executeWithProfileCheck = (
@@ -1993,6 +2074,7 @@ export default function PracticePage() {
             return (
               <div
                 key={groupTitle}
+                id={`topic-section-${encodeURIComponent(groupTitle)}`}
                 className="glass-card rounded-2xl border border-white/10 overflow-hidden transition-all duration-200"
               >
                 {/* Group Accordion Header */}
@@ -2022,6 +2104,17 @@ export default function PracticePage() {
                     <span className="text-xs font-mono text-gray-400">
                       {groupCompleted}/{items.length} Solved
                     </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShareTopic(groupTitle);
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-amber-400 transition-colors"
+                      title={`Share entire topic "${groupTitle}"`}
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                    </button>
                     {isExpanded ? (
                       <ChevronUp className="w-4 h-4 text-gray-400" />
                     ) : (
@@ -2203,6 +2296,16 @@ export default function PracticePage() {
                             >
                               <FileCode className="w-3.5 h-3.5" />
                               <span className="hidden md:inline">Editorial</span>
+                            </button>
+
+                            {/* Share Question Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleShareQuestion(item)}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                              title={`Share "${item.title}" question`}
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
